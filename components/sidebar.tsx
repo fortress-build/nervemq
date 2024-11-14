@@ -11,10 +11,12 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarTrigger,
-  useSidebar,
 } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
 import { Axis3D, Braces, Logs } from "lucide-react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import ThemeSelector from "./theme";
 
 const routes = [
   {
@@ -31,19 +33,14 @@ const routes = [
 ];
 
 export default function DashboardSidebar() {
-  const { open } = useSidebar();
+  const pathName = usePathname();
 
   return (
     <Sidebar collapsible="icon">
-      <SidebarHeader>
-        <h1
-          className={cn(
-            "flex gap-1 font-semibold justify-start",
-            open ? "py-2 px-1" : "py-2 pl-1",
-          )}
-        >
-          <Axis3D />
-        </h1>
+      <SidebarHeader
+        className={cn("flex gap-1 font-semibold justify-center p-3")}
+      >
+        <Axis3D />
       </SidebarHeader>
       <SidebarContent className="flex">
         <SidebarGroup>
@@ -51,11 +48,15 @@ export default function DashboardSidebar() {
             <SidebarMenu>
               {routes.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
-                    <a href={item.url}>
+                  <SidebarMenuButton
+                    isActive={pathName.endsWith(item.url)}
+                    tooltip={item.title}
+                    asChild
+                  >
+                    <Link href={item.url}>
                       <item.icon />
                       {item.title}
-                    </a>
+                    </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
@@ -63,8 +64,9 @@ export default function DashboardSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-      <SidebarFooter>
-        <SidebarTrigger />
+      <SidebarFooter className="flex flex-col gap-1">
+        <ThemeSelector />
+        <SidebarTrigger size={"sm"} />
       </SidebarFooter>
     </Sidebar>
   );
