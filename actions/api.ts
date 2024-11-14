@@ -61,7 +61,6 @@ export async function listQueues(): Promise<QueueStatistics[]> {
 
   return await fetch("http://localhost:8080/stats", {
     method: "GET",
-    mode: "no-cors",
     next: {
       tags: ["queues"],
     },

@@ -12,9 +12,17 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarTrigger,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
-import { Axis3D, Braces, Logs, Plus } from "lucide-react";
+import {
+  Axis3D,
+  Braces,
+  Logs,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Plus,
+} from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import ThemeSelector from "./theme";
@@ -22,6 +30,7 @@ import { Tooltip, TooltipContent } from "./ui/tooltip";
 import { TooltipTrigger } from "@radix-ui/react-tooltip";
 import { useState, type MouseEventHandler } from "react";
 import CreateQueue from "./create-queue";
+import { Button } from "./ui/button";
 
 function SidebarItem({
   title,
@@ -58,6 +67,7 @@ function SidebarItem({
 
 export default function DashboardSidebar() {
   const pathName = usePathname();
+  const { open } = useSidebar();
 
   type Mode = "normal" | "create-queue" | "create-namespace";
 
@@ -98,7 +108,11 @@ export default function DashboardSidebar() {
       </SidebarContent>
       <SidebarFooter className="flex flex-col gap-1">
         <ThemeSelector />
-        <SidebarTrigger size={"sm"} />
+        <SidebarTrigger size={"sm"} asChild>
+          <Button variant={"ghost"}>
+            {open ? <PanelLeftClose /> : <PanelLeftOpen />}
+          </Button>
+        </SidebarTrigger>
       </SidebarFooter>
     </Sidebar>
   );

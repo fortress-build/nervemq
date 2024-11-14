@@ -92,7 +92,7 @@ export default function ThemeSelector() {
         <motion.button
           key="button"
           layoutId={`popover-${uniqueId}`}
-          className={cn("flex h-8 w-7 justify-start")}
+          className={cn("flex h-8 w-8 justify-start")}
           onClick={openMenu}
         >
           <motion.span
@@ -101,7 +101,7 @@ export default function ThemeSelector() {
           >
             <SidebarMenuButton
               asChild
-              className="text-muted-foreground w-7 h-7 p-1.5"
+              className="text-muted-foreground w-8 h-8"
             >
               {
                 {
