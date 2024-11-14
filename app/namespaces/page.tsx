@@ -9,8 +9,8 @@ import { Button } from "@/components/ui/button";
 export default function Namespaces() {
   const [isOpen, setIsOpen] = useState(false);
   const { data, isLoading, error } = useQuery({
-    queryKey: ["list-namespaces"],
-    queryFn: listNamespaces,
+    queryKey: ["namespaces"],
+    queryFn: () => listNamespaces(),
   });
 
   if (isLoading) return <div>Loading...</div>;

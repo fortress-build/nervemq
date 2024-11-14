@@ -18,7 +18,6 @@ import { cn } from "@/lib/utils";
 import { createNamespace } from "@/actions/api";
 import { Spinner } from "@nextui-org/react";
 
-
 function isAlphaNumeric(str: string) {
   let code: number;
   let i: number;
@@ -67,7 +66,6 @@ export default function CreateNamespace({
       onMount: createNamespaceSchema,
     },
     onSubmit: async ({ value: data }) => {
-      console.log(data);
       await createNamespace(data.name);
     },
   });
@@ -121,7 +119,7 @@ export default function CreateNamespace({
               </div>
             )}
           </form.Field>
-          
+
           <DialogFooter>
             <form.Subscribe
               selector={(state) => [state.canSubmit, state.isSubmitting]}

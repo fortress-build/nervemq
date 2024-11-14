@@ -31,15 +31,19 @@ export async function deleteNamespace(name: string) {
   revalidateTag("namespaces");
 }
 
-export async function listNamespaces(): Promise<NamespaceStatistics[]>{
+export async function listNamespaces(): Promise<NamespaceStatistics[]> {
   "use server";
-  return await fetch("http://localhost:8080/stats", {
+  return await fetch("http://localhost:8080/ns", {
     method: "GET",
     next: {
       tags: ["namespaces"],
     },
   })
     .then((res) => res.json())
+    .then((res) => {
+      console.log("ns", res);
+      return res;
+    })
     .catch(() => []);
 }
 
