@@ -12,7 +12,7 @@ use sqlx::{
 };
 
 mod config;
-mod models;
+mod db;
 mod service;
 
 #[tokio::main]
