@@ -1,6 +1,7 @@
 "use client";
 
 import { SidebarProvider } from "@/components/ui/sidebar";
+import { Toaster } from "@/components/ui/sonner";
 
 export default function Providers({
   sidebarOpen,
@@ -10,6 +11,9 @@ export default function Providers({
   children: React.ReactNode;
 }) {
   return (
-    <SidebarProvider defaultOpen={sidebarOpen}>{children}</SidebarProvider>
+    <SidebarProvider defaultOpen={sidebarOpen}>
+      <Toaster closeButton={true} richColors={true} />
+      {children}
+    </SidebarProvider>
   );
 }

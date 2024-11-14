@@ -17,12 +17,7 @@ import { Label } from "./ui/label";
 import { cn } from "@/lib/utils";
 import { createQueue } from "@/actions/api";
 import { Spinner } from "@nextui-org/react";
-import {
-  AlignCenterHorizontal,
-  Check,
-  ChevronsUpDown,
-  Minus,
-} from "lucide-react";
+import { Check, ChevronsUpDown, Minus } from "lucide-react";
 import {
   Command,
   CommandEmpty,
@@ -32,6 +27,7 @@ import {
   CommandList,
 } from "./ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
+import { toast } from "sonner";
 
 function isAlphaNumeric(str: string) {
   let code: number;
@@ -91,7 +87,13 @@ export default function CreateQueue({
     },
     onSubmit: async ({ value: data }) => {
       console.log(data);
-      await createQueue(data);
+      await createQueue(data)
+        .catch((e) => {
+          toast.error(e.message);
+        })
+        .finally(() => {
+          close();
+        });
     },
   });
 
