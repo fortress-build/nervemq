@@ -28,14 +28,14 @@ pub struct QueueStatistics {
 impl Queue {
     pub async fn insert(
         db: &mut SqliteConnection,
-        namespace: impl AsRef<str>,
-        name: impl AsRef<str>,
+        namespace: &str,
+        name: &str,
     ) -> eyre::Result<()> {
         let namespace = Namespace::ensure(db, namespace).await?;
 
         sqlx::query("INSERT INTO queues (ns, name) VALUES ($1, $2)")
             .bind(namespace as i64)
-            .bind(name.as_ref())
+            .bind(name)
             .execute(db)
             .await?;
 
@@ -44,14 +44,13 @@ impl Queue {
 
     pub async fn delete(
         db: &mut SqliteConnection,
-        namespace: impl AsRef<str>,
-        name: impl AsRef<str>,
+        namespace: &str,
+        name: &str,
     ) -> eyre::Result<()> {
-        let namespace = Namespace::ensure(db, namespace).await?;
+        let id = Queue::get_id(db, namespace, name).await?;
 
-        sqlx::query("DELETE FROM queues q JOIN namespaces n ON q.ns = n.id WHERE n.name = $1 AND q.name = $2")
-            .bind(namespace as i64)
-            .bind(name.as_ref())
+        sqlx::query("DELETE FROM queues WHERE id = $1")
+            .bind(id as i64)
             .execute(db)
             .await?;
 
@@ -75,12 +74,12 @@ impl Queue {
 
     async fn list_for_namespace(
         db: &mut SqliteConnection,
-        namespace: impl AsRef<str>,
+        namespace: &str,
     ) -> eyre::Result<Vec<Queue>> {
         let mut stream = sqlx::query_as(
             "SELECT q.id, q.name, n.name as ns FROM queues q JOIN namespaces n ON q.ns = n.id WHERE n.name = $1",
         )
-        .bind(namespace.as_ref())
+        .bind(namespace)
         .fetch(db);
 
         let mut queues = Vec::new();
@@ -126,12 +125,12 @@ impl Queue {
 
     pub async fn get_id(
         db: &mut SqliteConnection,
-        namespace: impl AsRef<str>,
-        queue: impl AsRef<str>,
+        namespace: &str,
+        queue: &str,
     ) -> eyre::Result<u64> {
         Ok(sqlx::query_scalar("SELECT q.id FROM namespaces AS n INNER JOIN queues as q ON q.ns = n.id WHERE n.name = $1 AND q.name = $2")
-            .bind(namespace.as_ref())
-            .bind(queue.as_ref())
+            .bind(namespace)
+            .bind(queue)
             .fetch_one(db)
         .await?)
     }

@@ -31,9 +31,9 @@ struct MessageNoKv {
 impl Message {
     pub async fn insert(
         db: &mut SqliteConnection,
-        namespace: impl AsRef<str>,
-        queue: impl AsRef<str>,
-        body: impl AsRef<[u8]>,
+        namespace: &str,
+        queue: &str,
+        body: &[u8],
         kv: HashMap<String, String>,
     ) -> eyre::Result<()> {
         let queue_id = Queue::get_id(&mut *db, namespace, queue).await?;
