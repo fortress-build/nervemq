@@ -454,6 +454,7 @@ dependencies = [
  "serde_json",
  "snafu",
  "sqlx",
+ "tempfile",
  "tokio",
  "tokio-stream",
 ]
