@@ -10,7 +10,11 @@ use sqlx::{
 
 use crate::{
     config::Config,
-    db::{message::Message, namespace::Namespace, queue::Queue},
+    db::{
+        message::Message,
+        namespace::Namespace,
+        queue::{Queue, QueueStatistics},
+    },
 };
 
 pub struct Service {
@@ -104,5 +108,10 @@ impl Service {
     pub async fn list_messages(&self, namespace: &str, queue: &str) -> eyre::Result<Vec<Message>> {
         let mut db = self.db.acquire().await?;
         Message::list(db.acquire().await?, namespace, queue).await
+    }
+
+    pub async fn statistics(&self) -> eyre::Result<Vec<QueueStatistics>> {
+        let mut db = self.db.acquire().await?;
+        Queue::statistics(db.acquire().await?).await
     }
 }
