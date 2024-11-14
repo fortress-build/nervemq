@@ -18,12 +18,8 @@ export const columns: ColumnDef<NamespaceStatistics>[] = [
     header: "Name",
   },
   {
-    accessorKey: "ns",
-    header: "Namespace",
-  },
-  {
-    accessorKey: "messageCount",
-    header: "Inflight",
+    accessorKey: "queueCount",
+    header: "Queues",
   },
 ];
 
