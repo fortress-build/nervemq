@@ -1,45 +1,8 @@
-use std::{collections::HashMap, hash::Hash};
-
 use serde::{Deserialize, Serialize};
-use sqlx::{Acquire, Database, Executor, FromRow, Sqlite, SqliteConnection, SqlitePool, Statement};
-use tokio_stream::{Stream, StreamExt};
+use sqlx::{prelude::FromRow, SqliteConnection};
+use tokio_stream::StreamExt;
 
-#[derive(Serialize, Deserialize)]
-pub struct Namespace {
-    id: u64,
-    name: String,
-}
-
-impl Namespace {
-    pub async fn get_id<'a>(
-        db: &mut SqliteConnection,
-        name: impl AsRef<str>,
-    ) -> eyre::Result<Option<u64>> {
-        sqlx::query_scalar("SELECT id FROM namespaces WHERE name = $1")
-            .bind(name.as_ref())
-            .fetch_optional(db)
-            .await
-            .map_err(|e| eyre::eyre!(e))
-    }
-
-    pub async fn ensure<'a>(db: &mut SqliteConnection, name: impl AsRef<str>) -> eyre::Result<u64> {
-        if let Some(ns) = Self::get_id(db, &name).await? {
-            return Ok(ns);
-        }
-
-        sqlx::query("INSERT INTO namespaces(name) VALUES ($1)")
-            .bind(name.as_ref())
-            .execute(&mut *db)
-            .await
-            .map_err(|e| eyre::eyre!(e))?;
-
-        sqlx::query_scalar("SELECT id FROM namespaces WHERE name = $1")
-            .bind(name.as_ref())
-            .fetch_one(&mut *db)
-            .await
-            .map_err(|e| eyre::eyre!(e))
-    }
-}
+use super::namespace::Namespace;
 
 #[derive(Serialize, Deserialize, FromRow)]
 pub struct Queue {
@@ -135,46 +98,5 @@ impl Queue {
             .bind(queue.as_ref())
             .fetch_one(db)
         .await?)
-    }
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct Message {
-    id: u64,
-    queue: u64,
-
-    delivered_at: u64,
-
-    body: Vec<u8>,
-    kv: HashMap<String, String>,
-}
-
-impl Message {
-    pub async fn insert(
-        db: &mut SqliteConnection,
-        namespace: impl AsRef<str>,
-        queue: impl AsRef<str>,
-        body: impl AsRef<[u8]>,
-        kv: HashMap<String, String>,
-    ) -> eyre::Result<()> {
-        let queue_id = Queue::get_id(&mut *db, namespace, queue).await?;
-
-        let msg_id: i64 =
-            sqlx::query_scalar("INSERT INTO messages (queue, body) VALUES ($1, $2) RETURNING id")
-                .bind(queue_id as i64)
-                .bind(body.as_ref())
-                .fetch_one(&mut *db)
-                .await?;
-
-        for (k, v) in kv.into_iter() {
-            sqlx::query("INSERT INTO kv_pairs (message, k, v) VALUES ($1, $2, $3)")
-                .bind(msg_id)
-                .bind(k)
-                .bind(v)
-                .execute(&mut *db)
-                .await?;
-        }
-
-        Ok(())
     }
 }
