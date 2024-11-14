@@ -17,7 +17,12 @@ import { Label } from "./ui/label";
 import { cn } from "@/lib/utils";
 import { createQueue } from "@/actions/api";
 import { Spinner } from "@nextui-org/react";
-import { Check, ChevronsUpDown } from "lucide-react";
+import {
+  AlignCenterHorizontal,
+  Check,
+  ChevronsUpDown,
+  Minus,
+} from "lucide-react";
 import {
   Command,
   CommandEmpty,
@@ -182,14 +187,11 @@ export default function CreateQueue({
                                 );
                               }}
                             >
-                              <Check
-                                className={cn(
-                                  "mr-2 h-4 w-4",
-                                  field.state.value === namespace.value
-                                    ? "opacity-100"
-                                    : "opacity-0",
-                                )}
-                              />
+                              {field.state.value === namespace.value ? (
+                                <Check className={"mr-2 h-4 w-4"} />
+                              ) : (
+                                <Minus className={"mr-2 h-4 w-4"} />
+                              )}
                               {namespace.label}
                             </CommandItem>
                           ))}
