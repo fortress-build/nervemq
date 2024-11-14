@@ -1,20 +1,31 @@
 use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
-use sqlx::SqliteConnection;
+use sqlx::{prelude::FromRow, SqliteConnection};
 
 use super::queue::Queue;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, FromRow)]
 pub struct Message {
     id: u64,
-    queue: u64,
+    queue: String,
 
     delivered_at: u64,
 
     body: Vec<u8>,
 
+    #[sqlx(skip)]
     kv: HashMap<String, String>,
+}
+
+#[derive(Serialize, Deserialize, FromRow)]
+struct MessageNoKv {
+    id: u64,
+    queue: String,
+
+    delivered_at: u64,
+
+    body: Vec<u8>,
 }
 
 impl Message {
@@ -44,5 +55,22 @@ impl Message {
         }
 
         Ok(())
+    }
+
+    pub async fn list(
+        db: &mut SqliteConnection,
+        namespace: impl AsRef<str>,
+        queue: impl AsRef<str>,
+    ) -> eyre::Result<Vec<Message>> {
+        Ok(sqlx::query_as::<_, Message>(
+            "
+            SELECT m.*, q.name as queue FROM messages m
+            JOIN queues q ON m.queue = q.id
+        ",
+        )
+        .bind(namespace.as_ref())
+        .bind(queue.as_ref())
+        .fetch_all(db)
+        .await?)
     }
 }
