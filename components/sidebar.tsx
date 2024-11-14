@@ -30,6 +30,7 @@ import { Tooltip, TooltipContent } from "./ui/tooltip";
 import { TooltipTrigger } from "@radix-ui/react-tooltip";
 import { useState, type MouseEventHandler } from "react";
 import CreateQueue from "./create-queue";
+import CreateNamespace from "./create-namespace";
 
 function SidebarItem({
   title,
@@ -81,6 +82,10 @@ export default function DashboardSidebar() {
     <Sidebar collapsible="icon">
       <CreateQueue
         open={mode === "create-queue"}
+        close={() => setMode("normal")}
+      />
+      <CreateNamespace
+        open={mode === "create-namespace"}
         close={() => setMode("normal")}
       />
       <SidebarHeader
