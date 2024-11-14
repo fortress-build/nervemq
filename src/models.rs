@@ -1,7 +1,8 @@
 use std::{collections::HashMap, hash::Hash};
 
 use serde::{Deserialize, Serialize};
-use sqlx::{Acquire, Database, Executor, Sqlite, SqliteConnection, SqlitePool, Statement};
+use sqlx::{Acquire, Database, Executor, FromRow, Sqlite, SqliteConnection, SqlitePool, Statement};
+use tokio_stream::{Stream, StreamExt};
 
 #[derive(Serialize, Deserialize)]
 pub struct Namespace {
@@ -40,12 +41,11 @@ impl Namespace {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, FromRow)]
 pub struct Queue {
     id: u64,
-    ns: u64,
+    ns: String,
     name: String,
-    messages: Vec<Message>,
 }
 
 impl Queue {
@@ -63,6 +63,66 @@ impl Queue {
             .await?;
 
         Ok(())
+    }
+
+    pub async fn delete(
+        db: &mut SqliteConnection,
+        namespace: impl AsRef<str>,
+        name: impl AsRef<str>,
+    ) -> eyre::Result<()> {
+        let namespace = Namespace::ensure(db, namespace).await?;
+
+        sqlx::query("DELETE FROM queues q JOIN namespaces n ON q.ns = n.id WHERE n.name = $1 AND q.name = $2")
+            .bind(namespace as i64)
+            .bind(name.as_ref())
+            .execute(db)
+            .await?;
+
+        Ok(())
+    }
+
+    async fn list_all(db: &mut SqliteConnection) -> eyre::Result<Vec<Queue>> {
+        let mut stream = sqlx::query_as(
+            "SELECT q.id, q.name, n.name as ns FROM queues q JOIN namespaces n ON q.ns = n.id",
+        )
+        .fetch(db);
+
+        let mut queues = Vec::new();
+
+        while let Some(res) = stream.next().await.transpose()? {
+            queues.push(res);
+        }
+
+        Ok(queues)
+    }
+
+    async fn list_for_namespace(
+        db: &mut SqliteConnection,
+        namespace: impl AsRef<str>,
+    ) -> eyre::Result<Vec<Queue>> {
+        let mut stream = sqlx::query_as(
+            "SELECT q.id, q.name, n.name as ns FROM queues q JOIN namespaces n ON q.ns = n.id WHERE n.name = $1",
+        )
+        .bind(namespace.as_ref())
+        .fetch(db);
+
+        let mut queues = Vec::new();
+
+        while let Some(res) = stream.next().await.transpose()? {
+            queues.push(res);
+        }
+
+        Ok(queues)
+    }
+
+    pub async fn list(
+        db: &mut SqliteConnection,
+        namespace: Option<impl AsRef<str>>,
+    ) -> eyre::Result<Vec<Queue>> {
+        match namespace {
+            Some(ns) => Self::list_for_namespace(db, ns.as_ref()).await,
+            None => Self::list_all(db).await,
+        }
     }
 
     pub async fn get_id(

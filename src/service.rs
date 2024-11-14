@@ -5,12 +5,12 @@ use sqlx::{
         SqliteAutoVacuum, SqliteConnectOptions, SqliteJournalMode, SqliteLockingMode,
         SqlitePoolOptions,
     },
-    Acquire, Executor, SqlitePool,
+    Acquire, SqlitePool,
 };
 
 use crate::{
     config::Config,
-    models::{self, Message, Queue},
+    models::{Message, Queue},
 };
 
 pub struct Service {
@@ -58,5 +58,45 @@ impl Service {
         tx.commit().await?;
 
         Ok(())
+    }
+
+    // pub async fn dequeue(&self, namespace: impl AsRef<str>, queue: impl AsRef<[u8]>) {
+    //
+    // }
+
+    pub async fn create_queue(
+        &self,
+        namespace: impl AsRef<str>,
+        name: impl AsRef<str>,
+    ) -> eyre::Result<()> {
+        let mut tx = self.db.begin().await?;
+
+        Queue::insert(tx.acquire().await?, namespace, name).await?;
+
+        tx.commit().await?;
+
+        Ok(())
+    }
+
+    pub async fn delete_queue(
+        &self,
+        namespace: impl AsRef<str>,
+        name: impl AsRef<str>,
+    ) -> eyre::Result<()> {
+        let mut tx = self.db.begin().await?;
+
+        Queue::delete(tx.acquire().await?, namespace, name).await?;
+
+        tx.commit().await?;
+
+        Ok(())
+    }
+
+    pub async fn list_queues(
+        &self,
+        namespace: Option<impl AsRef<str>>,
+    ) -> eyre::Result<Vec<Queue>> {
+        let mut conn = self.db.acquire().await?;
+        Queue::list(conn.acquire().await?, namespace).await
     }
 }
