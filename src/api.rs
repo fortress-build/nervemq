@@ -71,7 +71,7 @@ async fn list_ns_queues(
     Ok(web::Json(ListQueuesResponse { queues }))
 }
 
-#[get("/queue/{ns_name}/{queue_name}")]
+#[delete("/queue/{ns_name}/{queue_name}")]
 async fn delete_queue(
     service: web::Data<Service>,
     path: web::Path<(String, String)>,
