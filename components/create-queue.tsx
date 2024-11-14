@@ -17,6 +17,21 @@ import { Label } from "./ui/label";
 import { cn } from "@/lib/utils";
 import { createQueue } from "@/actions/api";
 import { Spinner } from "@nextui-org/react";
+import {
+  AlignCenterHorizontal,
+  Check,
+  ChevronsUpDown,
+  Minus,
+} from "lucide-react";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "./ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 
 function isAlphaNumeric(str: string) {
   let code: number;
@@ -45,7 +60,15 @@ const createQueueSchema = object({
     .test("name", "name should be alphanumeric", (value: string) => {
       return isAlphaNumeric(value);
     }),
+  namespace: string().required("namespace is a required field"),
 });
+
+const namespaces = [
+  { label: "Default", value: "default" },
+  { label: "Production", value: "prod" },
+  { label: "Development", value: "dev" },
+  // Add more namespaces as needed
+] as const;
 
 export type CreateQueue = InferType<typeof createQueueSchema>;
 
@@ -59,6 +82,7 @@ export default function CreateQueue({
   const form = useForm({
     defaultValues: {
       name: "",
+      namespace: "",
     },
     validatorAdapter: yupValidator(),
     validators: {
@@ -107,17 +131,84 @@ export default function CreateQueue({
                   onBlur={field.handleBlur}
                   onChange={(e) => field.handleChange(e.target.value)}
                   placeholder="Name"
+                  data-1p-ignore
                   className={cn(
                     "focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0",
                     "focus:border-primary focus:border transition-all",
                   )}
                 />
                 {field.state.meta.errors ? (
-                  <span>{field.state.meta.errors.join(", ")}</span>
+                  <span className="text-sm text-destructive">
+                    {field.state.meta.errors.join(", ")}
+                  </span>
                 ) : null}
               </div>
             )}
           </form.Field>
+          <form.Field name="namespace">
+            {(field) => (
+              <div className="flex flex-col gap-2">
+                <Label htmlFor={field.name}>Namespace</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      // biome-ignore lint/a11y/useSemanticElements: <explanation>
+                      role="combobox"
+                      className={cn(
+                        "w-full justify-between",
+                        !field.state.value && "text-muted-foreground",
+                      )}
+                    >
+                      {field.state.value
+                        ? namespaces.find(
+                            (namespace) =>
+                              namespace.value === field.state.value,
+                          )?.label
+                        : "Select namespace"}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0">
+                    <Command className="bg-background">
+                      <CommandInput placeholder="Search namespace..." />
+                      <CommandList>
+                        <CommandEmpty>No namespace found.</CommandEmpty>
+                        <CommandGroup>
+                          {namespaces.map((namespace) => (
+                            <CommandItem
+                              key={namespace.value}
+                              value={namespace.value}
+                              onSelect={(currentValue) => {
+                                field.handleChange(
+                                  currentValue === field.state.value
+                                    ? ""
+                                    : currentValue,
+                                );
+                              }}
+                            >
+                              {field.state.value === namespace.value ? (
+                                <Check className={"mr-2 h-4 w-4"} />
+                              ) : (
+                                <Minus className={"mr-2 h-4 w-4"} />
+                              )}
+                              {namespace.label}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+                {field.state.meta.errors ? (
+                  <span className="text-sm text-destructive">
+                    {field.state.meta.errors.join(", ")}
+                  </span>
+                ) : null}
+              </div>
+            )}
+          </form.Field>
+
           <DialogFooter>
             <form.Subscribe
               selector={(state) => [state.canSubmit, state.isSubmitting]}

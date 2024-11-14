@@ -30,7 +30,6 @@ import { Tooltip, TooltipContent } from "./ui/tooltip";
 import { TooltipTrigger } from "@radix-ui/react-tooltip";
 import { useState, type MouseEventHandler } from "react";
 import CreateQueue from "./create-queue";
-import { Button } from "./ui/button";
 
 function SidebarItem({
   title,
@@ -108,10 +107,11 @@ export default function DashboardSidebar() {
       </SidebarContent>
       <SidebarFooter className="flex flex-col gap-1">
         <ThemeSelector />
-        <SidebarTrigger size={"sm"} asChild>
-          <Button variant={"ghost"}>
-            {open ? <PanelLeftClose /> : <PanelLeftOpen />}
-          </Button>
+        <SidebarTrigger
+          size={"sm"}
+          className="hover:bg-sidebar-accent cursor-pointer"
+        >
+          {open ? <PanelLeftClose /> : <PanelLeftOpen />}
         </SidebarTrigger>
       </SidebarFooter>
     </Sidebar>
