@@ -29,7 +29,7 @@ export const columns: ColumnDef<QueueStatistics>[] = [
 
 export function QueuesTable({ data }: { data: QueueStatistics[] }) {
   return (
-    <div className="px-4 py-16 w-full">
+    <div className="px-4 w-full">
       <DataTable columns={columns} data={data} />
     </div>
   );
