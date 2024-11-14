@@ -10,7 +10,7 @@ use sqlx::{
 
 use crate::{
     config::Config,
-    db::{message::Message, queue::Queue},
+    db::{message::Message, namespace::Namespace, queue::Queue},
 };
 
 pub struct Service {
@@ -44,25 +44,20 @@ impl Service {
         Ok(Self { db: pool, config })
     }
 
-    pub async fn enqueue(
-        &self,
-        namespace: impl AsRef<str>,
-        queue: impl AsRef<str>,
-        message: impl AsRef<[u8]>,
-        kv: HashMap<String, String>,
-    ) -> eyre::Result<()> {
-        let mut tx = self.db.begin().await?;
-
-        Message::insert(tx.acquire().await?, namespace, queue, message, kv).await?;
-
-        tx.commit().await?;
-
-        Ok(())
+    pub async fn list_namespaces(&self) -> eyre::Result<Vec<Namespace>> {
+        let mut db = self.db.acquire().await?;
+        Namespace::list(db.acquire().await?).await
     }
 
-    // pub async fn dequeue(&self, namespace: impl AsRef<str>, queue: impl AsRef<[u8]>) {
-    //
-    // }
+    pub async fn create_namespace(&self, name: impl AsRef<str>) -> eyre::Result<u64> {
+        let mut db = self.db.acquire().await?;
+        Namespace::insert(db.acquire().await?, name).await
+    }
+
+    pub async fn delete_namespace(&self, name: impl AsRef<str>) -> eyre::Result<()> {
+        let mut db = self.db.acquire().await?;
+        Namespace::delete(db.acquire().await?, name).await
+    }
 
     pub async fn create_queue(
         &self,
@@ -98,5 +93,34 @@ impl Service {
     ) -> eyre::Result<Vec<Queue>> {
         let mut conn = self.db.acquire().await?;
         Queue::list(conn.acquire().await?, namespace).await
+    }
+
+    pub async fn send_message(
+        &self,
+        namespace: impl AsRef<str>,
+        queue: impl AsRef<str>,
+        message: impl AsRef<[u8]>,
+        kv: HashMap<String, String>,
+    ) -> eyre::Result<()> {
+        let mut tx = self.db.begin().await?;
+
+        Message::insert(tx.acquire().await?, namespace, queue, message, kv).await?;
+
+        tx.commit().await?;
+
+        Ok(())
+    }
+
+    // pub async fn recv_message(&self, namespace: impl AsRef<str>, queue: impl AsRef<[u8]>) {
+    //
+    // }
+
+    pub async fn list_messages(
+        &self,
+        namespace: impl AsRef<str>,
+        queue: impl AsRef<str>,
+    ) -> eyre::Result<Vec<Message>> {
+        let mut db = self.db.acquire().await?;
+        Message::list(db.acquire().await?, namespace, queue).await
     }
 }
