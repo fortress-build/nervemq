@@ -10,7 +10,7 @@ use sqlx::{
 
 use crate::{
     config::Config,
-    models::{Message, Queue},
+    db::{message::Message, queue::Queue},
 };
 
 pub struct Service {
