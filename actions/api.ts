@@ -1,6 +1,7 @@
 "use server";
 
 import type { CreateQueue } from "@/components/create-queue";
+import type { NamespaceStatistics } from "@/components/namespaces/table";
 import type { QueueStatistics } from "@/components/queues/table";
 import { revalidateTag } from "next/cache";
 
@@ -28,6 +29,18 @@ export async function deleteNamespace(name: string) {
   });
 
   revalidateTag("namespaces");
+}
+
+export async function listNamespaces(): Promise<NamespaceStatistics[]>{
+  "use server";
+  return await fetch("http://localhost:8080/stats", {
+    method: "GET",
+    next: {
+      tags: ["namespaces"],
+    },
+  })
+    .then((res) => res.json())
+    .catch(() => []);
 }
 
 export async function createQueue(data: CreateQueue) {
