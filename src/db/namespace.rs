@@ -1,10 +1,10 @@
 use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, SqliteConnection};
 
-#[derive(Serialize, Deserialize, FromRow)]
+#[derive(Serialize, Deserialize, FromRow, PartialEq, Debug)]
 pub struct Namespace {
-    id: u64,
-    name: String,
+    pub id: u64,
+    pub name: String,
 }
 
 impl Namespace {

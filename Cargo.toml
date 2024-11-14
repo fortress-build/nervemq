@@ -3,6 +3,14 @@ name = "creek"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+name = "creek"
+path = "src/lib.rs"
+
+[[bin]]
+name = "creek"
+path = "src/main.rs"
+
 [dependencies]
 actix-web = "4.9.0"
 envy = "0.4.2"
@@ -17,3 +25,6 @@ sqlx = { version = "0.8.2", features = [
 ] }
 tokio = { version = "1.41.1", features = ["full"] }
 tokio-stream = { version = "0.1.16", features = ["full"] }
+
+[dev-dependencies]
+tempfile = "3.14.0"

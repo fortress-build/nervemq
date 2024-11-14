@@ -1,8 +1,6 @@
 use std::collections::HashMap;
 
-use config::Config;
 use serde::{Deserialize, Serialize};
-use service::Service;
 use sqlx::{
     sqlite::{
         SqliteAutoVacuum, SqliteConnectOptions, SqliteJournalMode, SqliteLockingMode,
@@ -11,9 +9,8 @@ use sqlx::{
     SqlitePool,
 };
 
-mod config;
-mod db;
-mod service;
+use creek::config::Config;
+use creek::service::Service;
 
 #[tokio::main]
 async fn main() -> eyre::Result<()> {

@@ -24,18 +24,14 @@ impl Service {
     }
 
     pub async fn connect_with(config: Config) -> eyre::Result<Self> {
-        let opts = if let Some(path) = &config.db_path() {
-            SqliteConnectOptions::new()
-                .filename(path)
-                .create_if_missing(true)
-        } else {
-            SqliteConnectOptions::new().in_memory(true)
-        }
-        .foreign_keys(true)
-        .journal_mode(SqliteJournalMode::Wal)
-        .locking_mode(SqliteLockingMode::Normal)
-        .optimize_on_close(true, None)
-        .auto_vacuum(SqliteAutoVacuum::Full);
+        let opts = SqliteConnectOptions::new()
+            .filename(config.db_path())
+            .create_if_missing(true)
+            .foreign_keys(true)
+            .journal_mode(SqliteJournalMode::Wal)
+            .locking_mode(SqliteLockingMode::Normal)
+            .optimize_on_close(true, None)
+            .auto_vacuum(SqliteAutoVacuum::Full);
 
         let pool = SqlitePoolOptions::new().connect_with(opts).await?;
 
