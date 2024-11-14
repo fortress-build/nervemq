@@ -46,14 +46,19 @@ function SidebarItem({
 }) {
   return (
     <SidebarMenuItem key={title}>
-      <SidebarMenuButton isActive={isActive} tooltip={title} asChild>
+      <SidebarMenuButton
+        className="transition-all duration-200"
+        isActive={isActive}
+        tooltip={title}
+        asChild
+      >
         <Link href={url}>
           <Icon />
           {title}
         </Link>
       </SidebarMenuButton>
       <Tooltip>
-        <TooltipContent>Create</TooltipContent>
+        <TooltipContent side="right">Create</TooltipContent>
         <SidebarMenuAction asChild onClick={onClick}>
           <TooltipTrigger>
             <Plus />
