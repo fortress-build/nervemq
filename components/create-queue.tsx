@@ -12,10 +12,11 @@ import {
 import { type InferType, object, string } from "yup";
 import { useForm } from "@tanstack/react-form";
 import { yupValidator } from "@tanstack/yup-form-adapter";
+import { useQuery } from "@tanstack/react-query";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
-import { cn } from "@/lib/utils";
-import { createQueue } from "@/actions/api";
+import { cn, isAlphaNumeric } from "@/lib/utils";
+import { createQueue, listNamespaces } from "@/actions/api";
 import { Spinner } from "@nextui-org/react";
 import { Check, ChevronsUpDown, Minus } from "lucide-react";
 import {
@@ -29,42 +30,18 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { toast } from "sonner";
 
-function isAlphaNumeric(str: string) {
-  let code: number;
-  let i: number;
-  let len: number;
-
-  for (i = 0, len = str.length; i < len; i++) {
-    code = str.charCodeAt(i);
-    if (
-      !(code > 47 && code < 58) && // numeric (0-9)
-      !(code > 64 && code < 91) && // upper alpha (A-Z)
-      !(code > 96 && code < 123)
-    ) {
-      // lower alpha (a-z)
-      return false;
-    }
-  }
-  return true;
-}
-
-const createQueueSchema = object({
+export const createQueueSchema = object({
   name: string()
     .required()
     .max(32)
     .min(1)
-    .test("name", "name should be alphanumeric", (value: string) => {
-      return isAlphaNumeric(value);
-    }),
-  namespace: string().required("namespace is a required field"),
+    .test("name", "name should be alphanumeric", isAlphaNumeric),
+  namespace: string()
+    .required()
+    .max(32)
+    .min(1)
+    .test("namespace", "namespace should be alphanumeric", isAlphaNumeric),
 });
-
-const namespaces = [
-  { label: "Default", value: "default" },
-  { label: "Production", value: "prod" },
-  { label: "Development", value: "dev" },
-  // Add more namespaces as needed
-] as const;
 
 export type CreateQueue = InferType<typeof createQueueSchema>;
 
@@ -75,6 +52,11 @@ export default function CreateQueue({
   open: boolean;
   close: () => void;
 }) {
+  const { data: namespaces = [], isLoading } = useQuery({
+    queryFn: () => listNamespaces(),
+    queryKey: ["namespaces"],
+  });
+
   const form = useForm({
     defaultValues: {
       name: "",
@@ -163,10 +145,7 @@ export default function CreateQueue({
                       )}
                     >
                       {field.state.value
-                        ? namespaces.find(
-                            (namespace) =>
-                              namespace.value === field.state.value,
-                          )?.label
+                        ? field.state.value
                         : "Select namespace"}
                       <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
@@ -175,12 +154,14 @@ export default function CreateQueue({
                     <Command className="bg-background">
                       <CommandInput placeholder="Search namespace..." />
                       <CommandList>
-                        <CommandEmpty>No namespace found.</CommandEmpty>
+                        <CommandEmpty>
+                          {isLoading ? <Spinner /> : "No namespace found."}
+                        </CommandEmpty>
                         <CommandGroup>
                           {namespaces.map((namespace) => (
                             <CommandItem
-                              key={namespace.value}
-                              value={namespace.value}
+                              key={namespace.name}
+                              value={namespace.name}
                               onSelect={(currentValue) => {
                                 field.handleChange(
                                   currentValue === field.state.value
@@ -189,12 +170,12 @@ export default function CreateQueue({
                                 );
                               }}
                             >
-                              {field.state.value === namespace.value ? (
+                              {field.state.value === namespace.name ? (
                                 <Check className={"mr-2 h-4 w-4"} />
                               ) : (
                                 <Minus className={"mr-2 h-4 w-4"} />
                               )}
-                              {namespace.label}
+                              {namespace.name}
                             </CommandItem>
                           ))}
                         </CommandGroup>

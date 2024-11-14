@@ -25,7 +25,7 @@ export const columns: ColumnDef<NamespaceStatistics>[] = [
 
 export function NamespaceTable({ data }: { data: NamespaceStatistics[] }) {
   return (
-    <div className="px-4 py-16 w-full">
+    <div className="px-4 w-full">
       <DataTable columns={columns} data={data} />
     </div>
   );
