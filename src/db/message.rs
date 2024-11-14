@@ -7,15 +7,15 @@ use super::queue::Queue;
 
 #[derive(Serialize, Deserialize, FromRow)]
 pub struct Message {
-    id: u64,
-    queue: String,
+    pub id: u64,
+    pub queue: String,
 
-    delivered_at: u64,
+    pub delivered_at: u64,
 
-    body: Vec<u8>,
+    pub body: Vec<u8>,
 
     #[sqlx(skip)]
-    kv: HashMap<String, String>,
+    pub kv: HashMap<String, String>,
 }
 
 #[derive(Serialize, Deserialize, FromRow)]

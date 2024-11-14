@@ -4,11 +4,17 @@ use tokio_stream::StreamExt;
 
 use super::namespace::Namespace;
 
-#[derive(Serialize, Deserialize, FromRow)]
+#[derive(Serialize, Deserialize, FromRow, Debug)]
 pub struct Queue {
-    id: u64,
-    ns: String,
-    name: String,
+    pub id: u64,
+    pub ns: String,
+    pub name: String,
+}
+
+impl PartialEq for Queue {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+    }
 }
 
 #[derive(Serialize, Deserialize, FromRow, Debug)]
