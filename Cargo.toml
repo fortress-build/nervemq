@@ -25,6 +25,9 @@ sqlx = { version = "0.8.2", features = [
 ] }
 tokio = { version = "1.41.1", features = ["full"] }
 tokio-stream = { version = "0.1.16", features = ["full"] }
+tracing = { version = "0.1.40", features = ["async-await"] }
+tracing-actix-web = "0.7.14"
+tracing-subscriber = { version = "0.3.18", features = ["tracing", "serde"] }
 
 [dev-dependencies]
 tempfile = "3.14.0"

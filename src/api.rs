@@ -1,9 +1,12 @@
 use actix_web::{delete, get, post, web, Responder};
 use serde::{Deserialize, Serialize};
 
-use crate::{db::queue::Queue, service::Service};
+use crate::{
+    db::queue::{Queue, QueueStatistics},
+    service::Service,
+};
 
-#[get("/ns")]
+#[get("/")]
 async fn list_namespaces(service: web::Data<Service>) -> actix_web::Result<impl Responder> {
     let data = match service.list_namespaces().await {
         Ok(data) => data,
@@ -18,7 +21,7 @@ pub struct CreateNamespaceResponse {
     id: u64,
 }
 
-#[post("/ns/{ns_name}")]
+#[post("/{ns_name}")]
 async fn create_namespace(
     service: web::Data<Service>,
     path: web::Path<String>,
@@ -31,7 +34,7 @@ async fn create_namespace(
     Ok(web::Json(CreateNamespaceResponse { id }))
 }
 
-#[delete("/ns/{ns_name}")]
+#[delete("/{ns_name}")]
 async fn delete_namespace(
     service: web::Data<Service>,
     path: web::Path<String>,
@@ -48,7 +51,7 @@ pub struct ListQueuesResponse {
     queues: Vec<Queue>,
 }
 
-#[get("/queue")]
+#[get("/")]
 async fn list_all_queues(service: web::Data<Service>) -> actix_web::Result<impl Responder> {
     let queues = match service.list_queues(None).await {
         Ok(q) => q,
@@ -58,7 +61,7 @@ async fn list_all_queues(service: web::Data<Service>) -> actix_web::Result<impl 
     Ok(web::Json(ListQueuesResponse { queues }))
 }
 
-#[get("/queue/{ns_name}")]
+#[get("/{ns_name}")]
 async fn list_ns_queues(
     service: web::Data<Service>,
     path: web::Path<String>,
@@ -71,7 +74,7 @@ async fn list_ns_queues(
     Ok(web::Json(ListQueuesResponse { queues }))
 }
 
-#[get("/queue/{ns_name}/{queue_name}")]
+#[delete("/{ns_name}/{queue_name}")]
 async fn delete_queue(
     service: web::Data<Service>,
     path: web::Path<(String, String)>,
@@ -84,7 +87,7 @@ async fn delete_queue(
     Ok("OK")
 }
 
-#[post("/queue/{ns_name}/{queue_name}")]
+#[post("/{ns_name}/{queue_name}")]
 async fn create_queue(
     service: web::Data<Service>,
     path: web::Path<(String, String)>,
@@ -95,4 +98,12 @@ async fn create_queue(
     }
 
     Ok("OK")
+}
+
+#[get("/stats")]
+async fn stats(service: web::Data<Service>) -> actix_web::Result<web::Json<Vec<QueueStatistics>>> {
+    match service.statistics().await {
+        Ok(val) => Ok(web::Json(val)),
+        Err(e) => Err(actix_web::error::ErrorInternalServerError(e)),
+    }
 }

@@ -11,6 +11,14 @@ pub struct Queue {
     name: String,
 }
 
+#[derive(Serialize, Deserialize, FromRow, Debug)]
+pub struct QueueStatistics {
+    id: u64,
+    ns: String,
+    name: String,
+    message_count: u64,
+}
+
 impl Queue {
     pub async fn insert(
         db: &mut SqliteConnection,
@@ -78,12 +86,34 @@ impl Queue {
         Ok(queues)
     }
 
+    pub async fn statistics(db: &mut SqliteConnection) -> eyre::Result<Vec<QueueStatistics>> {
+        let res = sqlx::query_as(
+            "
+            SELECT
+                q.id   AS id,
+                n.name as ns,
+                q.name AS name,
+                COUNT(m.id) AS message_count
+            FROM queues q
+            LEFT JOIN messages m ON q.id = m.queue
+            LEFT JOIN namespaces n ON q.ns = n.id
+            GROUP BY q.id, q.name;
+        ",
+        )
+        .fetch_all(db)
+        .await?;
+
+        tracing::warn!("{res:?}");
+
+        Ok(res)
+    }
+
     pub async fn list(
         db: &mut SqliteConnection,
-        namespace: Option<impl AsRef<str>>,
+        namespace: Option<&str>,
     ) -> eyre::Result<Vec<Queue>> {
         match namespace {
-            Some(ns) => Self::list_for_namespace(db, ns.as_ref()).await,
+            Some(ns) => Self::list_for_namespace(db, ns).await,
             None => Self::list_all(db).await,
         }
     }
