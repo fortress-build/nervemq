@@ -15,6 +15,7 @@ use crate::{
 
 pub struct Service {
     db: SqlitePool,
+    #[allow(unused)]
     config: crate::config::Config,
 }
 
@@ -45,21 +46,17 @@ impl Service {
         Namespace::list(db.acquire().await?).await
     }
 
-    pub async fn create_namespace(&self, name: impl AsRef<str>) -> eyre::Result<u64> {
+    pub async fn create_namespace(&self, name: &str) -> eyre::Result<u64> {
         let mut db = self.db.acquire().await?;
         Namespace::insert(db.acquire().await?, name).await
     }
 
-    pub async fn delete_namespace(&self, name: impl AsRef<str>) -> eyre::Result<()> {
+    pub async fn delete_namespace(&self, name: &str) -> eyre::Result<()> {
         let mut db = self.db.acquire().await?;
         Namespace::delete(db.acquire().await?, name).await
     }
 
-    pub async fn create_queue(
-        &self,
-        namespace: impl AsRef<str>,
-        name: impl AsRef<str>,
-    ) -> eyre::Result<()> {
+    pub async fn create_queue(&self, namespace: &str, name: &str) -> eyre::Result<()> {
         let mut tx = self.db.begin().await?;
 
         Queue::insert(tx.acquire().await?, namespace, name).await?;
@@ -69,11 +66,7 @@ impl Service {
         Ok(())
     }
 
-    pub async fn delete_queue(
-        &self,
-        namespace: impl AsRef<str>,
-        name: impl AsRef<str>,
-    ) -> eyre::Result<()> {
+    pub async fn delete_queue(&self, namespace: &str, name: &str) -> eyre::Result<()> {
         let mut tx = self.db.begin().await?;
 
         Queue::delete(tx.acquire().await?, namespace, name).await?;
@@ -83,19 +76,16 @@ impl Service {
         Ok(())
     }
 
-    pub async fn list_queues(
-        &self,
-        namespace: Option<impl AsRef<str>>,
-    ) -> eyre::Result<Vec<Queue>> {
+    pub async fn list_queues(&self, namespace: Option<&str>) -> eyre::Result<Vec<Queue>> {
         let mut conn = self.db.acquire().await?;
         Queue::list(conn.acquire().await?, namespace).await
     }
 
     pub async fn send_message(
         &self,
-        namespace: impl AsRef<str>,
-        queue: impl AsRef<str>,
-        message: impl AsRef<[u8]>,
+        namespace: &str,
+        queue: &str,
+        message: &[u8],
         kv: HashMap<String, String>,
     ) -> eyre::Result<()> {
         let mut tx = self.db.begin().await?;
@@ -111,11 +101,7 @@ impl Service {
     //
     // }
 
-    pub async fn list_messages(
-        &self,
-        namespace: impl AsRef<str>,
-        queue: impl AsRef<str>,
-    ) -> eyre::Result<Vec<Message>> {
+    pub async fn list_messages(&self, namespace: &str, queue: &str) -> eyre::Result<Vec<Message>> {
         let mut db = self.db.acquire().await?;
         Message::list(db.acquire().await?, namespace, queue).await
     }

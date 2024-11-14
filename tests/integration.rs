@@ -1,10 +1,11 @@
-use std::{ops::Deref, path::PathBuf};
+use std::ops::Deref;
 
 use creek::{config::Config, db::namespace::Namespace, service::Service};
-use tempfile::{env::temp_dir, TempDir};
+use tempfile::TempDir;
 
 struct TmpService {
     svc: Service,
+    #[allow(unused)]
     tmpdir: TempDir,
 }
 
