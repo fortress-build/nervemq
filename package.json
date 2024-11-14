@@ -9,6 +9,10 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@nextui-org/react": "^2.4.8",
+    "@nextui-org/spinner": "^2.0.34",
+    "@nextui-org/system": "^2.2.6",
+    "@nextui-org/theme": "^2.2.11",
     "@radix-ui/react-dialog": "^1.1.2",
     "@radix-ui/react-label": "^2.1.0",
     "@radix-ui/react-select": "^2.1.2",
@@ -25,9 +29,10 @@
     "framer-motion": "^11.11.15",
     "lucide-react": "^0.456.0",
     "next": "15.0.3",
-    "react": "19.0.0-rc-66855b96-20241106",
-    "react-dom": "19.0.0-rc-66855b96-20241106",
+    "react": "^19.0.0-rc-7ac8e612-20241113",
+    "react-dom": "^19.0.0-rc-7ac8e612-20241113",
     "tailwind-merge": "^2.5.4",
+    "tailwindcss": "^3.4.14",
     "tailwindcss-animate": "^1.0.7",
     "yup": "^1.4.0"
   },
@@ -37,7 +42,6 @@
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "postcss": "^8",
-    "tailwindcss": "^3.4.1",
     "eslint": "^8",
     "eslint-config-next": "15.0.3"
   }

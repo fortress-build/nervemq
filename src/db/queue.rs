@@ -11,12 +11,12 @@ pub struct Queue {
     name: String,
 }
 
-#[derive(Serialize, Deserialize, FromRow)]
+#[derive(Serialize, Deserialize, FromRow, Debug)]
 pub struct QueueStatistics {
     id: u64,
     ns: String,
     name: String,
-    message_count: String,
+    message_count: u64,
 }
 
 impl Queue {
@@ -90,17 +90,20 @@ impl Queue {
         let res = sqlx::query_as(
             "
             SELECT
-                q.id as id,
+                q.id   AS id,
                 n.name as ns,
-                q.name as name,
-                count(*) as message_count
-            FROM messages m
-            JOIN queues q ON q.id = m.queue
-            JOIN namespaces n ON q.ns = n.id
+                q.name AS name,
+                COUNT(m.id) AS message_count
+            FROM queues q
+            LEFT JOIN messages m ON q.id = m.queue
+            LEFT JOIN namespaces n ON q.ns = n.id
+            GROUP BY q.id, q.name;
         ",
         )
         .fetch_all(db)
         .await?;
+
+        tracing::warn!("{res:?}");
 
         Ok(res)
     }

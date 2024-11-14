@@ -18,14 +18,15 @@ create unique index queues_ns_name_idx on queues(ns, name);
 
 create table messages (
   id    integer not null,
-  queue integer not null,
+  ns    integer not null,
+  queue integer  not null,
   body  blob    not null,
   delivered_at  integer not null default 0,
 
   primary key (id),
   foreign key (queue) references queues(id) on delete cascade
 );
-create unique index messages_queue_idx on messages(queue);
+create index messages_ns_queue_idx on messages(ns, queue);
 
 create table kv_pairs (
   id      integer not null,
@@ -36,4 +37,4 @@ create table kv_pairs (
   primary key (id),
   foreign key (message) references messages(id) on delete cascade
 );
-create unique index kv_message_idx on kv_pairs(message);
+create unique index kv_message_idx on kv_pairs(message, k);

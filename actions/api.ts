@@ -2,29 +2,70 @@
 
 import type { CreateQueue } from "@/components/create-queue";
 import type { QueueStatistics } from "@/components/queues/table";
+import { revalidateTag } from "next/cache";
+
+export async function createNamespace(name: string) {
+  "use server";
+
+  await fetch(`http://localhost:8080/ns/${name}`, {
+    method: "POST",
+    next: {
+      tags: ["namespaces"],
+    },
+  });
+
+  revalidateTag("namespaces");
+}
+
+export async function deleteNamespace(name: string) {
+  "use server";
+
+  await fetch(`http://localhost:8080/ns/${name}`, {
+    method: "DELETE",
+    next: {
+      tags: ["namespaces"],
+    },
+  });
+
+  revalidateTag("namespaces");
+}
 
 export async function createQueue(data: CreateQueue) {
   "use server";
 
-  console.log(data);
-
-  await new Promise((resolve) => {
-    setTimeout(() => {
-      resolve(null);
-    }, 2000);
+  await fetch(`http://localhost:8080/queue/default/${data.name}`, {
+    method: "POST",
+    next: {
+      tags: ["queues"],
+    },
   });
+
+  revalidateTag("queues");
+}
+
+export async function deleteQueue(data: CreateQueue) {
+  "use server";
+
+  await fetch(`http://localhost:8080/queue/default/${data.name}`, {
+    method: "DELETE",
+    next: {
+      tags: ["queues"],
+    },
+  });
+
+  revalidateTag("queues");
 }
 
 export async function listQueues(): Promise<QueueStatistics[]> {
   "use server";
 
-  const res = await fetch("http://localhost:8080/stats/", {
+  return await fetch("http://localhost:8080/stats", {
     method: "GET",
+    mode: "no-cors",
+    next: {
+      tags: ["queues"],
+    },
   })
     .then((res) => res.json())
-    .catch(() => ({
-      queues: [],
-    }));
-
-  return res.queues;
+    .catch(() => []);
 }

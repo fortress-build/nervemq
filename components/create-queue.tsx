@@ -1,6 +1,7 @@
 import { Button } from "./ui/button";
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -14,8 +15,8 @@ import { yupValidator } from "@tanstack/yup-form-adapter";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { cn } from "@/lib/utils";
-import { Spinner } from "@nextui-org/react";
 import { createQueue } from "@/actions/api";
+import { Spinner } from "@nextui-org/react";
 
 function isAlphaNumeric(str: string) {
   let code: number;
@@ -79,7 +80,6 @@ export default function CreateQueue({
         }
       }}
     >
-      <DialogDescription>Create Queue</DialogDescription>
       <DialogContent>
         <form
           onSubmit={(e) => {
@@ -91,6 +91,9 @@ export default function CreateQueue({
         >
           <DialogHeader>
             <DialogTitle>Create Queue</DialogTitle>
+            <DialogDescription>
+              There is no limit to the number of queues you can create.
+            </DialogDescription>
           </DialogHeader>
           <form.Field name="name">
             {(field) => (
@@ -120,22 +123,32 @@ export default function CreateQueue({
               selector={(state) => [state.canSubmit, state.isSubmitting]}
             >
               {([canSubmit, isSubmitting]) => (
-                <Button type="submit" disabled={!canSubmit}>
-                  {isSubmitting ? (
-                    <>
-                      <Spinner
-                        color="white"
-                        className="w-16 absolute self-center"
-                      />
-                      <p className="text-transparent">Create</p>
-                    </>
-                  ) : (
-                    "Create"
-                  )}
-                </Button>
+                <>
+                  <Button type="submit" disabled={!canSubmit}>
+                    {isSubmitting ? (
+                      <>
+                        {
+                          <Spinner
+                            className="absolute self-center"
+                            size="sm"
+                            color="current"
+                          />
+                        }
+                        <p className="text-transparent">Create</p>
+                      </>
+                    ) : (
+                      "Create"
+                    )}
+                  </Button>
+
+                  <DialogClose asChild>
+                    <Button variant={"secondary"} disabled={isSubmitting}>
+                      Cancel
+                    </Button>
+                  </DialogClose>
+                </>
               )}
             </form.Subscribe>
-            <Button variant={"secondary"}>Cancel</Button>
           </DialogFooter>
         </form>
       </DialogContent>
