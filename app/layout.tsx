@@ -23,7 +23,9 @@ export default async function RootLayout({
         <Providers sidebarOpen={defaultOpen}>
           <DashboardSidebar />
 
-          <main className="w-full min-h-svh bg-background">{children}</main>
+          <main className="w-full min-h-svh bg-background py-16">
+            {children}
+          </main>
         </Providers>
       </body>
     </html>
