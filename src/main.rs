@@ -19,6 +19,7 @@ async fn main() -> eyre::Result<()> {
             .service(api::list_ns_queues)
             .service(api::create_queue)
             .service(api::delete_queue)
+            .service(api::stats)
     })
     .bind(("127.0.0.1", 8080))?
     .run()

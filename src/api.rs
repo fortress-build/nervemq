@@ -96,3 +96,12 @@ async fn create_queue(
 
     Ok("OK")
 }
+
+#[get("/stats")]
+async fn stats(service: web::Data<Service>) -> actix_web::Result<impl Responder> {
+    if let Err(e) = service.statistics().await {
+        return Err(actix_web::error::ErrorInternalServerError(e));
+    }
+
+    Ok("OK")
+}
