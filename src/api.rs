@@ -6,7 +6,7 @@ use crate::{
     service::Service,
 };
 
-#[get("/")]
+#[get("")]
 async fn list_namespaces(service: web::Data<Service>) -> actix_web::Result<impl Responder> {
     let data = match service.list_namespaces().await {
         Ok(data) => data,
@@ -51,7 +51,7 @@ pub struct ListQueuesResponse {
     queues: Vec<Queue>,
 }
 
-#[get("/")]
+#[get("")]
 async fn list_all_queues(service: web::Data<Service>) -> actix_web::Result<impl Responder> {
     let queues = match service.list_queues(None).await {
         Ok(q) => q,

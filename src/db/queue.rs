@@ -108,8 +108,6 @@ impl Queue {
         .fetch_all(db)
         .await?;
 
-        tracing::warn!("{res:?}");
-
         Ok(res)
     }
 
