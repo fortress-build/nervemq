@@ -54,6 +54,7 @@ export default function CreateNamespace({
       await createNamespace(data.name)
         .then(() => {
           invalidate();
+          close();
         })
         .catch(() => {
           toast.error("Something went wrong");

@@ -99,8 +99,6 @@ const QueuePage = () => {
 
   return (
     <div className="container mx-auto p-4">
-      <h1 className="text-2xl font-medium mb-4">Queue #{queueId}</h1>
-
       <div className="grid gap-4">
         {/* Queue Status Section */}
         <section className="border rounded-lg p-4">
