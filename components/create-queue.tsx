@@ -88,6 +88,12 @@ export default function CreateQueue({
     },
   });
 
+  const handleNamespaceCreated = async (namespaceName: string) => {
+    await form.setFieldValue('namespace', namespaceName);
+    await form.validateField('namespace', 'change');
+    setShowCreateNamespace(false);
+  };
+
   return (
     <>
       <Dialog
@@ -247,6 +253,7 @@ export default function CreateQueue({
       <CreateNamespace 
         open={showCreateNamespace}
         close={() => setShowCreateNamespace(false)}
+        onSuccess={handleNamespaceCreated}
       />
     </>
   );

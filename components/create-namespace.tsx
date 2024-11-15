@@ -32,13 +32,17 @@ export const createNamespaceSchema = object({
 
 export type CreateNamespace = InferType<typeof createNamespaceSchema>;
 
+interface CreateNamespaceProps {
+  open: boolean;
+  close: () => void;
+  onSuccess?: (namespaceName: string) => void;
+}
+
 export default function CreateNamespace({
   open,
   close,
-}: {
-  open: boolean;
-  close: () => void;
-}) {
+  onSuccess,
+}: CreateNamespaceProps) {
   const invalidate = useInvalidate(["namespaces"]);
 
   const form = useForm({
@@ -54,6 +58,9 @@ export default function CreateNamespace({
       await createNamespace(data.name)
         .then(() => {
           invalidate();
+          if (onSuccess) {
+            onSuccess(data.name);
+          }
           close();
         })
         .catch(() => {
