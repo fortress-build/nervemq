@@ -18,7 +18,7 @@ import { Label } from "./ui/label";
 import { cn, isAlphaNumeric } from "@/lib/utils";
 import { createQueue, listNamespaces } from "@/actions/api";
 import { Spinner } from "@nextui-org/react";
-import { Check, ChevronsUpDown, Minus, Plus } from "lucide-react";
+import { ChevronsUpDown, Plus } from "lucide-react";
 import {
   Command,
   CommandEmpty,
@@ -51,11 +51,9 @@ export type CreateQueue = InferType<typeof createQueueSchema>;
 export default function CreateQueue({
   open,
   close,
-  onCreateNamespace,
 }: {
   open: boolean;
   close: () => void;
-  onCreateNamespace: () => void;
 }) {
   const [showCreateNamespace, setShowCreateNamespace] = useState(false);
 
