@@ -74,8 +74,8 @@ export default function CreateNamespace({
         .then(() => {
           invalidate();
         })
-        .catch((e) => {
-          toast.error(e.message);
+        .catch(() => {
+          toast.error("Something went wrong");
         });
     },
   });
