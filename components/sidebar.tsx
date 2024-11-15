@@ -99,7 +99,7 @@ export default function DashboardSidebar() {
             <SidebarMenu>
               <SidebarItem
                 title="Queues"
-                url="/"
+                url="/queues"
                 icon={Logs}
                 isActive={pathName.endsWith("/")}
                 onClick={() => setMode("create-queue")}
