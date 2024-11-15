@@ -13,7 +13,7 @@ export type QueueStatistics = Queue & {
   messageCount: number;
 };
 
-export const columns: ColumnDef<QueueStatistics>[] = [
+export const columns: ColumnDef<Queue>[] = [
   {
     accessorKey: "name",
     header: () => <ColumnHeader label="Name" icon={KeySquare} />,
@@ -27,3 +27,5 @@ export const columns: ColumnDef<QueueStatistics>[] = [
     header: () => <ColumnHeader label="Inflight" icon={Activity} />,
   },
 ];
+
+
