@@ -17,6 +17,7 @@ import { Label } from "./ui/label";
 import { cn } from "@/lib/utils";
 import { createNamespace } from "@/actions/api";
 import { Spinner } from "@nextui-org/react";
+import { toast } from "sonner";
 
 function isAlphaNumeric(str: string) {
   let code: number;
@@ -66,7 +67,9 @@ export default function CreateNamespace({
       onMount: createNamespaceSchema,
     },
     onSubmit: async ({ value: data }) => {
-      await createNamespace(data.name);
+      await createNamespace(data.name).catch((e) => {
+        toast.error(e.message);
+      });
     },
   });
 
@@ -106,6 +109,7 @@ export default function CreateNamespace({
                   onBlur={field.handleBlur}
                   onChange={(e) => field.handleChange(e.target.value)}
                   placeholder="Name"
+                  data-1p-ignore
                   className={cn(
                     "focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0",
                     "focus:border-primary focus:border transition-all",

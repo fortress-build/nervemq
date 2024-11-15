@@ -68,7 +68,6 @@ export default function CreateQueue({
       onMount: createQueueSchema,
     },
     onSubmit: async ({ value: data }) => {
-      console.log(data);
       await createQueue(data)
         .catch((e) => {
           toast.error(e.message);
