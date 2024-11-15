@@ -25,7 +25,7 @@ export default function Queues() {
   const router = useRouter();
 
   return (
-    <div className="flex flex-col px-4 gap-4">
+    <div className="flex flex-col gap-4">
       <DataTable
         className="w-full"
         columns={columns}
