@@ -15,7 +15,7 @@ export default function Namespaces() {
   });
 
   return (
-    <div className="h-full flex flex-col gap-4 px-4">
+    <div className="h-full flex flex-col gap-4">
       <DataTable
         className="w-full"
         columns={columns}

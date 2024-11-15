@@ -1,5 +1,7 @@
 "use client";
 import type { ColumnDef } from "@tanstack/react-table";
+import { Activity, Braces, KeySquare } from "lucide-react";
+import { ColumnHeader } from "../table-header";
 
 export type Queue = {
   id: string;
@@ -14,14 +16,14 @@ export type QueueStatistics = Queue & {
 export const columns: ColumnDef<QueueStatistics>[] = [
   {
     accessorKey: "name",
-    header: "Name",
+    header: () => <ColumnHeader label="Name" icon={KeySquare} />,
   },
   {
     accessorKey: "ns",
-    header: "Namespace",
+    header: () => <ColumnHeader label="Namespace" icon={Braces} />,
   },
   {
     accessorKey: "messageCount",
-    header: "Inflight",
+    header: () => <ColumnHeader label="Inflight" icon={Activity} />,
   },
 ];

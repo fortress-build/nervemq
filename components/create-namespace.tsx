@@ -14,32 +14,13 @@ import { useForm } from "@tanstack/react-form";
 import { yupValidator } from "@tanstack/yup-form-adapter";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
-import { cn } from "@/lib/utils";
+import { cn, isAlphaNumeric } from "@/lib/utils";
 import { createNamespace } from "@/actions/api";
 import { Spinner } from "@nextui-org/react";
 import { toast } from "sonner";
 import { useInvalidate } from "@/hooks/use-invalidate";
 
-function isAlphaNumeric(str: string) {
-  let code: number;
-  let i: number;
-  let len: number;
-
-  for (i = 0, len = str.length; i < len; i++) {
-    code = str.charCodeAt(i);
-    if (
-      !(code > 47 && code < 58) && // numeric (0-9)
-      !(code > 64 && code < 91) && // upper alpha (A-Z)
-      !(code > 96 && code < 123)
-    ) {
-      // lower alpha (a-z)
-      return false;
-    }
-  }
-  return true;
-}
-
-const createNamespaceSchema = object({
+export const createNamespaceSchema = object({
   name: string()
     .required()
     .max(32)
