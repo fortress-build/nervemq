@@ -1,10 +1,9 @@
 use actix_web::web::{self};
-use actix_web::{get, Responder};
+use actix_web::Responder;
 use actix_web::{web::Data, App, HttpServer};
 
 use creek::service::Service;
 use creek::{api, config::Config};
-use serde::ser;
 use tracing_actix_web::TracingLogger;
 
 #[tokio::main]

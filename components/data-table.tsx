@@ -16,16 +16,19 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
+import { Spinner } from "@nextui-org/spinner";
 
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
   data: TData[];
   className?: string;
+  isLoading?: boolean;
 }
 
 export function DataTable<TData, TValue>({
   columns,
   data,
+  isLoading,
   className,
 }: DataTableProps<TData, TValue>) {
   const table = useReactTable({
@@ -72,7 +75,7 @@ export function DataTable<TData, TValue>({
           ) : (
             <TableRow>
               <TableCell colSpan={columns.length} className="h-24 text-center">
-                No results.
+                {isLoading ? <Spinner /> : "No results."}
               </TableCell>
             </TableRow>
           )}
