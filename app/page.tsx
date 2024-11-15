@@ -17,7 +17,7 @@ export default function Queues() {
   const [isOpen, setIsOpen] = useState(false);
 
   return (
-    <div className="flex px-4">
+    <div className="flex flex-col px-4 gap-4">
       <DataTable
         className="w-full"
         columns={columns}
@@ -25,7 +25,7 @@ export default function Queues() {
         isLoading={isLoading}
       />
 
-      <div className="flex justify-end px-4">
+      <div className="flex justify-end">
         <Button onClick={() => setIsOpen(true)}>Create Queue</Button>
       </div>
       <CreateQueue open={isOpen} close={() => setIsOpen(false)} />

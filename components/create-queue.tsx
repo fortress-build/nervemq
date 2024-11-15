@@ -75,8 +75,8 @@ export default function CreateQueue({
         .then(() => {
           invalidate();
         })
-        .catch((e) => {
-          toast.error(e.message);
+        .catch(() => {
+          toast.error("Something went wrong");
         })
         .finally(() => {
           close();

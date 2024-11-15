@@ -9,22 +9,20 @@ import { DataTable } from "@/components/data-table";
 
 export default function Namespaces() {
   const [isOpen, setIsOpen] = useState(false);
-  const {
-    data = [],
-    isLoading,
-    error,
-  } = useQuery({
+  const { data = [], isLoading } = useQuery({
     queryKey: ["namespaces"],
     queryFn: () => listNamespaces(),
   });
 
-  if (isLoading) return <div>Loading...</div>;
-  if (error) return <div>Error loading namespaces</div>;
-
   return (
     <div className="h-full flex flex-col gap-4 px-4">
-      <DataTable className="w-full" columns={columns} data={data} />
-      <div className="flex justify-end px-4">
+      <DataTable
+        className="w-full"
+        columns={columns}
+        data={data}
+        isLoading={isLoading}
+      />
+      <div className="flex justify-end">
         <Button onClick={() => setIsOpen(true)}>Create Namespace</Button>
       </div>
       <CreateNamespace open={isOpen} close={() => setIsOpen(false)} />
