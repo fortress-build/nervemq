@@ -9,6 +9,7 @@ import { DataTable } from "@/components/data-table";
 import CreateQueue from "@/components/create-queue";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
+import { ChevronRight } from "lucide-react";
 
 export type Queue = {
   id: string;
@@ -28,7 +29,13 @@ export default function Queues() {
     <div className="flex flex-col gap-4">
       <DataTable
         className="w-full"
-        columns={columns}
+        columns={[
+          {
+            id: "actions",
+            cell: () => <ChevronRight className="h-4 w-4 text-muted-foreground" />,
+          },
+          ...columns,
+        ]}
         data={data}
         isLoading={isLoading}
         onRowClick={(row: QueueStatistics) => router.push(`/queues/${row.id}`)}
