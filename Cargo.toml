@@ -12,9 +12,20 @@ name = "creek"
 path = "src/main.rs"
 
 [dependencies]
+actix-casbin = { version = "1.1.0", default-features = false, features = [
+  "runtime-tokio",
+  "tokio",
+] }
+actix-casbin-auth = { version = "1.1.0", default-features = false, features = [
+  "runtime-tokio",
+  "tokio",
+] }
 actix-web = "4.9.0"
+argon2 = { version = "0.5.3", features = ["simple", "std", "zeroize"] }
+base64 = "0.22.1"
 envy = "0.4.2"
 eyre = "0.6.12"
+rand = "0.8.5"
 serde = { version = "1.0.215", features = ["derive"] }
 serde_json = "1.0.132"
 snafu = "0.8.5"
