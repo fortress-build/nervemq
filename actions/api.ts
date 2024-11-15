@@ -1,5 +1,4 @@
 "use server";
-
 import type { CreateQueue } from "@/components/create-queue";
 import type { NamespaceStatistics } from "@/components/namespaces/table";
 import type { QueueStatistics } from "@/components/queues/table";

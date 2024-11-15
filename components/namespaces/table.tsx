@@ -1,5 +1,7 @@
 "use client";
 import type { ColumnDef } from "@tanstack/react-table";
+import { KeySquare, Logs } from "lucide-react";
+import { ColumnHeader } from "../table-header";
 
 export type Namespace = {
   id: string;
@@ -14,10 +16,10 @@ export type NamespaceStatistics = Namespace & {
 export const columns: ColumnDef<NamespaceStatistics>[] = [
   {
     accessorKey: "name",
-    header: "Name",
+    header: () => <ColumnHeader label="Name" icon={KeySquare} />,
   },
   {
     accessorKey: "queueCount",
-    header: "Queues",
+    header: () => <ColumnHeader label="Queues" icon={Logs} />,
   },
 ];

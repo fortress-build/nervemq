@@ -3,6 +3,7 @@ import "./globals.css";
 import { cookies } from "next/headers";
 import Providers from "./providers";
 import DashboardSidebar from "@/components/sidebar";
+import Header from "@/components/header";
 
 export const metadata: Metadata = {
   title: "Creek UI",
@@ -23,9 +24,10 @@ export default async function RootLayout({
         <Providers sidebarOpen={defaultOpen}>
           <DashboardSidebar />
 
-          <main className="w-full min-h-svh bg-background py-16">
-            {children}
-          </main>
+          <div className="flex flex-col w-full min-h-svh bg-background gap-2 px-4">
+            <Header className="h-12" />
+            <main className="">{children}</main>
+          </div>
         </Providers>
       </body>
     </html>
