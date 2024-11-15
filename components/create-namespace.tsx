@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils";
 import { createNamespace } from "@/actions/api";
 import { Spinner } from "@nextui-org/react";
 import { toast } from "sonner";
+import { useInvalidate } from "@/hooks/use-invalidate";
 
 function isAlphaNumeric(str: string) {
   let code: number;
@@ -57,6 +58,8 @@ export default function CreateNamespace({
   open: boolean;
   close: () => void;
 }) {
+  const invalidate = useInvalidate(["namespaces"]);
+
   const form = useForm({
     defaultValues: {
       name: "",
@@ -67,9 +70,13 @@ export default function CreateNamespace({
       onMount: createNamespaceSchema,
     },
     onSubmit: async ({ value: data }) => {
-      await createNamespace(data.name).catch((e) => {
-        toast.error(e.message);
-      });
+      await createNamespace(data.name)
+        .then(() => {
+          invalidate();
+        })
+        .catch((e) => {
+          toast.error(e.message);
+        });
     },
   });
 

@@ -1,18 +1,10 @@
 use actix_web::web::{self};
-use actix_web::{get, Responder};
+use actix_web::Responder;
 use actix_web::{web::Data, App, HttpServer};
 
 use creek::service::Service;
 use creek::{api, config::Config};
-use serde::ser;
 use tracing_actix_web::TracingLogger;
-
-// .service(
-//     web::scope("/ns")
-//         .route("", web::get().to(api::list_namespaces))
-//         .route("/{ns_name}", web::post().to(api::create_namespace))
-//         .route("/{ns_id}", web::delete().to(api::delete_namespace)),
-// )
 
 #[tokio::main]
 async fn main() -> eyre::Result<()> {
@@ -38,7 +30,6 @@ async fn main() -> eyre::Result<()> {
                     .service(api::delete_queue),
             )
             .service(api::stats)
-            // .default_service(web::route().to(not_found))
             .wrap(TracingLogger::default())
             .wrap(actix_web::middleware::Logger::default())
             .app_data(service.clone())
@@ -48,8 +39,4 @@ async fn main() -> eyre::Result<()> {
     .await?;
 
     Ok(())
-}
-
-async fn not_found() -> impl Responder {
-    Result::<String, _>::Err(actix_web::error::ErrorNotFound("not found"))
 }
