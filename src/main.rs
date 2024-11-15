@@ -1,5 +1,4 @@
 use actix_web::web::{self};
-use actix_web::Responder;
 use actix_web::{web::Data, App, HttpServer};
 
 use creek::service::Service;
