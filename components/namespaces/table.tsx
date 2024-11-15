@@ -1,6 +1,5 @@
 "use client";
 import type { ColumnDef } from "@tanstack/react-table";
-import { DataTable } from "../data-table";
 
 export type Namespace = {
   id: string;
@@ -22,11 +21,3 @@ export const columns: ColumnDef<NamespaceStatistics>[] = [
     header: "Queues",
   },
 ];
-
-export function NamespaceTable({ data }: { data: NamespaceStatistics[] }) {
-  return (
-    <div className="px-4 w-full">
-      <DataTable columns={columns} data={data} />
-    </div>
-  );
-}
