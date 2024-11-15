@@ -19,8 +19,14 @@ export default async function RootLayout({
   const defaultOpen = cookieStore.get("sidebar:state")?.value === "true";
 
   return (
-    <html lang="en">
-      <body>
+    <html lang="en" suppressHydrationWarning>
+      <body
+      // className={
+      //   window.matchMedia("(prefers-color-scheme: dark)").matches
+      //     ? "dark"
+      //     : ""
+      // }
+      >
         <Providers sidebarOpen={defaultOpen}>
           <DashboardSidebar />
 

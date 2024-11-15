@@ -18,7 +18,7 @@ import { Label } from "./ui/label";
 import { cn, isAlphaNumeric } from "@/lib/utils";
 import { createQueue, listNamespaces } from "@/actions/api";
 import { Spinner } from "@nextui-org/react";
-import { Check, ChevronsUpDown, Minus, Plus } from "lucide-react";
+import { ChevronsUpDown, Plus } from "lucide-react";
 import {
   Command,
   CommandEmpty,
@@ -51,13 +51,12 @@ export type CreateQueue = InferType<typeof createQueueSchema>;
 export default function CreateQueue({
   open,
   close,
-  onCreateNamespace,
 }: {
   open: boolean;
   close: () => void;
-  onCreateNamespace: () => void;
 }) {
   const [showCreateNamespace, setShowCreateNamespace] = useState(false);
+  const [nsPopoverOpen, setNsPopoverOpen] = useState(false);
 
   const { data: namespaces = [], isLoading } = useQuery({
     queryFn: () => listNamespaces(),
@@ -145,7 +144,7 @@ export default function CreateQueue({
               {(field) => (
                 <div className="flex flex-col gap-2">
                   <Label htmlFor={field.name}>Namespace</Label>
-                  <Popover>
+                  <Popover open={nsPopoverOpen} onOpenChange={setNsPopoverOpen}>
                     <PopoverTrigger asChild>
                       <Button
                         variant="outline"
@@ -153,7 +152,7 @@ export default function CreateQueue({
                         role="combobox"
                         className={cn(
                           "w-full justify-between",
-                          !field.state.value && "text-muted-foreground",
+                          field.state.value ? "" : "text-muted-foreground",
                         )}
                       >
                         {field.state.value
@@ -171,7 +170,9 @@ export default function CreateQueue({
                               <Spinner />
                             ) : (
                               <div className="flex flex-col items-center justify-center py-4 gap-2">
-                                <p className="text-sm text-muted-foreground">No namespace found.</p>
+                                <p className="text-sm text-muted-foreground">
+                                  No namespace found.
+                                </p>
                               </div>
                             )}
                           </CommandEmpty>
@@ -180,8 +181,10 @@ export default function CreateQueue({
                               <CommandItem
                                 key={namespace.name}
                                 value={namespace.name}
+                                className="cursor-pointer"
                                 onSelect={(currentValue) => {
                                   field.handleChange(currentValue);
+                                  setNsPopoverOpen(false);
                                 }}
                               >
                                 {namespace.name}
@@ -191,7 +194,7 @@ export default function CreateQueue({
                           <CommandGroup>
                             <CommandItem
                               onSelect={() => setShowCreateNamespace(true)}
-                              className="flex items-center gap-2"
+                              className="flex items-center gap-2 cursor-pointer"
                             >
                               <Plus className="h-4 w-4" />
                               Create Namespace
@@ -246,7 +249,7 @@ export default function CreateQueue({
         </DialogContent>
       </Dialog>
 
-      <CreateNamespace 
+      <CreateNamespace
         open={showCreateNamespace}
         close={() => setShowCreateNamespace(false)}
       />
