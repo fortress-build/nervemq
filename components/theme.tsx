@@ -3,12 +3,12 @@ import useClickOutside from "@/hooks/use-click-outside";
 import { cn } from "@/lib/utils";
 import { AnimatePresence, MotionConfig, motion } from "framer-motion";
 import { Computer, Moon, Sun } from "lucide-react";
-import { useRef, useState, useEffect, useId, useCallback } from "react";
+import { useRef, useState, useEffect, useId } from "react";
 import { SidebarMenuButton } from "./ui/sidebar";
 
 import React from "react";
 import { Button } from "./ui/button";
-import { useTheme } from "next-themes";
+import { useTheme, type UseThemeProps } from "next-themes";
 
 const TRANSITION = {
   type: "spring",
@@ -16,7 +16,9 @@ const TRANSITION = {
   duration: 0.3,
 };
 
-const themes = {
+type Theme = "light" | "dark" | "system";
+
+const themes: Record<Theme, { icon: JSX.ElementType }> = {
   light: {
     icon: Sun,
   },
@@ -32,15 +34,9 @@ export default function ThemeSelector() {
   const uniqueId = useId();
   const formContainerRef = useRef<HTMLDivElement>(null);
   const [isOpen, setIsOpen] = useState(false);
-  const { theme, setTheme } = useTheme();
-
-  const openMenu = () => {
-    setIsOpen(true);
+  const { theme, setTheme } = useTheme() as UseThemeProps & {
+    theme: Theme;
   };
-
-  const closeMenu = useCallback(() => {
-    setIsOpen(false);
-  }, []);
 
   const onValueChange = (value: string) => {
     setTheme(value);
@@ -48,13 +44,13 @@ export default function ThemeSelector() {
   };
 
   useClickOutside(formContainerRef, () => {
-    closeMenu();
+    setIsOpen(false);
   });
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
-        closeMenu();
+        setIsOpen(false);
       }
     };
 
@@ -63,7 +59,9 @@ export default function ThemeSelector() {
     return () => {
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [closeMenu]);
+  }, []);
+
+  const currentTheme = themes[theme ?? "system"];
 
   return (
     <MotionConfig transition={TRANSITION}>
@@ -72,20 +70,14 @@ export default function ThemeSelector() {
           key="button"
           layoutId={`popover-${uniqueId}`}
           className={cn("flex h-8 w-8 justify-start")}
-          onClick={openMenu}
+          onClick={() => setIsOpen(true)}
         >
           <motion.span
             className="flex items-center justify-center"
             layoutId={`popover-label-${uniqueId}`}
           >
             <SidebarMenuButton asChild className="text-current w-8 h-8">
-              {
-                {
-                  system: <Computer />,
-                  dark: <Moon />,
-                  light: <Sun />,
-                }[theme ?? "system"]
-              }
+              {<currentTheme.icon />}
             </SidebarMenuButton>
           </motion.span>
         </motion.button>
@@ -96,7 +88,7 @@ export default function ThemeSelector() {
               ref={formContainerRef}
               layoutId={`popover-${uniqueId}`}
               className={cn(
-                "absolute rounded-md border-border min-w-28 left-0 bottom-0 overflow-hidden border",
+                "absolute rounded-md border-border left-0 bottom-0 overflow-hidden border",
                 "flex flex-row h-8 bg-background",
               )}
               style={{
@@ -118,7 +110,10 @@ export default function ThemeSelector() {
                     key={name}
                     variant={"ghost"}
                     onClick={() => onValueChange(name)}
-                    className="text-primary cursor-pointer h-full py-0 flex flex-col justify-center"
+                    className={cn(
+                      "text-primary cursor-pointer h-full py-0 flex flex-col justify-center",
+                      "px-2",
+                    )}
                   >
                     <props.icon />
                   </Button>
