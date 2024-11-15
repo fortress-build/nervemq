@@ -43,3 +43,7 @@ next-env.d.ts
 # Added by cargo
 
 /target
+
+/creek.db
+/creek.db-shm
+/creek.db-wal

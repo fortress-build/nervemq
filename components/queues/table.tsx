@@ -1,6 +1,5 @@
 "use client";
 import type { ColumnDef } from "@tanstack/react-table";
-import { DataTable } from "../data-table";
 
 export type Queue = {
   id: string;
@@ -26,11 +25,3 @@ export const columns: ColumnDef<QueueStatistics>[] = [
     header: "Inflight",
   },
 ];
-
-export function QueuesTable({ data }: { data: QueueStatistics[] }) {
-  return (
-    <div className="px-4 w-full">
-      <DataTable columns={columns} data={data} />
-    </div>
-  );
-}

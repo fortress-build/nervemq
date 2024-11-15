@@ -40,17 +40,17 @@ export async function listNamespaces(): Promise<NamespaceStatistics[]> {
     },
   })
     .then((res) => res.json())
-    .then((res) => {
-      console.log("ns", res);
-      return res;
-    })
-    .catch(() => []);
+    .catch((e) => {
+      console.error(e);
+
+      return [];
+    });
 }
 
 export async function createQueue(data: CreateQueue) {
   "use server";
 
-  await fetch(`http://localhost:8080/queue/default/${data.name}`, {
+  await fetch(`http://localhost:8080/queue/${data.namespace}/${data.name}`, {
     method: "POST",
     next: {
       tags: ["queues"],

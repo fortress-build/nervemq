@@ -29,6 +29,7 @@ import {
 } from "./ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { toast } from "sonner";
+import { useInvalidate } from "@/hooks/use-invalidate";
 
 export const createQueueSchema = object({
   name: string()
@@ -57,6 +58,8 @@ export default function CreateQueue({
     queryKey: ["namespaces"],
   });
 
+  const invalidate = useInvalidate(["queues"]);
+
   const form = useForm({
     defaultValues: {
       name: "",
@@ -68,8 +71,10 @@ export default function CreateQueue({
       onMount: createQueueSchema,
     },
     onSubmit: async ({ value: data }) => {
-      console.log(data);
       await createQueue(data)
+        .then(() => {
+          invalidate();
+        })
         .catch((e) => {
           toast.error(e.message);
         })
