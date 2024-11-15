@@ -4,7 +4,7 @@ import { listQueues } from "@/actions/api";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 
-import { columns } from "@/components/queues/table";
+import { columns, type QueueStatistics } from "@/components/queues/table";
 import { DataTable } from "@/components/data-table";
 import CreateQueue from "@/components/create-queue";
 import { Button } from "@/components/ui/button";
@@ -16,32 +16,9 @@ export type Queue = {
   name: string;
 };
 
-const mockQueues: Queue[] = [
-  {
-    id: "queue-1",
-    ns: "default",
-    name: "notifications",
-  },
-  {
-    id: "queue-2",
-    ns: "default",
-    name: "emails",
-  },
-  {
-    id: "queue-3",
-    ns: "marketing",
-    name: "campaign-events",
-  },
-  {
-    id: "queue-4",
-    ns: "analytics",
-    name: "tracking-events",
-  },
-];
-
 export default function Queues() {
-  const { data = mockQueues, isLoading } = useQuery({
-    //queryFn: () => listQueues(),
+  const { data = [], isLoading } = useQuery({
+    queryFn: () => listQueues(),
     queryKey: ["queues"],
   });
   const [isOpen, setIsOpen] = useState(false);
@@ -54,7 +31,7 @@ export default function Queues() {
         columns={columns}
         data={data}
         isLoading={isLoading}
-        onRowClick={(row) => router.push(`/queues/${row.id}`)}
+        onRowClick={(row: QueueStatistics) => router.push(`/queues/${row.id}`)}
       />
 
       <div className="flex justify-end">

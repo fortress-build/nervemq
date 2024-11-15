@@ -23,7 +23,7 @@ interface DataTableProps<TData, TValue> {
   data: TData[];
   className?: string;
   isLoading?: boolean;
-  onRowClick?: (row: TData) => void;
+  onRowClick?: (row: TValue) => void;
 }
 
 export function DataTable<TData, TValue>({
@@ -31,7 +31,7 @@ export function DataTable<TData, TValue>({
   data,
   isLoading,
   className,
-  onRowClick
+  onRowClick,
 }: DataTableProps<TData, TValue>) {
   const table = useReactTable({
     data,
