@@ -8,6 +8,7 @@ import { SidebarMenuButton } from "./ui/sidebar";
 
 import React from "react";
 import { Button } from "./ui/button";
+import { useTheme } from "next-themes";
 
 const TRANSITION = {
   type: "spring",
@@ -15,11 +16,23 @@ const TRANSITION = {
   duration: 0.3,
 };
 
+const themes = {
+  light: {
+    icon: Sun,
+  },
+  dark: {
+    icon: Moon,
+  },
+  system: {
+    icon: Computer,
+  },
+};
+
 export default function ThemeSelector() {
   const uniqueId = useId();
   const formContainerRef = useRef<HTMLDivElement>(null);
   const [isOpen, setIsOpen] = useState(false);
-  const [theme, setTheme] = useState("system");
+  const { theme, setTheme } = useTheme();
 
   const openMenu = () => {
     setIsOpen(true);
@@ -37,40 +50,6 @@ export default function ThemeSelector() {
   useClickOutside(formContainerRef, () => {
     closeMenu();
   });
-
-  useEffect(() => {
-    if (window.matchMedia === undefined) {
-      return;
-    }
-
-    const match = window.matchMedia("(prefers-color-scheme: dark)");
-
-    const updateTheme = () => {
-      switch (theme) {
-        case "dark":
-          document.body.classList.add("dark");
-          break;
-        case "light":
-          document.body.classList.remove("dark");
-          break;
-        default:
-          if (match.matches) {
-            document.body.classList.add("dark");
-          } else {
-            document.body.classList.remove("dark");
-          }
-          break;
-      }
-    };
-
-    updateTheme();
-
-    match.addEventListener("change", updateTheme);
-
-    return () => {
-      match.removeEventListener("change", updateTheme);
-    };
-  }, [theme]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -99,16 +78,13 @@ export default function ThemeSelector() {
             className="flex items-center justify-center"
             layoutId={`popover-label-${uniqueId}`}
           >
-            <SidebarMenuButton
-              asChild
-              className="text-muted-foreground w-8 h-8"
-            >
+            <SidebarMenuButton asChild className="text-current w-8 h-8">
               {
                 {
                   system: <Computer />,
                   dark: <Moon />,
                   light: <Sun />,
-                }[theme]
+                }[theme ?? "system"]
               }
             </SidebarMenuButton>
           </motion.span>
@@ -127,27 +103,26 @@ export default function ThemeSelector() {
                 borderRadius: 8,
               }}
             >
-              <Button
-                variant={"ghost"}
-                onClick={() => onValueChange("dark")}
-                className="cursor-pointer h-full py-0 flex flex-col justify-center"
-              >
-                <Moon />
-              </Button>
-              <Button
-                variant={"ghost"}
-                onClick={() => onValueChange("light")}
-                className="cursor-pointer h-full py-0 flex flex-col justify-center"
-              >
-                <Sun />
-              </Button>
-              <Button
-                variant={"ghost"}
-                onClick={() => onValueChange("system")}
-                className="cursor-pointer h-full py-0 flex flex-col justify-center"
-              >
-                <Computer />
-              </Button>
+              {Object.entries(themes)
+                .toSorted((a, b) => {
+                  if (theme === a[0]) {
+                    return -1;
+                  }
+                  if (theme === b[0]) {
+                    return 1;
+                  }
+                  return 0;
+                })
+                .map(([name, props]) => (
+                  <Button
+                    key={name}
+                    variant={"ghost"}
+                    onClick={() => onValueChange(name)}
+                    className="text-primary cursor-pointer h-full py-0 flex flex-col justify-center"
+                  >
+                    <props.icon />
+                  </Button>
+                ))}
             </motion.div>
           )}
         </AnimatePresence>

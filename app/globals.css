@@ -40,7 +40,7 @@
     --sidebar-ring: hsl(217.2 91.2% 59.8%);
   }
 
-  .dark {
+  [data-theme="dark"] {
     --background: hsl(0 0% 3.9%);
     --foreground: hsl(210 20% 98%);
     --card: hsl(224 71.4% 4.1%);
