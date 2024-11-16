@@ -3,6 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { DataTable } from "@/components/data-table";
 import { useParams } from "next/navigation";
+import type { ColumnDef } from "@tanstack/react-table";
 
 // Add these type definitions
 type Message = {
@@ -41,7 +42,7 @@ const mockMessages: Message[] = [
 ];
 
 // Define columns for the messages table
-const columns = [
+const columns: ColumnDef<Message>[] = [
   {
     accessorKey: "id",
     header: "ID",
@@ -68,8 +69,8 @@ const columns = [
             status === "completed"
               ? "bg-green-100 text-green-800"
               : status === "failed"
-              ? "bg-red-100 text-red-800"
-              : "bg-yellow-100 text-yellow-800"
+                ? "bg-red-100 text-red-800"
+                : "bg-yellow-100 text-yellow-800"
           }`}
         >
           {status}
@@ -88,17 +89,16 @@ const columns = [
   },
 ];
 
-
 const QueuePage = () => {
   const { queueId }: { queueId: string } = useParams();
 
   const { data = mockMessages } = useQuery({
     queryKey: ["queue-messages", queueId],
-    // queryFn: () => fetchQueueMessages(queueId),
+    queryFn: () => [] as Message[],
   });
 
   return (
-    <div className="container mx-auto p-4">
+    <div className="container mx-auto">
       <div className="grid gap-4">
         {/* Queue Status Section */}
         <section className="border rounded-lg p-4">
