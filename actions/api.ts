@@ -3,6 +3,7 @@ import type { NamespaceStatistics } from "@/components/namespaces/table";
 import type { QueueStatistics } from "@/components/queues/table";
 import type { CreateNamespaceRequest } from "@/schemas/create-namespace";
 import type { CreateQueueRequest } from "@/schemas/create-queue";
+import type { APIKey } from "@/components/create-api-key";
 import { revalidateTag } from "next/cache";
 
 export async function createNamespace(data: CreateNamespaceRequest) {
@@ -86,16 +87,9 @@ export async function listQueues(): Promise<QueueStatistics[]> {
     .catch(() => []);
 }
 
-
-export interface APIKey {
-  id: string;
-  name: string;
-  created_at: string;
-  last_used?: string;
-}
 export async function listAPIKeys(): Promise<APIKey[]> {
   "use server";
-  
+
   return await fetch("http://localhost:8080/api-keys", {
     method: "GET",
     next: {
@@ -125,3 +119,4 @@ export async function createAPIKey(name: string): Promise<APIKey> {
       throw e;
     });
 }
+
