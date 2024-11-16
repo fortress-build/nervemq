@@ -41,7 +41,7 @@ impl Message {
         let msg_id: i64 =
             sqlx::query_scalar("INSERT INTO messages (queue, body) VALUES ($1, $2) RETURNING id")
                 .bind(queue_id as i64)
-                .bind(body.as_ref())
+                .bind(body)
                 .fetch_one(&mut *db)
                 .await?;
 

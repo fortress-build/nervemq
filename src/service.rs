@@ -24,6 +24,10 @@ pub struct Service {
 }
 
 impl Service {
+    pub fn db(&self) -> &SqlitePool {
+        &self.db
+    }
+
     pub async fn connect() -> eyre::Result<Self> {
         Self::connect_with(Config::default()).await
     }
