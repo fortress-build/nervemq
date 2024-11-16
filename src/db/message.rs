@@ -18,16 +18,6 @@ pub struct Message {
     pub kv: HashMap<String, String>,
 }
 
-#[derive(Serialize, Deserialize, FromRow)]
-struct MessageNoKv {
-    id: u64,
-    queue: String,
-
-    delivered_at: u64,
-
-    body: Vec<u8>,
-}
-
 impl Message {
     pub async fn insert(
         db: &mut SqliteConnection,
