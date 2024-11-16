@@ -24,6 +24,7 @@ interface DataTableProps<TData, TValue> {
   className?: string;
   isLoading?: boolean;
   onRowClick?: (row: TData) => void;
+  meta?: Record<string, unknown>;
 }
 
 export function DataTable<TData, TValue>({
@@ -32,11 +33,13 @@ export function DataTable<TData, TValue>({
   isLoading,
   className,
   onRowClick,
+  meta,
 }: DataTableProps<TData, TValue>) {
   const table = useReactTable({
     data,
     columns,
     getCoreRowModel: getCoreRowModel(),
+    meta,
   });
 
   return (
