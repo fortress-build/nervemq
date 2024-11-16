@@ -85,3 +85,43 @@ export async function listQueues(): Promise<QueueStatistics[]> {
     .then((res) => res.json())
     .catch(() => []);
 }
+
+
+export interface APIKey {
+  id: string;
+  name: string;
+  created_at: string;
+  last_used?: string;
+}
+export async function listAPIKeys(): Promise<APIKey[]> {
+  "use server";
+  
+  return await fetch("http://localhost:8080/api-keys", {
+    method: "GET",
+    next: {
+      tags: ["api-keys"],
+    },
+  })
+    .then((res) => res.json())
+    .catch(() => []);
+}
+
+export async function createAPIKey(name: string): Promise<APIKey> {
+  "use server";
+
+  return await fetch("http://localhost:8080/api-keys", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ name }),
+    next: {
+      tags: ["api-keys"],
+    },
+  })
+    .then((res) => res.json())
+    .catch((e) => {
+      console.error(e);
+      throw e;
+    });
+}

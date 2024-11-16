@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils";
 import {
   Axis3D,
   Braces,
+  Key,
   Logs,
   PanelLeftClose,
   PanelLeftOpen,
@@ -110,6 +111,12 @@ export default function DashboardSidebar() {
                 icon={Braces}
                 isActive={pathName.endsWith("/namespaces")}
                 onClick={() => setMode("create-namespace")}
+              />
+              <SidebarItem
+                title="API Keys"
+                url="/api-keys"
+                icon={Key}
+                isActive={pathName.endsWith("/api-keys")}
               />
             </SidebarMenu>
           </SidebarGroupContent>
