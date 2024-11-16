@@ -1,5 +1,5 @@
 "use server";
-import type { CreateQueue } from "@/components/create-queue";
+import type { QueueSelector } from "@/components/create-queue";
 import type { NamespaceStatistics } from "@/components/namespaces/table";
 import type { QueueStatistics } from "@/components/queues/table";
 import { revalidateTag } from "next/cache";
@@ -46,7 +46,7 @@ export async function listNamespaces(): Promise<NamespaceStatistics[]> {
     });
 }
 
-export async function createQueue(data: CreateQueue) {
+export async function createQueue(data: QueueSelector) {
   "use server";
 
   await fetch(`http://localhost:8080/queue/${data.namespace}/${data.name}`, {
@@ -59,10 +59,10 @@ export async function createQueue(data: CreateQueue) {
   revalidateTag("queues");
 }
 
-export async function deleteQueue(data: CreateQueue) {
+export async function deleteQueue(data: QueueSelector) {
   "use server";
 
-  await fetch(`http://localhost:8080/queue/default/${data.name}`, {
+  await fetch(`http://localhost:8080/queue/${data.namespace}/${data.name}`, {
     method: "DELETE",
     next: {
       tags: ["queues"],
