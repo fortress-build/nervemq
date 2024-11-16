@@ -16,7 +16,7 @@ import CreateApiKey from "@/components/create-api-key";
 import type { ColumnDef } from "@tanstack/react-table";
 import { Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { listAPIKeys } from "@/actions/api";
+import { listAPIKeys, deleteAPIKey } from "@/actions/api";
 
 type ApiKey = {
   id: string;
@@ -82,10 +82,7 @@ export default function ApiKeys() {
 
   const handleDeleteKey = async (id: string) => {
     try {
-      const response = await fetch(`/api/keys/${id}`, {
-        method: 'DELETE'
-      });
-      if (!response.ok) throw new Error();
+      await deleteAPIKey(id);
       await refetch();
       setKeyToDelete(null);
     } catch {

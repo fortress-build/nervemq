@@ -32,6 +32,7 @@ import { TooltipTrigger } from "@radix-ui/react-tooltip";
 import { useState, type MouseEventHandler } from "react";
 import CreateQueue from "./create-queue";
 import CreateNamespace from "./create-namespace";
+import CreateApiKey from "./create-api-key";
 
 function SidebarItem({
   title,
@@ -75,7 +76,7 @@ export default function DashboardSidebar() {
   const pathName = usePathname();
   const { open } = useSidebar();
 
-  type Mode = "normal" | "create-queue" | "create-namespace";
+  type Mode = "normal" | "create-queue" | "create-namespace" | "create-api-key";
 
   const [mode, setMode] = useState<Mode>("normal");
 
@@ -87,6 +88,10 @@ export default function DashboardSidebar() {
       />
       <CreateNamespace
         open={mode === "create-namespace"}
+        close={() => setMode("normal")}
+      />
+      <CreateApiKey
+        open={mode === "create-api-key"}
         close={() => setMode("normal")}
       />
       <SidebarHeader
@@ -117,7 +122,9 @@ export default function DashboardSidebar() {
                 url="/api-keys"
                 icon={Key}
                 isActive={pathName.endsWith("/api-keys")}
+                onClick={()=> setMode("create-api-key")}
               />
+
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

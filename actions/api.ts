@@ -120,3 +120,15 @@ export async function createAPIKey(name: string): Promise<APIKey> {
     });
 }
 
+export async function deleteAPIKey(id: string) {
+  "use server";
+
+  await fetch(`http://localhost:8080/api-keys/${id}`, {
+    method: "DELETE",
+    next: {
+      tags: ["api-keys"],
+    },
+  });
+
+  revalidateTag("api-keys");
+}
