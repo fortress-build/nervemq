@@ -33,7 +33,7 @@ import { useInvalidate } from "@/hooks/use-invalidate";
 import CreateNamespace from "./create-namespace";
 import { useState } from "react";
 
-export const createQueueSchema = object({
+export const queueSelectorSchema = object({
   name: string()
     .required()
     .max(32)
@@ -46,7 +46,7 @@ export const createQueueSchema = object({
     .test("namespace", "namespace should be alphanumeric", isAlphaNumeric),
 });
 
-export type CreateQueue = InferType<typeof createQueueSchema>;
+export type QueueSelector = InferType<typeof queueSelectorSchema>;
 
 export default function CreateQueue({
   open,
@@ -72,8 +72,8 @@ export default function CreateQueue({
     },
     validatorAdapter: yupValidator(),
     validators: {
-      onChange: createQueueSchema,
-      onMount: createQueueSchema,
+      onChange: queueSelectorSchema,
+      onMount: queueSelectorSchema,
     },
     onSubmit: async ({ value: data }) => {
       await createQueue(data)
@@ -90,8 +90,8 @@ export default function CreateQueue({
   });
 
   const handleNamespaceCreated = async (namespaceName: string) => {
-    await form.setFieldValue('namespace', namespaceName);
-    await form.validateField('namespace', 'change');
+    await form.setFieldValue("namespace", namespaceName);
+    await form.validateField("namespace", "change");
     setShowCreateNamespace(false);
   };
 
