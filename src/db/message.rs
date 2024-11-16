@@ -18,16 +18,6 @@ pub struct Message {
     pub kv: HashMap<String, String>,
 }
 
-#[derive(Serialize, Deserialize, FromRow)]
-struct MessageNoKv {
-    id: u64,
-    queue: String,
-
-    delivered_at: u64,
-
-    body: Vec<u8>,
-}
-
 impl Message {
     pub async fn insert(
         db: &mut SqliteConnection,
@@ -41,7 +31,7 @@ impl Message {
         let msg_id: i64 =
             sqlx::query_scalar("INSERT INTO messages (queue, body) VALUES ($1, $2) RETURNING id")
                 .bind(queue_id as i64)
-                .bind(body.as_ref())
+                .bind(body)
                 .fetch_one(&mut *db)
                 .await?;
 
