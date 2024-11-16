@@ -126,10 +126,17 @@ impl Queue {
         namespace: &str,
         queue: &str,
     ) -> eyre::Result<u64> {
-        Ok(sqlx::query_scalar("SELECT q.id FROM namespaces AS n INNER JOIN queues as q ON q.ns = n.id WHERE n.name = $1 AND q.name = $2")
-            .bind(namespace)
-            .bind(queue)
-            .fetch_one(db)
+        tracing::warn!("ns: {namespace}, queue: {queue}");
+        Ok(sqlx::query_scalar(
+            "
+            SELECT q.id FROM namespaces AS n
+            INNER JOIN queues as q ON q.ns = n.id
+            WHERE n.name = $1 AND q.name = $2
+        ",
+        )
+        .bind(namespace)
+        .bind(queue)
+        .fetch_one(db)
         .await?)
     }
 }
