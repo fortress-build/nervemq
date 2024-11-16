@@ -23,6 +23,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Plus,
+  Users,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -33,6 +34,7 @@ import { useState, type MouseEventHandler } from "react";
 import CreateQueue from "./create-queue";
 import CreateNamespace from "./create-namespace";
 import CreateApiKey from "./create-api-key";
+import CreateUser from "./create-user";
 
 function SidebarItem({
   title,
@@ -76,7 +78,7 @@ export default function DashboardSidebar() {
   const pathName = usePathname();
   const { open } = useSidebar();
 
-  type Mode = "normal" | "create-queue" | "create-namespace" | "create-api-key";
+  type Mode = "normal" | "create-queue" | "create-namespace" | "create-api-key" | "create-user";
 
   const [mode, setMode] = useState<Mode>("normal");
 
@@ -92,6 +94,10 @@ export default function DashboardSidebar() {
       />
       <CreateApiKey
         open={mode === "create-api-key"}
+        close={() => setMode("normal")}
+      />
+      <CreateUser
+        open={mode === "create-user"}
         close={() => setMode("normal")}
       />
       <SidebarHeader
@@ -124,7 +130,13 @@ export default function DashboardSidebar() {
                 isActive={pathName.endsWith("/api-keys")}
                 onClick={()=> setMode("create-api-key")}
               />
-
+              <SidebarItem
+                title="Admin"
+                url="/admin"
+                icon={Users}
+                isActive={pathName.endsWith("/admin")}
+                onClick={() => setMode("create-user")}
+              />
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

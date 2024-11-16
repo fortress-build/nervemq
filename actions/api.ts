@@ -5,6 +5,7 @@ import type { CreateNamespaceRequest } from "@/schemas/create-namespace";
 import type { CreateQueueRequest } from "@/schemas/create-queue";
 import type { APIKey } from "@/components/create-api-key";
 import { revalidateTag } from "next/cache";
+import type { UserStatistics } from "@/components/create-user";
 
 export async function createNamespace(data: CreateNamespaceRequest) {
   "use server";
@@ -131,4 +132,50 @@ export async function deleteAPIKey(id: string) {
   });
 
   revalidateTag("api-keys");
+}
+
+export async function createUser(username: string): Promise<UserStatistics> {
+  "use server";
+
+  return await fetch("http://localhost:8080/users", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ username }),
+    next: {
+      tags: ["users"],
+    },
+  })
+    .then((res) => res.json())
+    .catch((e) => {
+      console.error(e);
+      throw e;
+    });
+}
+
+export async function deleteUser(id: string) {
+  "use server";
+
+  await fetch(`http://localhost:8080/users/${id}`, {
+    method: "DELETE",
+    next: {
+      tags: ["users"],
+    },
+  });
+
+  revalidateTag("users");
+}
+
+export async function listUsers(): Promise<UserStatistics[]> {
+  "use server";
+
+  return await fetch("http://localhost:8080/users", {
+    method: "GET",
+    next: {
+      tags: ["users"],
+    },
+  })
+    .then((res) => res.json())
+    .catch(() => []);
 }
