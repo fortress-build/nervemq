@@ -32,7 +32,7 @@ export default async function RootLayout({
 
           <div className="flex flex-col w-full min-h-svh bg-background gap-2 px-4">
             <Header className="h-12" />
-            <main className="">{children}</main>
+            <main>{children}</main>
           </div>
         </Providers>
       </body>

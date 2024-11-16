@@ -7,16 +7,29 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/data-table";
 import { ChevronRight, Trash2 } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { deleteNamespace } from "@/actions/api";
 
 export default function Namespaces() {
   const [isOpen, setIsOpen] = useState(false);
-  const { data = [], isLoading, refetch } = useQuery({
+  const {
+    data = [],
+    isLoading,
+    refetch,
+  } = useQuery({
     queryKey: ["namespaces"],
     queryFn: () => listNamespaces(),
   });
-  const [namespaceToDelete, setNamespaceToDelete] = useState<string | null>(null);
+  const [namespaceToDelete, setNamespaceToDelete] = useState<string | null>(
+    null,
+  );
 
   const handleDeleteNamespace = async (name: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -43,7 +56,9 @@ export default function Namespaces() {
                   variant="ghost"
                   size="sm"
                   className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                  onClick={(e) => handleDeleteNamespace(row.row.original.name, e)}
+                  onClick={(e) =>
+                    handleDeleteNamespace(row.row.original.name, e)
+                  }
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>
@@ -58,12 +73,16 @@ export default function Namespaces() {
         <Button onClick={() => setIsOpen(true)}>Create Namespace</Button>
       </div>
       <CreateNamespace open={isOpen} close={() => setIsOpen(false)} />
-      <Dialog open={!!namespaceToDelete} onOpenChange={(open) => !open && setNamespaceToDelete(null)}>
+      <Dialog
+        open={!!namespaceToDelete}
+        onOpenChange={(open) => !open && setNamespaceToDelete(null)}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Delete Namespace</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete this namespace? This action cannot be undone.
+              Are you sure you want to delete this namespace? This action cannot
+              be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

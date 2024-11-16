@@ -14,14 +14,20 @@ import { usePathname } from "next/navigation";
 export default function Header({ className }: { className?: string }) {
   const pathName = usePathname();
 
-  let route: string[];
+  let route: { label: string; href: string }[];
   if (pathName === "/") {
-    route = ["Queues"];
+    route = [
+      {
+        label: "Queues",
+        href: "/",
+      },
+    ];
   } else {
-    route = pathName
-      .split("/")
-      .filter((s) => s.length > 0)
-      .map((s) => s.charAt(0).toUpperCase() + s.slice(1));
+    const segments = pathName.split("/").filter((s) => s.length > 0);
+    route = segments.map((s, i) => ({
+      label: s.charAt(0).toUpperCase() + s.slice(1),
+      href: `/${segments.slice(0, i + 1).join("/")}`,
+    }));
   }
 
   return (
@@ -37,14 +43,15 @@ export default function Header({ className }: { className?: string }) {
             >
               <Slash />
             </BreadcrumbSeparator>,
-            <BreadcrumbItem key={value}>
+            <BreadcrumbItem key={value.href}>
               <BreadcrumbLink
+                href={value.href}
                 className={cn(
                   "text-primary text-lg",
                   i === 0 ? "font-semibold" : "font-medium",
                 )}
               >
-                {value}
+                {value.label}
               </BreadcrumbLink>
             </BreadcrumbItem>,
           ])}
