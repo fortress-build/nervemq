@@ -27,5 +27,3 @@ export const columns: ColumnDef<Queue>[] = [
     header: () => <ColumnHeader label="Inflight" icon={Activity} />,
   },
 ];
-
-
