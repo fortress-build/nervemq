@@ -20,11 +20,16 @@ actix-casbin-auth = { version = "1.1.0", default-features = false, features = [
   "runtime-tokio",
   "tokio",
 ] }
-actix-web = "4.9.0"
+actix-identity = "0.8.0"
+actix-session = { version = "0.10.1", features = ["cookie-session"] }
+actix-web = { version = "4.9.0", features = ["actix-tls", "openssl", "secure-cookies"] }
+anyhow = "1.0.93"
 argon2 = { version = "0.5.3", features = ["simple", "std", "zeroize"] }
 base64 = "0.22.1"
 envy = "0.4.2"
 eyre = "0.6.12"
+openssl = "0.10.68"
+pom = "3.4.0"
 rand = "0.8.5"
 serde = { version = "1.0.215", features = ["derive"] }
 serde_json = "1.0.132"
