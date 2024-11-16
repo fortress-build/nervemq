@@ -23,7 +23,7 @@ interface DataTableProps<TData, TValue> {
   data: TData[];
   className?: string;
   isLoading?: boolean;
-  onRowClick?: (row: TValue) => void;
+  onRowClick?: (row: TData) => void;
 }
 
 export function DataTable<TData, TValue>({
