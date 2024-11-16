@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/breadcrumb";
 import { cn } from "@/lib/utils";
 import { Slash } from "lucide-react";
+import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 export default function Header({ className }: { className?: string }) {
@@ -45,13 +46,13 @@ export default function Header({ className }: { className?: string }) {
             </BreadcrumbSeparator>,
             <BreadcrumbItem key={value.href}>
               <BreadcrumbLink
-                href={value.href}
                 className={cn(
                   "text-primary text-lg",
                   i === 0 ? "font-semibold" : "font-medium",
                 )}
+                asChild
               >
-                {value.label}
+                <Link href={value.href}>{value.label}</Link>
               </BreadcrumbLink>
             </BreadcrumbItem>,
           ])}
