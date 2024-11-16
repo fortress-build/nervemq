@@ -40,13 +40,12 @@ async fn authenticate_api_key(
     pool: web::Data<SqlitePool>,
     req: web::Json<ApiKeyRequest>,
 ) -> actix_web::Result<impl Responder> {
-    let api_key = &req.api_key;
-    let key_id = &req.key_id;
+    let req = req.into_inner();
 
     // Fetch all stored keys
     let Some(hashed_key) =
         sqlx::query_scalar::<_, String>("SELECT hashed_key FROM api_keys WHERE key_id = $1")
-            .bind(key_id)
+            .bind(&req.key_id)
             .fetch_optional(pool.get_ref())
             .await
             .expect("Failed to fetch API keys")
@@ -58,8 +57,8 @@ async fn authenticate_api_key(
         return Err(ErrorInternalServerError("Authentication failed"));
     };
 
-    if let Err(e) = verify_api_key(api_key, hashed_key) {
-        tracing::warn!("Failed to authenticate key id {key_id}: {e}");
+    if let Err(e) = verify_api_key(req.api_key, hashed_key).await {
+        tracing::warn!("Failed to authenticate key id {}: {}", req.key_id, e);
         return Err(actix_web::error::ErrorUnauthorized("Invalid API key"));
     }
 
@@ -67,7 +66,7 @@ async fn authenticate_api_key(
 }
 
 async fn gen_api_key() -> eyre::Result<(PasswordHashString, String, String)> {
-    match tokio::task::spawn_blocking(|| {
+    match web::block(|| {
         // Generate a random API key id
         let key_id: String = (0..32)
             .map(|_| rand::thread_rng().gen_range(33..127) as u8 as char)
@@ -104,10 +103,20 @@ async fn gen_api_key() -> eyre::Result<(PasswordHashString, String, String)> {
     }
 }
 
-fn verify_api_key(api_key: &str, hashed_key: PasswordHashString) -> eyre::Result<()> {
-    Argon2::default()
-        .verify_password(api_key.as_bytes(), &hashed_key.password_hash())
-        .map_err(|e| eyre::eyre!(e))
+async fn verify_api_key(api_key: String, hashed_key: PasswordHashString) -> eyre::Result<()> {
+    match web::block(move || {
+        Argon2::default()
+            .verify_password(api_key.as_bytes(), &hashed_key.password_hash())
+            .map_err(|e| eyre::eyre!(e))
+    })
+    .await
+    {
+        Ok(Ok(res)) => Ok(res),
+        Ok(Err(e)) => Err(e),
+        Err(e) => Err(eyre::eyre!(
+            "Failed to join create API key verify task: {e}"
+        )),
+    }
 }
 
 // #[actix_web::main]
