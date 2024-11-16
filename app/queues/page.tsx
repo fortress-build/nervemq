@@ -9,7 +9,6 @@ import { DataTable } from "@/components/data-table";
 import CreateQueue from "@/components/create-queue";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
-import { ChevronRight, Trash2 } from "lucide-react";
 import { deleteQueue } from "@/actions/api";
 import {
   Dialog,
@@ -55,41 +54,13 @@ export default function Queues() {
     <div className="flex flex-col gap-4">
       <DataTable
         className="w-full"
-        columns={[
-          {
-            id: "chevron",
-            cell: () => (
-              <ChevronRight className="h-4 w-4 text-muted-foreground" />
-            ),
-          },
-          ...columns,
-          {
-            id: "actions",
-            cell: (row) => (
-              <div className="flex items-center justify-end gap-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                  onClick={async (e) => {
-                    handleDeleteQueue(
-                      row.row.original.name,
-                      row.row.original.ns,
-                      e,
-                    );
-                  }}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            ),
-          },
-        ]}
+        columns={columns}
         data={data}
         isLoading={isLoading}
         onRowClick={(row: QueueStatistics) =>
           router.push(`/queues/${row.name}`)
         }
+        meta={{ handleDeleteQueue }}
       />
 
       <div className="flex justify-end">

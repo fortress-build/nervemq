@@ -6,7 +6,6 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/data-table";
-import { ChevronRight, Trash2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -40,34 +39,10 @@ export default function Namespaces() {
     <div className="h-full flex flex-col gap-4">
       <DataTable
         className="w-full"
-        columns={[
-          {
-            id: "chevron",
-            cell: () => (
-              <ChevronRight className="h-4 w-4 text-muted-foreground" />
-            ),
-          },
-          ...columns,
-          {
-            id: "actions",
-            cell: (row) => (
-              <div className="flex items-center justify-end gap-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                  onClick={(e) =>
-                    handleDeleteNamespace(row.row.original.name, e)
-                  }
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            ),
-          },
-        ]}
+        columns={columns}
         data={data}
         isLoading={isLoading}
+        meta={{ handleDeleteNamespace }}
       />
       <div className="flex justify-end">
         <Button onClick={() => setIsOpen(true)}>Create Namespace</Button>
