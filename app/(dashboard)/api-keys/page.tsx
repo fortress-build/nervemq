@@ -13,58 +13,9 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import CreateApiKey from "@/components/create-api-key";
-import type { ColumnDef } from "@tanstack/react-table";
-import { Trash2 } from "lucide-react";
+import { columns } from "@/components/api-keys/table";
 import { toast } from "sonner";
 import { listAPIKeys, deleteAPIKey } from "@/actions/api";
-
-type ApiKey = {
-  id: string;
-  name: string;
-  createdAt: string;
-  lastUsed?: string;
-};
-
-const columns: ColumnDef<ApiKey>[] = [
-  {
-    accessorKey: "name",
-    header: "Name",
-  },
-  {
-    accessorKey: "createdAt",
-    header: "Created",
-    cell: ({ row }) => new Date(row.original.createdAt).toLocaleDateString(),
-  },
-  {
-    accessorKey: "lastUsed",
-    header: "Last Used",
-    cell: ({ row }) =>
-      row.original.lastUsed
-        ? new Date(row.original.lastUsed).toLocaleDateString()
-        : "Never",
-  },
-  {
-    id: "actions",
-    cell: ({ row, table }) => {
-      const meta = table.options.meta as {
-        handleDeleteKey: (id: string) => void;
-      };
-
-      return (
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={(e) => {
-            e.stopPropagation();
-            meta.handleDeleteKey(row.original.id);
-          }}
-        >
-          <Trash2 className="h-4 w-4" />
-        </Button>
-      );
-    },
-  },
-];
 
 export default function ApiKeys() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
