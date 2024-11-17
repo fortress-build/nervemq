@@ -5,12 +5,11 @@ use actix_web::{
     HttpMessage, HttpRequest, HttpResponse, Responder,
 };
 use serde::{Deserialize, Serialize};
-use zeroize::{Zeroize, ZeroizeOnDrop};
 
-#[derive(Debug, Serialize, Deserialize, Zeroize, ZeroizeOnDrop)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct LoginRequest {
     email: String,
-    password: String,
+    password: zeroize::Zeroizing<String>,
 }
 
 #[post("/login")]
@@ -20,7 +19,7 @@ pub async fn login(
 ) -> actix_web::Result<impl Responder> {
     let form = form.into_inner();
 
-    Identity::login(&request.extensions(), form.email.clone())
+    Identity::login(&request.extensions(), form.email)
         .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
 
     Ok(HttpResponse::Ok())
