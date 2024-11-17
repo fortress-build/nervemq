@@ -1,6 +1,6 @@
 "use client";
 import type { ColumnDef } from "@tanstack/react-table";
-import { ChevronRight, KeySquare, Logs, Trash2 } from "lucide-react";
+import { KeySquare, Logs, Trash2 } from "lucide-react";
 import { Button } from "../ui/button";
 
 export type Namespace = {

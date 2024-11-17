@@ -3,7 +3,6 @@ import type { ColumnDef } from "@tanstack/react-table";
 import {
   Activity,
   Braces,
-  ChevronRight,
   KeySquare,
   Trash2,
 } from "lucide-react";
