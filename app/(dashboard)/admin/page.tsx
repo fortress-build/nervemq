@@ -12,58 +12,10 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import CreateUser, { type UserStatistics } from "@/components/create-user";
-import type { ColumnDef } from "@tanstack/react-table";
-import { Trash2 } from "lucide-react";
+import CreateUser from "@/components/create-user";
+import { columns, type User } from "@/components/admin/table";
 import { toast } from "sonner";
 import { listUsers, deleteUser } from "@/actions/api";
-
-const columns: ColumnDef<UserStatistics>[] = [
-  {
-    accessorKey: "email",
-    header: "Email",
-  },
-  {
-    accessorKey: "role",
-    header: "Role",
-  },
-  // {
-  //   accessorKey: "createdAt",
-  //   header: "Joined",
-  //   cell: ({ row }) => new Date(row.original.createdAt).toLocaleDateString(),
-  // },
-  // {
-  //   accessorKey: "lastLogin",
-  //   header: "Last Login",
-  //   cell: ({ row }) =>
-  //     row.original.lastLogin
-  //       ? new Date(row.original.lastLogin).toLocaleDateString()
-  //       : "Never",
-  // },
-  {
-    id: "actions",
-    cell: () => {
-      // const meta = table.options.meta as {
-      //   handleDeleteUser: (id: string) => void;
-      // };
-
-      // { row, table }
-
-      return (
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={(e) => {
-            e.stopPropagation();
-            // meta.handleDeleteUser(row.original.id);
-          }}
-        >
-          <Trash2 className="h-4 w-4" />
-        </Button>
-      );
-    },
-  },
-];
 
 export default function AdminPanel() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -104,7 +56,13 @@ export default function AdminPanel() {
       <DataTable
         className="w-full"
         columns={columns}
-        data={data}
+        data={data.map(
+          (user) =>
+            ({
+              ...user,
+              lastLogin: (user as User).lastLogin ?? null,
+            }) as User,
+        )}
         isLoading={isLoading}
         meta={{ handleDeleteUser }}
       />
