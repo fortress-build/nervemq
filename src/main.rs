@@ -5,6 +5,7 @@ use actix_web::cookie::time::Duration;
 use actix_web::web::{self};
 use actix_web::{web::Data, App, HttpServer};
 
+use creek::auth;
 use creek::auth::middleware::ApiKeyAuth;
 use creek::auth::session::SqliteSessionStore;
 use creek::service::Service;
@@ -70,6 +71,11 @@ async fn main() -> eyre::Result<()> {
                     .service(api::delete_queue),
             )
             .service(api::stats)
+            .service(
+                web::scope("/auth")
+                    .service(auth::api::login)
+                    .service(auth::api::logout),
+            )
     })
     .bind_openssl(("127.0.0.1", 443), ssl_acceptor)?
     // .bind(("127.0.0.1", 8080))?
