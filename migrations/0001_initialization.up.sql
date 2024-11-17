@@ -65,3 +65,22 @@ create table if not exists session_state (
   foreign key (session) references sessions(id) on delete cascade
 );
 create unique index if not exists sessions_kv_idx on session_state(session, k);
+
+create table if not exists users (
+  id integer not null,
+  email text not null unique,
+  hashed_pass text not null,
+
+  primary key(id)
+);
+create unique index if not exists users_email_idx on users(email);
+
+create table if not exists permissions (
+  id integer not null,
+  user integer not null,
+  perm text not null,
+
+  primary key (id),
+  foreign key (user) references users(id)
+);
+create unique index if not exists permissions_user_perm_idx on permissions(user, perm);
