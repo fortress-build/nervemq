@@ -40,7 +40,7 @@ export default function AdminPanel() {
     },
   });
 
-  const handleDeleteUser = async (id: string) => {
+  const confirmDeleteUser = async (id: string) => {
     try {
       await deleteUser(id);
       await refetch();
@@ -49,6 +49,11 @@ export default function AdminPanel() {
     } catch {
       toast.error("Failed to delete user");
     }
+  };
+
+  const handleDeleteUser = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setUserToDelete(id);
   };
 
   return (
@@ -92,7 +97,11 @@ export default function AdminPanel() {
           <DialogFooter>
             <Button
               variant="destructive"
-              onClick={() => userToDelete && handleDeleteUser(userToDelete)}
+              onClick={async () => {
+                if (userToDelete) {
+                  await confirmDeleteUser(userToDelete);
+                }
+              }}
             >
               Delete
             </Button>

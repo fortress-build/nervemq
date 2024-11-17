@@ -30,10 +30,10 @@ export default function ApiKeys() {
     queryFn: async () => {
       const keys = await listAPIKeys();
       return keys.map((key) => ({
-        id: key.id,
+        // id: key.id,
         name: key.name,
-        createdAt: key.created_at,
-        lastUsed: key.last_used,
+        // createdAt: key.created_at,
+        // lastUsed: key.last_used,
       }));
     },
   });

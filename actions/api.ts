@@ -1,44 +1,37 @@
-"use server";
+"use client";
 import type { NamespaceStatistics } from "@/components/namespaces/table";
 import type { QueueStatistics } from "@/components/queues/table";
 import type { CreateNamespaceRequest } from "@/schemas/create-namespace";
 import type { CreateQueueRequest } from "@/schemas/create-queue";
 import type { APIKey } from "@/components/create-api-key";
-import { revalidateTag } from "next/cache";
 import type { UserStatistics } from "@/components/create-user";
 import { SERVER_ENDPOINT } from "@/app/globals";
 import type { CreateUserRequest } from "@/schemas/create-user";
 
 export async function createNamespace(data: CreateNamespaceRequest) {
-  "use server";
-
   await fetch(`${SERVER_ENDPOINT}/ns/${data.name}`, {
     method: "POST",
+    credentials: "include",
     next: {
       tags: ["namespaces"],
     },
   });
-
-  revalidateTag("namespaces");
 }
 
 export async function deleteNamespace(name: string) {
-  "use server";
-
   await fetch(`${SERVER_ENDPOINT}/ns/${name}`, {
     method: "DELETE",
+    credentials: "include",
     next: {
       tags: ["namespaces"],
     },
   });
-
-  revalidateTag("namespaces");
 }
 
 export async function listNamespaces(): Promise<NamespaceStatistics[]> {
-  "use server";
   return await fetch(`${SERVER_ENDPOINT}/ns`, {
     method: "GET",
+    credentials: "include",
     next: {
       tags: ["namespaces"],
     },
@@ -52,36 +45,29 @@ export async function listNamespaces(): Promise<NamespaceStatistics[]> {
 }
 
 export async function createQueue(data: CreateQueueRequest) {
-  "use server";
-
   await fetch(`${SERVER_ENDPOINT}/queue/${data.namespace}/${data.name}`, {
     method: "POST",
+    credentials: "include",
     next: {
       tags: ["queues"],
     },
   });
-
-  revalidateTag("queues");
 }
 
 export async function deleteQueue(data: CreateQueueRequest) {
-  "use server";
-
   await fetch(`${SERVER_ENDPOINT}/queue/${data.namespace}/${data.name}`, {
     method: "DELETE",
+    credentials: "include",
     next: {
       tags: ["queues"],
     },
   });
-
-  revalidateTag("queues");
 }
 
 export async function listQueues(): Promise<QueueStatistics[]> {
-  "use server";
-
   return await fetch(`${SERVER_ENDPOINT}/stats`, {
     method: "GET",
+    credentials: "include",
     next: {
       tags: ["queues"],
     },
@@ -91,23 +77,28 @@ export async function listQueues(): Promise<QueueStatistics[]> {
 }
 
 export async function listAPIKeys(): Promise<APIKey[]> {
-  "use server";
-
-  return await fetch(`${SERVER_ENDPOINT}/api-keys`, {
+  "use client";
+  // window.Headers
+  // console.log(await cookies())
+  return await fetch(`${SERVER_ENDPOINT}/tokens`, {
     method: "GET",
+    credentials: "include",
+    mode: "cors",
     next: {
       tags: ["api-keys"],
     },
   })
-    .then((res) => res.json())
+    .then((res) => {
+      console.log(res);
+      return res.json();
+    })
     .catch(() => []);
 }
 
 export async function createAPIKey(name: string): Promise<APIKey> {
-  "use server";
-
-  return await fetch(`${SERVER_ENDPOINT}/api-keys`, {
+  return await fetch(`${SERVER_ENDPOINT}/tokens`, {
     method: "POST",
+    credentials: "include",
     headers: {
       "Content-Type": "application/json",
     },
@@ -124,23 +115,19 @@ export async function createAPIKey(name: string): Promise<APIKey> {
 }
 
 export async function deleteAPIKey(id: string) {
-  "use server";
-
-  await fetch(`${SERVER_ENDPOINT}/api-keys/${id}`, {
+  await fetch(`${SERVER_ENDPOINT}/tokens/${id}`, {
     method: "DELETE",
+    credentials: "include",
     next: {
       tags: ["api-keys"],
     },
   });
-
-  revalidateTag("api-keys");
 }
 
 export async function createUser(data: CreateUserRequest): Promise<void> {
-  "use server";
-
   await fetch(`${SERVER_ENDPOINT}/admin/users`, {
     method: "POST",
+    credentials: "include",
     headers: {
       "Content-Type": "application/json",
     },
@@ -152,23 +139,20 @@ export async function createUser(data: CreateUserRequest): Promise<void> {
 }
 
 export async function deleteUser(id: string) {
-  "use server";
-
   await fetch(`${SERVER_ENDPOINT}/admin/users/${id}`, {
     method: "DELETE",
+    credentials: "include",
+    headers: {},
     next: {
       tags: ["users"],
     },
   });
-
-  revalidateTag("users");
 }
 
 export async function listUsers(): Promise<UserStatistics[]> {
-  "use server";
-
   return await fetch(`${SERVER_ENDPOINT}/admin/users`, {
     method: "GET",
+    credentials: "include",
     next: {
       tags: ["users"],
     },

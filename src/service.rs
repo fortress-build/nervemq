@@ -5,7 +5,7 @@ use sqlx::{
         SqliteAutoVacuum, SqliteConnectOptions, SqliteJournalMode, SqliteLockingMode,
         SqlitePoolOptions,
     },
-    Acquire, SqlitePool,
+    Acquire, Pool, Sqlite, SqlitePool,
 };
 
 use crate::{
@@ -24,7 +24,7 @@ pub struct Service {
 }
 
 impl Service {
-    pub fn db(&self) -> &SqlitePool {
+    pub fn db(&self) -> &Pool<Sqlite> {
         &self.db
     }
 
