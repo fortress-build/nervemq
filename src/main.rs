@@ -1,6 +1,7 @@
 use actix_cors::Cors;
 use actix_identity::IdentityMiddleware;
 use actix_session::config::PersistentSession;
+use actix_session::storage::CookieSessionStore;
 use actix_session::SessionMiddleware;
 use actix_web::cookie::time::Duration;
 use actix_web::web::{self, JsonConfig};
@@ -43,7 +44,7 @@ async fn main() -> eyre::Result<()> {
 
     HttpServer::new(move || {
         let identity_middleware = IdentityMiddleware::builder()
-            .visit_deadline(Some(deadline))
+            // .visit_deadline(Some(deadline))
             .logout_behaviour(actix_identity::config::LogoutBehaviour::PurgeSession)
             .build();
 
@@ -53,7 +54,8 @@ async fn main() -> eyre::Result<()> {
                 .build();
 
         let cors = Cors::default()
-            .send_wildcard()
+            // .send_wildcard()
+            .supports_credentials()
             .allow_any_origin()
             .allow_any_header()
             .allow_any_method();
@@ -62,17 +64,18 @@ async fn main() -> eyre::Result<()> {
 
         App::new()
             // .wrap(ApiKeyAuth)
-            .wrap(cors)
+            .wrap(actix_web::middleware::Logger::default())
             .wrap(identity_middleware)
             .wrap(session_middleware)
+            .wrap(cors)
             // .wrap(TracingLogger::default())
-            .wrap(actix_web::middleware::Logger::default())
             .app_data(json_cfg)
             .app_data(data.clone())
             .service(creek::api::namespace::service())
             .service(creek::api::queue::service())
             .service(creek::api::data::service())
             .service(creek::api::admin::service())
+            .service(creek::api::tokens::service())
             .service(creek::api::auth::service())
     })
     // .bind_openssl(("127.0.0.1", 443), ssl_acceptor)?

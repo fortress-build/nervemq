@@ -53,19 +53,16 @@ pub async fn login(
     request: HttpRequest,
     form: web::Json<LoginRequest>,
     service: web::Data<Service>,
-) -> Result<impl Responder, Error> {
+) -> HttpResponse {
     let form = form.into_inner();
 
-    let Some(hashed_key) =
+    let Ok(Some(hashed_key)) =
         sqlx::query_scalar::<_, String>("SELECT hashed_pass FROM users WHERE email = $1")
             .bind(&form.email)
             .fetch_optional(service.db())
             .await
-            .map_err(|e| Error::InternalError {
-                source: eyre::eyre!(e),
-            })?
     else {
-        return Err(Error::IdentityNotFound);
+        return HttpResponse::from_error(Error::IdentityNotFound);
     };
 
     match web::block(move || {
@@ -77,25 +74,24 @@ pub async fn login(
     {
         Ok(Err(e)) => {
             tracing::error!("{e}");
-            return Err(Error::Unauthorized);
+            return HttpResponse::from_error(Error::Unauthorized);
         }
         Err(e) => {
             tracing::error!("{e}");
-            return Err(Error::InternalError {
+            return HttpResponse::from_error(Error::InternalError {
                 source: eyre::eyre!(e),
             });
         }
         Ok(Ok(_)) => {}
     };
 
-    Identity::login(&request.extensions(), form.email.clone()).map_err(|e| {
-        tracing::error!("{e}");
-        Error::InternalError {
+    if let Err(e) = Identity::login(&request.extensions(), form.email.clone()) {
+        return HttpResponse::from_error(Error::InternalError {
             source: eyre::eyre!(e),
-        }
-    })?;
+        });
+    }
 
-    Ok(Json(SessionResponse::Valid { email: form.email }))
+    HttpResponse::Ok().json(SessionResponse::Valid { email: form.email })
 }
 
 #[post("/logout")]

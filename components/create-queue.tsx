@@ -60,7 +60,7 @@ export default function CreateQueue({
       onChange: createQueueSchema,
       onMount: createQueueSchema,
     },
-    onSubmit: async ({ value: data }) => {
+    onSubmit: async ({ value: data, formApi }) => {
       await createQueue(data)
         .then(() => {
           invalidate();
@@ -70,6 +70,7 @@ export default function CreateQueue({
         })
         .finally(() => {
           close();
+          formApi.reset();
         });
     },
   });

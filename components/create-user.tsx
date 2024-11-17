@@ -72,7 +72,7 @@ export default function CreateUser({
       onMount: createUserSchema,
       onSubmit: createUserSchema,
     },
-    onSubmit: async ({ value: data }) => {
+    onSubmit: async ({ value: data, formApi }) => {
       await createUser({
         email: data.email,
         password: data.password,
@@ -81,12 +81,11 @@ export default function CreateUser({
         .then(() => {
           invalidate();
           onSuccess?.(data.email);
+          close();
+          formApi.reset();
         })
         .catch(() => {
           toast.error("Something went wrong");
-        })
-        .finally(() => {
-          close();
         });
     },
   });

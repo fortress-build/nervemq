@@ -20,7 +20,7 @@ impl SqliteSessionStore {
 
 pub type SessionState = HashMap<String, String>;
 
-#[derive(Serialize, Deserialize, sqlx::FromRow)]
+#[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
 pub struct Session {
     id: u64,
     session_key: String,
@@ -43,6 +43,7 @@ impl SessionStore for SqliteSessionStore {
     ) -> impl Future<Output = Result<Option<SessionState>, actix_session::storage::LoadError>> {
         let db = self.db.clone();
         async move {
+            tracing::info!("Loading session");
             let mut tx = db
                 .begin()
                 .await
@@ -58,6 +59,8 @@ impl SessionStore for SqliteSessionStore {
                     )
                     .await
                     .map_err(|e| LoadError::Other(anyhow::Error::new(e)))?;
+
+            tracing::info!("Loaded session: {session:?}");
 
             let mut session = match session {
                 Some(session) => session,
@@ -154,6 +157,7 @@ impl SessionStore for SqliteSessionStore {
         let db = self.db.clone();
 
         async move {
+            tracing::info!("Updating session");
             let mut tx = db
                 .begin()
                 .await

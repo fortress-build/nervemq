@@ -53,9 +53,10 @@ export default function LoginPage() {
       ).then((res) => {
         if (!res.ok) {
           switch (res.status) {
-            case 401:
+            case 401: {
               toast.error("Invalid email or password");
               break;
+            }
             default: {
               toast.error("Something went wrong");
               break;
@@ -65,12 +66,12 @@ export default function LoginPage() {
         }
         return res.json();
       });
-      if (response === undefined) {
-        return;
-      }
+      // if (response === undefined) {
+      //   return;
+      // }
 
       if (
-        response.type !== "valid" ||
+        response?.type !== "valid" ||
         // This should never happen but... just to be safe
         response.data.email !== value.email
       ) {
