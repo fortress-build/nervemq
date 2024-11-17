@@ -9,13 +9,12 @@ import {
   DialogTitle,
 } from "./ui/dialog";
 
-import { type InferType, object, string } from "yup";
 import { useForm } from "@tanstack/react-form";
 import { yupValidator } from "@tanstack/yup-form-adapter";
 import { useQuery } from "@tanstack/react-query";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
-import { cn, isAlphaNumeric } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import { createQueue, listNamespaces } from "@/actions/api";
 import { Spinner } from "@nextui-org/react";
 import { ChevronsUpDown, Plus } from "lucide-react";
@@ -32,21 +31,7 @@ import { toast } from "sonner";
 import { useInvalidate } from "@/hooks/use-invalidate";
 import CreateNamespace from "./create-namespace";
 import { useState } from "react";
-
-export const queueSelectorSchema = object({
-  name: string()
-    .required()
-    .max(32)
-    .min(1)
-    .test("name", "name should be alphanumeric", isAlphaNumeric),
-  namespace: string()
-    .required()
-    .max(32)
-    .min(1)
-    .test("namespace", "namespace should be alphanumeric", isAlphaNumeric),
-});
-
-export type QueueSelector = InferType<typeof queueSelectorSchema>;
+import { createQueueSchema } from "@/schemas/create-queue";
 
 export default function CreateQueue({
   open,
@@ -72,8 +57,8 @@ export default function CreateQueue({
     },
     validatorAdapter: yupValidator(),
     validators: {
-      onChange: queueSelectorSchema,
-      onMount: queueSelectorSchema,
+      onChange: createQueueSchema,
+      onMount: createQueueSchema,
     },
     onSubmit: async ({ value: data }) => {
       await createQueue(data)
@@ -90,7 +75,7 @@ export default function CreateQueue({
   });
 
   const handleNamespaceCreated = async (namespaceName: string) => {
-    await form.setFieldValue("namespace", namespaceName);
+    form.setFieldValue("namespace", namespaceName);
     await form.validateField("namespace", "change");
     setShowCreateNamespace(false);
   };
