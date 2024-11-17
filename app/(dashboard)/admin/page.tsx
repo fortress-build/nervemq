@@ -14,31 +14,50 @@ import {
 } from "@/components/ui/dialog";
 import CreateUser, { type UserStatistics } from "@/components/create-user";
 import type { ColumnDef } from "@tanstack/react-table";
-import { Trash2 } from "lucide-react";
+import { Trash2, User, Mail, Shield, Calendar, Clock } from "lucide-react";
 import { toast } from "sonner";
 import { listUsers, deleteUser } from "@/actions/api";
 
 const columns: ColumnDef<UserStatistics>[] = [
   {
     accessorKey: "email",
-    header: "Email",
+    header: () => (
+      <div className="flex items-center gap-2">
+        <Mail className="h-4 w-4" />
+        <span>Email</span>
+      </div>
+    ),
   },
   {
     accessorKey: "role",
-    header: "Role",
+    header: () => (
+      <div className="flex items-center gap-2">
+        <Shield className="h-4 w-4" />
+        <span>Role</span>
+      </div>
+    ),
   },
   // {
   //   accessorKey: "createdAt",
-  //   header: "Joined",
+  //   header: () => (
+  //     <div className="flex items-center gap-2">
+  //       <Calendar className="h-4 w-4" />
+  //       <span>Joined</span>
+  //     </div>
+  //   ),
   //   cell: ({ row }) => new Date(row.original.createdAt).toLocaleDateString(),
   // },
   // {
   //   accessorKey: "lastLogin",
-  //   header: "Last Login",
-  //   cell: ({ row }) =>
-  //     row.original.lastLogin
-  //       ? new Date(row.original.lastLogin).toLocaleDateString()
-  //       : "Never",
+  //   header: () => (
+  //     <div className="flex items-center gap-2">
+  //       <Clock className="h-4 w-4" />
+  //       <span>Last Login</span>
+  //     </div>
+  //   ),
+  //   cell: ({ row }) => row.original.lastLogin
+  //     ? new Date(row.original.lastLogin).toLocaleDateString()
+  //     : "Never",
   // },
   {
     id: "actions",

@@ -1,7 +1,6 @@
 "use client";
 import type { ColumnDef } from "@tanstack/react-table";
 import { ChevronRight, KeySquare, Logs, Trash2 } from "lucide-react";
-import { ColumnHeader } from "../table-header";
 import { Button } from "../ui/button";
 
 export type Namespace = {
@@ -16,16 +15,22 @@ export type NamespaceStatistics = Namespace & {
 
 export const columns: ColumnDef<NamespaceStatistics>[] = [
   {
-    id: "chevron",
-    cell: () => <ChevronRight className="h-4 w-4 text-muted-foreground" />,
-  },
-  {
     accessorKey: "name",
-    header: () => <ColumnHeader label="Name" icon={KeySquare} />,
+    header: () => (
+      <div className="flex items-center gap-2">
+        <KeySquare className="h-4 w-4" />
+        <span>Name</span>
+      </div>
+    ),
   },
   {
     accessorKey: "queueCount",
-    header: () => <ColumnHeader label="Queues" icon={Logs} />,
+    header: () => (
+      <div className="flex items-center gap-2">
+        <Logs className="h-4 w-4" />
+        <span>Queues</span>
+      </div>
+    ),
   },
   {
     id: "actions",

@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import CreateApiKey from "@/components/create-api-key";
 import type { ColumnDef } from "@tanstack/react-table";
-import { Trash2 } from "lucide-react";
+import { Trash2, KeySquare, Calendar, Clock } from "lucide-react";
 import { toast } from "sonner";
 import { listAPIKeys, deleteAPIKey } from "@/actions/api";
 
@@ -28,16 +28,31 @@ type ApiKey = {
 const columns: ColumnDef<ApiKey>[] = [
   {
     accessorKey: "name",
-    header: "Name",
+    header: () => (
+      <div className="flex items-center gap-2">
+        <KeySquare className="h-4 w-4" />
+        <span>Name</span>
+      </div>
+    ),
   },
   {
     accessorKey: "createdAt",
-    header: "Created",
+    header: () => (
+      <div className="flex items-center gap-2">
+        <Calendar className="h-4 w-4" />
+        <span>Created</span>
+      </div>
+    ),
     cell: ({ row }) => new Date(row.original.createdAt).toLocaleDateString(),
   },
   {
     accessorKey: "lastUsed",
-    header: "Last Used",
+    header: () => (
+      <div className="flex items-center gap-2">
+        <Clock className="h-4 w-4" />
+        <span>Last Used</span>
+      </div>
+    ),
     cell: ({ row }) =>
       row.original.lastUsed
         ? new Date(row.original.lastUsed).toLocaleDateString()

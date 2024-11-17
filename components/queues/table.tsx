@@ -22,16 +22,22 @@ export type QueueStatistics = Queue & {
 
 export const columns: ColumnDef<QueueStatistics>[] = [
   {
-    id: "chevron",
-    cell: () => <ChevronRight className="h-4 w-4 text-muted-foreground" />,
-  },
-  {
     accessorKey: "name",
-    header: () => <ColumnHeader label="Name" icon={KeySquare} />,
+    header: () => (
+      <div className="flex items-center gap-2">
+        <KeySquare className="h-4 w-4" />
+        <span>Name</span>
+      </div>
+    ),
   },
   {
     accessorKey: "ns",
-    header: () => <ColumnHeader label="Namespace" icon={Braces} />,
+    header: () => (
+      <div className="flex items-center gap-2">
+        <Braces className="h-4 w-4" />
+        <span>Namespace</span>
+      </div>
+    ),
   },
   {
     accessorKey: "messageCount",
