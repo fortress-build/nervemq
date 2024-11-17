@@ -37,7 +37,6 @@ export const columns: ColumnDef<QueueStatistics>[] = [
     accessorKey: "messageCount",
     header: () => <ColumnHeader label="Inflight" icon={Activity} />,
   },
-
   {
     id: "actions",
     cell: (row) => (
