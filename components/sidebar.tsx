@@ -78,7 +78,12 @@ export default function DashboardSidebar() {
   const pathName = usePathname();
   const { open } = useSidebar();
 
-  type Mode = "normal" | "create-queue" | "create-namespace" | "create-api-key" | "create-user";
+  type Mode =
+    | "normal"
+    | "create-queue"
+    | "create-namespace"
+    | "create-api-key"
+    | "create-user";
 
   const [mode, setMode] = useState<Mode>("normal");
 
@@ -128,7 +133,7 @@ export default function DashboardSidebar() {
                 url="/api-keys"
                 icon={Key}
                 isActive={pathName.endsWith("/api-keys")}
-                onClick={()=> setMode("create-api-key")}
+                onClick={() => setMode("create-api-key")}
               />
               <SidebarItem
                 title="Admin"
