@@ -9,28 +9,16 @@ import {
   DialogTitle,
 } from "./ui/dialog";
 
-import { type InferType, object, string } from "yup";
 import { useForm } from "@tanstack/react-form";
 import { yupValidator } from "@tanstack/yup-form-adapter";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
-import { cn, isAlphaNumeric } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import { createNamespace } from "@/actions/api";
 import { Spinner } from "@nextui-org/react";
 import { toast } from "sonner";
 import { useInvalidate } from "@/hooks/use-invalidate";
-
-export const createNamespaceSchema = object({
-  name: string()
-    .required()
-    .max(32)
-    .min(1)
-    .test("name", "name should be alphanumeric", (value: string) => {
-      return isAlphaNumeric(value);
-    }),
-});
-
-export type CreateNamespace = InferType<typeof createNamespaceSchema>;
+import { createNamespaceSchema } from "@/schemas/create-namespace";
 
 interface CreateNamespaceProps {
   open: boolean;
@@ -55,7 +43,7 @@ export default function CreateNamespace({
       onMount: createNamespaceSchema,
     },
     onSubmit: async ({ value: data }) => {
-      await createNamespace(data.name)
+      await createNamespace(data)
         .then(() => {
           invalidate();
           if (onSuccess) {
