@@ -6,11 +6,12 @@ import type { CreateQueueRequest } from "@/schemas/create-queue";
 import type { APIKey } from "@/components/create-api-key";
 import { revalidateTag } from "next/cache";
 import type { UserStatistics } from "@/components/create-user";
+import { SERVER_ENDPOINT } from "@/app/globals";
 
 export async function createNamespace(data: CreateNamespaceRequest) {
   "use server";
 
-  await fetch(`http://localhost:8080/ns/${data.name}`, {
+  await fetch(`${SERVER_ENDPOINT}/ns/${data.name}`, {
     method: "POST",
     next: {
       tags: ["namespaces"],
@@ -23,7 +24,7 @@ export async function createNamespace(data: CreateNamespaceRequest) {
 export async function deleteNamespace(name: string) {
   "use server";
 
-  await fetch(`http://localhost:8080/ns/${name}`, {
+  await fetch(`${SERVER_ENDPOINT}/ns/${name}`, {
     method: "DELETE",
     next: {
       tags: ["namespaces"],
@@ -35,7 +36,7 @@ export async function deleteNamespace(name: string) {
 
 export async function listNamespaces(): Promise<NamespaceStatistics[]> {
   "use server";
-  return await fetch("http://localhost:8080/ns", {
+  return await fetch(`${SERVER_ENDPOINT}/ns`, {
     method: "GET",
     next: {
       tags: ["namespaces"],
@@ -52,7 +53,7 @@ export async function listNamespaces(): Promise<NamespaceStatistics[]> {
 export async function createQueue(data: CreateQueueRequest) {
   "use server";
 
-  await fetch(`http://localhost:8080/queue/${data.namespace}/${data.name}`, {
+  await fetch(`${SERVER_ENDPOINT}/queue/${data.namespace}/${data.name}`, {
     method: "POST",
     next: {
       tags: ["queues"],
@@ -65,7 +66,7 @@ export async function createQueue(data: CreateQueueRequest) {
 export async function deleteQueue(data: CreateQueueRequest) {
   "use server";
 
-  await fetch(`http://localhost:8080/queue/${data.namespace}/${data.name}`, {
+  await fetch(`${SERVER_ENDPOINT}/queue/${data.namespace}/${data.name}`, {
     method: "DELETE",
     next: {
       tags: ["queues"],
@@ -78,7 +79,7 @@ export async function deleteQueue(data: CreateQueueRequest) {
 export async function listQueues(): Promise<QueueStatistics[]> {
   "use server";
 
-  return await fetch("http://localhost:8080/stats", {
+  return await fetch(`${SERVER_ENDPOINT}/stats`, {
     method: "GET",
     next: {
       tags: ["queues"],
@@ -91,7 +92,7 @@ export async function listQueues(): Promise<QueueStatistics[]> {
 export async function listAPIKeys(): Promise<APIKey[]> {
   "use server";
 
-  return await fetch("http://localhost:8080/api-keys", {
+  return await fetch(`${SERVER_ENDPOINT}/api-keys`, {
     method: "GET",
     next: {
       tags: ["api-keys"],
@@ -104,7 +105,7 @@ export async function listAPIKeys(): Promise<APIKey[]> {
 export async function createAPIKey(name: string): Promise<APIKey> {
   "use server";
 
-  return await fetch("http://localhost:8080/api-keys", {
+  return await fetch(`${SERVER_ENDPOINT}/api-keys`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -124,7 +125,7 @@ export async function createAPIKey(name: string): Promise<APIKey> {
 export async function deleteAPIKey(id: string) {
   "use server";
 
-  await fetch(`http://localhost:8080/api-keys/${id}`, {
+  await fetch(`${SERVER_ENDPOINT}/api-keys/${id}`, {
     method: "DELETE",
     next: {
       tags: ["api-keys"],
@@ -137,7 +138,7 @@ export async function deleteAPIKey(id: string) {
 export async function createUser(username: string): Promise<UserStatistics> {
   "use server";
 
-  return await fetch("http://localhost:8080/users", {
+  return await fetch(`${SERVER_ENDPOINT}/users`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -157,7 +158,7 @@ export async function createUser(username: string): Promise<UserStatistics> {
 export async function deleteUser(id: string) {
   "use server";
 
-  await fetch(`http://localhost:8080/users/${id}`, {
+  await fetch(`${SERVER_ENDPOINT}/users/${id}`, {
     method: "DELETE",
     next: {
       tags: ["users"],
@@ -170,7 +171,7 @@ export async function deleteUser(id: string) {
 export async function listUsers(): Promise<UserStatistics[]> {
   "use server";
 
-  return await fetch("http://localhost:8080/users", {
+  return await fetch(`${SERVER_ENDPOINT}/users`, {
     method: "GET",
     next: {
       tags: ["users"],

@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { useForm } from "@tanstack/react-form";
 import { yupValidator } from "@tanstack/yup-form-adapter";
 import { loginFormSchema } from "@/schemas/login-form";
+import { SERVER_ENDPOINT } from "../globals";
 
 type SessionResponse =
   | {
@@ -40,7 +41,7 @@ export default function LoginPage() {
     },
     onSubmit: async ({ value }) => {
       const response: SessionResponse | undefined = await fetch(
-        "http://localhost:8080/auth/login",
+        `${SERVER_ENDPOINT}/auth/login`,
         {
           method: "POST",
           body: JSON.stringify(value),

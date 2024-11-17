@@ -35,7 +35,7 @@ pub async fn create_api_key(pool: web::Data<SqlitePool>) -> actix_web::Result<im
 }
 
 #[derive(Debug, Snafu)]
-enum Error {
+pub enum Error {
     #[snafu(display("Unauthorized"))]
     Unauthorized,
     #[snafu(display("Internal server error"))]
@@ -49,7 +49,6 @@ pub async fn authenticate_api_key(
     key_id: String,
     api_key: String,
 ) -> eyre::Result<()> {
-    // Fetch all stored keys
     let Some(hashed_key) =
         sqlx::query_scalar::<_, String>("SELECT hashed_key FROM api_keys WHERE key_id = $1")
             .bind(&key_id)
@@ -124,25 +123,3 @@ pub async fn verify_api_key(api_key: String, hashed_key: PasswordHashString) -> 
         )),
     }
 }
-
-// #[actix_web::main]
-// async fn main() -> std::io::Result<()> {
-//     dotenv().ok();
-//
-//     let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
-//     let pool = SqlitePool::connect(&database_url)
-//         .await
-//         .expect("Failed to create SQLite pool");
-//
-//     initialize_db(&pool).await;
-//
-//     HttpServer::new(move || {
-//         App::new()
-//             .app_data(web::Data::new(pool.clone()))
-//             .route("/create", web::post().to(create_api_key))
-//             .route("/authenticate", web::post().to(authenticate_api_key))
-//     })
-//     .bind(("127.0.0.1", 8080))?
-//     .run()
-//     .await
-// }
