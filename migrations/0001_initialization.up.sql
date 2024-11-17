@@ -38,15 +38,6 @@ create table if not exists kv_pairs (
 );
 create unique index if not exists kv_message_idx on kv_pairs(message, k);
 
-create table if not exists api_keys (
-  id integer not null,
-  key_id string not null unique,
-  hashed_key text not null,
-
-  primary key (id)
-);
-create unique index if not exists api_keys_hash_idx on api_keys(key_id, hashed_key);
-
 create table if not exists sessions (
   id integer not null,
   session_key text not null,
@@ -84,3 +75,14 @@ create table if not exists permissions (
   foreign key (user) references users(id)
 );
 create unique index if not exists permissions_user_perm_idx on permissions(user, perm);
+
+create table if not exists api_keys (
+  id integer not null,
+  user integer not null,
+  name string not null,
+  hashed_key text not null,
+
+  primary key (id),
+  foreign key (user) references users(id)
+);
+create unique index if not exists api_keys_user_name_idx on api_keys(user, name);

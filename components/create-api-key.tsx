@@ -34,10 +34,10 @@ export const createApiKeySchema = object({
 export type CreateApiKey = InferType<typeof createApiKeySchema>;
 
 export interface APIKey {
-  id: string;
+  // id: string;
   name: string;
-  created_at: string;
-  last_used?: string;
+  // created_at: string;
+  // last_used?: string;
   key?: string;
 }
 
@@ -84,7 +84,7 @@ export default function CreateApiKey({
       onChange: createApiKeySchema,
       onMount: createApiKeySchema,
     },
-    onSubmit: async ({ value: data }) => {
+    onSubmit: async ({ value: data, formApi }) => {
       await createAPIKey(data.name)
         .then((result) => {
           setApiKey(result);
@@ -93,6 +93,7 @@ export default function CreateApiKey({
           if (onSuccess) {
             onSuccess(data.name);
           }
+          formApi.reset();
         })
         .catch(() => {
           toast.error("Failed to create API key");

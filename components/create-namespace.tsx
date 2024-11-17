@@ -42,7 +42,7 @@ export default function CreateNamespace({
       onChange: createNamespaceSchema,
       onMount: createNamespaceSchema,
     },
-    onSubmit: async ({ value: data }) => {
+    onSubmit: async ({ value: data, formApi }) => {
       await createNamespace(data)
         .then(() => {
           invalidate();
@@ -50,6 +50,7 @@ export default function CreateNamespace({
             onSuccess(data.name);
           }
           close();
+          formApi.reset();
         })
         .catch(() => {
           toast.error("Something went wrong");

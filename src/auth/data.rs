@@ -1,9 +1,8 @@
-use actix_web::{web, Responder};
+use actix_web::web;
 use argon2::{
-    password_hash::{PasswordHashString, Salt, SaltString},
+    password_hash::{PasswordHashString, SaltString},
     Argon2, PasswordHasher, PasswordVerifier,
 };
-use base64::{prelude::BASE64_STANDARD, Engine};
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
@@ -11,27 +10,7 @@ use sqlx::SqlitePool;
 
 #[derive(Serialize, Deserialize)]
 pub struct ApiKeyRequest {
-    key_id: String,
     api_key: String,
-}
-
-pub async fn create_api_key(pool: web::Data<SqlitePool>) -> actix_web::Result<impl Responder> {
-    let Ok((hashed_key, raw_key, key_id)) = gen_api_key().await else {
-        return Err(actix_web::error::ErrorInternalServerError("Auth failed"));
-    };
-
-    sqlx::query("INSERT INTO api_keys (key_id, hashed_key) VALUES ($1, $2)")
-        .bind(&key_id)
-        .bind(hashed_key.to_string())
-        .execute(pool.get_ref())
-        .await
-        .expect("Failed to insert API key");
-
-    // Return the plain API key (should be securely sent/stored by the user).
-    Ok(web::Json(serde_json::json!({
-        "client_id": key_id,
-        "secret": raw_key
-    })))
 }
 
 #[derive(Debug, Snafu)]
@@ -70,13 +49,8 @@ pub async fn authenticate_api_key(
     return Ok(());
 }
 
-pub async fn gen_api_key() -> eyre::Result<(PasswordHashString, String, String)> {
+pub async fn gen_api_key() -> eyre::Result<(PasswordHashString, String)> {
     match web::block(|| {
-        // Generate a random API key id
-        let key_id: String = (0..32)
-            .map(|_| rand::thread_rng().gen_range(33..127) as u8 as char)
-            .collect();
-
         // Generate a random API key
         let api_key: String = (0..32)
             .map(|_| rand::thread_rng().gen_range(33..127) as u8 as char)
@@ -91,7 +65,6 @@ pub async fn gen_api_key() -> eyre::Result<(PasswordHashString, String, String)>
                 .hash_password(api_key.as_bytes(), salt.as_salt())?
                 .serialize(),
             api_key,
-            key_id,
         ))
     })
     .await

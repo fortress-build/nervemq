@@ -7,6 +7,7 @@ import {
   BreadcrumbList,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
+import { useSession } from "@/lib/state/global";
 import { cn } from "@/lib/utils";
 import { Slash } from "lucide-react";
 import Link from "next/link";
@@ -29,6 +30,15 @@ export default function Header({ className }: { className?: string }) {
       label: s.charAt(0).toUpperCase() + s.slice(1),
       href: `/${segments.slice(0, i + 1).join("/")}`,
     }));
+  }
+
+  const session = useSession();
+
+  if (session) {
+    route.push({
+      label: session?.email ?? "anonymous",
+      href: "",
+    });
   }
 
   return (
