@@ -14,7 +14,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { useForm } from "@tanstack/react-form";
 import { yupValidator } from "@tanstack/yup-form-adapter";
-import { loginFormShema } from "@/schemas/login-form";
+import { loginFormSchema } from "@/schemas/login-form";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -22,8 +22,8 @@ export default function LoginPage() {
   const form = useForm({
     validatorAdapter: yupValidator(),
     validators: {
-      onChange: loginFormShema,
-      onMount: loginFormShema,
+      onChange: loginFormSchema,
+      onMount: loginFormSchema,
     },
     defaultValues: {
       email: "",
