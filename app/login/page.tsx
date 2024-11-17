@@ -32,6 +32,7 @@ export default function LoginPage() {
   const form = useForm({
     validatorAdapter: yupValidator(),
     validators: {
+      onSubmit: loginFormSchema,
       onChange: loginFormSchema,
       onMount: loginFormSchema,
     },
@@ -44,17 +45,27 @@ export default function LoginPage() {
         `${SERVER_ENDPOINT}/auth/login`,
         {
           method: "POST",
-          body: JSON.stringify(value),
+          body: JSON.stringify({
+            email: value.email,
+            password: value.password,
+          }),
         },
       ).then((res) => {
         if (!res.ok) {
-          res.text().then((msg) => toast.error(msg ?? "Something went wrong"));
+          switch (res.status) {
+            case 401:
+              toast.error("Invalid email or password");
+              break;
+            default: {
+              toast.error("Something went wrong");
+              break;
+            }
+          }
           return;
         }
         return res.json();
       });
       if (response === undefined) {
-        toast.error("Something went wrong");
         return;
       }
 
@@ -90,10 +101,18 @@ export default function LoginPage() {
                 <div className="flex flex-col gap-2">
                   <Label htmlFor={field.name}>Email</Label>
                   <Input
-                    type="email"
+                    type="text"
                     name={field.name}
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChange={(e) => field.handleChange(e.target.value)}
                     className="w-full p-2 border rounded"
                   />
+                  {field.state.meta.errors ? (
+                    <span className="text-sm text-destructive">
+                      {field.state.meta.errors.join(", ")}
+                    </span>
+                  ) : null}
                 </div>
               )}
             </form.Field>
@@ -104,8 +123,16 @@ export default function LoginPage() {
                   <Input
                     type="password"
                     name={field.name}
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChange={(e) => field.handleChange(e.target.value)}
                     className="w-full p-2 border rounded"
                   />
+                  {field.state.meta.errors ? (
+                    <span className="text-sm text-destructive">
+                      {field.state.meta.errors.join(", ")}
+                    </span>
+                  ) : null}
                 </div>
               )}
             </form.Field>

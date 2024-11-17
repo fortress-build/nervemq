@@ -1,6 +1,6 @@
 use actix_web::{web, Responder};
 use argon2::{
-    password_hash::{PasswordHashString, Salt},
+    password_hash::{PasswordHashString, Salt, SaltString},
     Argon2, PasswordHasher, PasswordVerifier,
 };
 use base64::{prelude::BASE64_STANDARD, Engine};
@@ -84,17 +84,11 @@ pub async fn gen_api_key() -> eyre::Result<(PasswordHashString, String, String)>
 
         // Hash the API key using Argon2
         let argon2 = Argon2::default();
-        let salt = {
-            let mut rng = rand::thread_rng();
-            rng.gen::<[u8; 16]>()
-        };
+        let salt = SaltString::generate(&mut rand::thread_rng());
 
         Ok((
             argon2
-                .hash_password(
-                    api_key.as_bytes(),
-                    Salt::from_b64(BASE64_STANDARD.encode(salt).as_str())?,
-                )?
+                .hash_password(api_key.as_bytes(), salt.as_salt())?
                 .serialize(),
             api_key,
             key_id,

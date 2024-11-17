@@ -18,13 +18,7 @@ import { Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { listUsers, deleteUser } from "@/actions/api";
 
-
-
 const columns: ColumnDef<UserStatistics>[] = [
-  {
-    accessorKey: "name",
-    header: "Name",
-  },
   {
     accessorKey: "email",
     header: "Email",
@@ -33,30 +27,35 @@ const columns: ColumnDef<UserStatistics>[] = [
     accessorKey: "role",
     header: "Role",
   },
-  {
-    accessorKey: "createdAt",
-    header: "Joined",
-    cell: ({ row }) => new Date(row.original.createdAt).toLocaleDateString(),
-  },
-  {
-    accessorKey: "lastLogin",
-    header: "Last Login",
-    cell: ({ row }) => row.original.lastLogin 
-      ? new Date(row.original.lastLogin).toLocaleDateString()
-      : "Never",
-  },
+  // {
+  //   accessorKey: "createdAt",
+  //   header: "Joined",
+  //   cell: ({ row }) => new Date(row.original.createdAt).toLocaleDateString(),
+  // },
+  // {
+  //   accessorKey: "lastLogin",
+  //   header: "Last Login",
+  //   cell: ({ row }) =>
+  //     row.original.lastLogin
+  //       ? new Date(row.original.lastLogin).toLocaleDateString()
+  //       : "Never",
+  // },
   {
     id: "actions",
-    cell: ({ row, table }) => {
-      const meta = table.options.meta as { handleDeleteUser: (id: string) => void };
-      
+    cell: () => {
+      // const meta = table.options.meta as {
+      //   handleDeleteUser: (id: string) => void;
+      // };
+
+      // { row, table }
+
       return (
         <Button
           variant="ghost"
           size="icon"
           onClick={(e) => {
             e.stopPropagation();
-            meta.handleDeleteUser(row.original.id);
+            // meta.handleDeleteUser(row.original.id);
           }}
         >
           <Trash2 className="h-4 w-4" />
@@ -69,19 +68,22 @@ const columns: ColumnDef<UserStatistics>[] = [
 export default function AdminPanel() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<string | null>(null);
-  
-  const { data = [], isLoading, refetch } = useQuery({
+
+  const {
+    data = [],
+    isLoading,
+    refetch,
+  } = useQuery({
     queryKey: ["users"],
     queryFn: async () => {
       const users = await listUsers();
-      return users.map(user => ({
-        id: user.id,
-        name: user.name,
+      return users.map((user) => ({
+        // id: user.id,
         email: user.email,
-        role: user.role,
-        createdAt: user.createdAt,
-        lastLogin: user.lastLogin,
-        namespaces: user.namespaces
+        // role: user.role,
+        // createdAt: user.createdAt,
+        // lastLogin: user.lastLogin,
+        // namespaces: user.namespaces,
       }));
     },
   });
@@ -108,13 +110,11 @@ export default function AdminPanel() {
       />
 
       <div className="flex justify-end">
-        <Button onClick={() => setIsCreateOpen(true)}>
-          Add New User
-        </Button>
+        <Button onClick={() => setIsCreateOpen(true)}>Add New User</Button>
       </div>
 
-      <CreateUser 
-        open={isCreateOpen} 
+      <CreateUser
+        open={isCreateOpen}
         close={() => setIsCreateOpen(false)}
         onSuccess={() => refetch()}
       />
@@ -127,7 +127,8 @@ export default function AdminPanel() {
           <DialogHeader>
             <DialogTitle>Delete User</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete this user? This action cannot be undone.
+              Are you sure you want to delete this user? This action cannot be
+              undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -137,10 +138,7 @@ export default function AdminPanel() {
             >
               Delete
             </Button>
-            <Button
-              variant="secondary"
-              onClick={() => setUserToDelete(null)}
-            >
+            <Button variant="secondary" onClick={() => setUserToDelete(null)}>
               Cancel
             </Button>
           </DialogFooter>

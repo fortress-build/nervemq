@@ -7,6 +7,7 @@ import type { APIKey } from "@/components/create-api-key";
 import { revalidateTag } from "next/cache";
 import type { UserStatistics } from "@/components/create-user";
 import { SERVER_ENDPOINT } from "@/app/globals";
+import type { CreateUserRequest } from "@/schemas/create-user";
 
 export async function createNamespace(data: CreateNamespaceRequest) {
   "use server";
@@ -135,30 +136,25 @@ export async function deleteAPIKey(id: string) {
   revalidateTag("api-keys");
 }
 
-export async function createUser(username: string): Promise<UserStatistics> {
+export async function createUser(data: CreateUserRequest): Promise<void> {
   "use server";
 
-  return await fetch(`${SERVER_ENDPOINT}/users`, {
+  await fetch(`${SERVER_ENDPOINT}/admin/users`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ username }),
+    body: JSON.stringify(data),
     next: {
       tags: ["users"],
     },
-  })
-    .then((res) => res.json())
-    .catch((e) => {
-      console.error(e);
-      throw e;
-    });
+  });
 }
 
 export async function deleteUser(id: string) {
   "use server";
 
-  await fetch(`${SERVER_ENDPOINT}/users/${id}`, {
+  await fetch(`${SERVER_ENDPOINT}/admin/users/${id}`, {
     method: "DELETE",
     next: {
       tags: ["users"],
@@ -171,7 +167,7 @@ export async function deleteUser(id: string) {
 export async function listUsers(): Promise<UserStatistics[]> {
   "use server";
 
-  return await fetch(`${SERVER_ENDPOINT}/users`, {
+  return await fetch(`${SERVER_ENDPOINT}/admin/users`, {
     method: "GET",
     next: {
       tags: ["users"],

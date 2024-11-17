@@ -1,19 +1,24 @@
+use std::fmt::Display;
+
 use actix_identity::Identity;
 use actix_web::{
-    error::{ErrorInternalServerError, ErrorUnauthorized},
-    get, post,
-    web::{self, Json, ServiceConfig},
-    HttpMessage, HttpRequest, HttpResponse, Responder,
+    error::{ErrorInternalServerError, ErrorUnauthorized, InternalError},
+    get,
+    http::StatusCode,
+    post,
+    web::{self, Json, JsonBody},
+    FromRequest, HttpMessage, HttpRequest, HttpResponse, Responder, ResponseError, Scope,
 };
 use argon2::{password_hash::PasswordHashString, Argon2, PasswordVerifier};
 use serde::{Deserialize, Serialize};
+use snafu::{Snafu, Whatever};
 
 use crate::service::Service;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct LoginRequest {
     email: String,
-    password: zeroize::Zeroizing<String>,
+    password: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -23,12 +28,32 @@ pub enum SessionResponse {
     Invalid,
 }
 
+#[derive(Debug, Snafu)]
+pub enum Error {
+    #[snafu(display("Identity not found"))]
+    IdentityNotFound,
+    #[snafu(display("Unauthorized"))]
+    Unauthorized,
+    #[snafu(display("Internal server error"))]
+    InternalError { source: eyre::Report },
+}
+
+impl ResponseError for Error {
+    fn status_code(&self) -> actix_web::http::StatusCode {
+        match self {
+            Error::IdentityNotFound => StatusCode::UNAUTHORIZED,
+            Error::Unauthorized => StatusCode::UNAUTHORIZED,
+            Error::InternalError { .. } => StatusCode::INTERNAL_SERVER_ERROR,
+        }
+    }
+}
+
 #[post("/login")]
 pub async fn login(
     request: HttpRequest,
-    form: Json<LoginRequest>,
+    form: web::Json<LoginRequest>,
     service: web::Data<Service>,
-) -> actix_web::Result<impl Responder> {
+) -> Result<impl Responder, Error> {
     let form = form.into_inner();
 
     let Some(hashed_key) =
@@ -36,9 +61,11 @@ pub async fn login(
             .bind(&form.email)
             .fetch_optional(service.db())
             .await
-            .map_err(|e| ErrorInternalServerError(e))?
+            .map_err(|e| Error::InternalError {
+                source: eyre::eyre!(e),
+            })?
     else {
-        return Err(ErrorUnauthorized("identity not found"));
+        return Err(Error::IdentityNotFound);
     };
 
     match web::block(move || {
@@ -48,19 +75,27 @@ pub async fn login(
     })
     .await
     {
-        Ok(Err(e)) => return Err(ErrorUnauthorized(e)),
+        Ok(Err(e)) => {
+            tracing::error!("{e}");
+            return Err(Error::Unauthorized);
+        }
         Err(e) => {
-            return Err(ErrorInternalServerError(eyre::eyre!(
-                "Failed to join API key verify task: {e}"
-            )))
+            tracing::error!("{e}");
+            return Err(Error::InternalError {
+                source: eyre::eyre!(e),
+            });
         }
         Ok(Ok(_)) => {}
     };
 
-    Identity::login(&request.extensions(), form.email.clone())
-        .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
+    Identity::login(&request.extensions(), form.email.clone()).map_err(|e| {
+        tracing::error!("{e}");
+        Error::InternalError {
+            source: eyre::eyre!(e),
+        }
+    })?;
 
-    Ok(web::Json(SessionResponse::Valid { email: form.email }))
+    Ok(Json(SessionResponse::Valid { email: form.email }))
 }
 
 #[post("/logout")]
@@ -83,11 +118,9 @@ pub async fn get_session(identity: Option<Identity>) -> actix_web::Result<impl R
     }
 }
 
-pub fn config(cfg: &mut ServiceConfig) {
-    cfg.service(
-        web::scope("/auth")
-            .service(login)
-            .service(logout)
-            .service(get_session),
-    );
+pub fn service() -> Scope {
+    web::scope("/auth")
+        .service(login)
+        .service(logout)
+        .service(get_session)
 }

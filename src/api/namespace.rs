@@ -1,8 +1,4 @@
-use actix_web::{
-    delete, get, post,
-    web::{self, ServiceConfig},
-    Responder,
-};
+use actix_web::{delete, get, post, web, Responder, Scope};
 use serde::{Deserialize, Serialize};
 
 use crate::service::Service;
@@ -47,11 +43,9 @@ async fn delete_namespace(
     Ok("OK")
 }
 
-pub fn config(cfg: &mut ServiceConfig) {
-    cfg.service(
-        web::scope("/ns")
-            .service(list_namespaces)
-            .service(create_namespace)
-            .service(delete_namespace),
-    );
+pub fn service() -> Scope {
+    web::scope("/ns")
+        .service(list_namespaces)
+        .service(create_namespace)
+        .service(delete_namespace)
 }

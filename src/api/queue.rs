@@ -1,8 +1,4 @@
-use actix_web::{
-    delete, get, post,
-    web::{self, ServiceConfig},
-    Responder,
-};
+use actix_web::{delete, get, post, web, Responder, Scope};
 use serde::{Deserialize, Serialize};
 
 use crate::{db::queue::Queue, service::Service};
@@ -61,12 +57,10 @@ async fn create_queue(
     Ok("OK")
 }
 
-pub fn config(cfg: &mut ServiceConfig) {
-    cfg.service(
-        web::scope("/queue")
-            .service(list_all_queues)
-            .service(list_ns_queues)
-            .service(create_queue)
-            .service(delete_queue),
-    );
+pub fn service() -> Scope {
+    web::scope("/queue")
+        .service(list_all_queues)
+        .service(list_ns_queues)
+        .service(create_queue)
+        .service(delete_queue)
 }
