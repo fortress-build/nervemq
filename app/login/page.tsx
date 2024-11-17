@@ -1,74 +1,100 @@
 "use client";
 
 import { signIn } from "next-auth/react";
-import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardHeader, CardContent } from "@/components/ui/card";
+import {
+  Card,
+  CardHeader,
+  CardContent,
+  CardFooter,
+} from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
+import { toast } from "sonner";
+import { useForm } from "@tanstack/react-form";
+import { yupValidator } from "@tanstack/yup-form-adapter";
+import { loginFormShema } from "@/schemas/login-form";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const formData = new FormData(e.currentTarget);
-
-    try {
+  const form = useForm({
+    validatorAdapter: yupValidator(),
+    validators: {
+      onChange: loginFormShema,
+      onMount: loginFormShema,
+    },
+    defaultValues: {
+      email: "",
+      password: "",
+    },
+    onSubmit: async ({ value }) => {
       const response = await signIn("credentials", {
-        username: formData.get("username"),
-        password: formData.get("password"),
+        username: value.email,
+        password: value.password,
         redirect: false,
       });
 
-      if (response?.error) {
-        setError("Invalid credentials");
-      } else {
-        router.push("/queues");
-        router.refresh();
+      if (response === undefined) {
+        toast.error("Something went wrong");
+        return;
       }
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    } catch (error) {
-      setError("An error occurred during login");
-    }
-  };
+
+      if (!response.ok) {
+        toast.error(response.error ?? "Something went wrong");
+        return;
+      }
+
+      router.replace("/queues");
+    },
+  });
 
   return (
-    <div className="min-h-screen flex items-center justify-center">
+    <div className="min-h-screen w-full flex items-center justify-center">
       <Card className="w-96">
         <CardHeader>
           <h1 className="text-2xl font-bold">Login</h1>
         </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit}>
-            {error && <div className="mb-4 text-red-500 text-sm">{error}</div>}
-            <div className="mb-4">
-              <Label htmlFor="username">Username</Label>
-              <Input
-                type="text"
-                id="username"
-                name="username"
-                className="w-full p-2 border rounded"
-                required
-              />
-            </div>
-            <div className="mb-6">
-              <Label htmlFor="password">Password</Label>
-              <Input
-                type="password"
-                id="password"
-                name="password"
-                className="w-full p-2 border rounded"
-                required
-              />
-            </div>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            form.handleSubmit();
+          }}
+        >
+          <CardContent className="flex flex-col gap-4">
+            <form.Field name="email">
+              {(field) => (
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor={field.name}>Email</Label>
+                  <Input
+                    type="email"
+                    name={field.name}
+                    className="w-full p-2 border rounded"
+                  />
+                </div>
+              )}
+            </form.Field>
+            <form.Field name="password">
+              {(field) => (
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="password">Password</Label>
+                  <Input
+                    type="password"
+                    name={field.name}
+                    className="w-full p-2 border rounded"
+                  />
+                </div>
+              )}
+            </form.Field>
+          </CardContent>
+          <CardFooter>
             <Button type="submit" className="w-full">
               Sign In
             </Button>
-          </form>
-        </CardContent>
+          </CardFooter>
+        </form>
       </Card>
     </div>
   );

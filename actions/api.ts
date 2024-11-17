@@ -1,13 +1,14 @@
 "use server";
-import type { QueueSelector } from "@/components/create-queue";
 import type { NamespaceStatistics } from "@/components/namespaces/table";
 import type { QueueStatistics } from "@/components/queues/table";
+import type { CreateNamespaceRequest } from "@/schemas/create-namespace";
+import type { CreateQueueRequest } from "@/schemas/create-queue";
 import { revalidateTag } from "next/cache";
 
-export async function createNamespace(name: string) {
+export async function createNamespace(data: CreateNamespaceRequest) {
   "use server";
 
-  await fetch(`http://localhost:8080/ns/${name}`, {
+  await fetch(`http://localhost:8080/ns/${data.name}`, {
     method: "POST",
     next: {
       tags: ["namespaces"],
@@ -46,7 +47,7 @@ export async function listNamespaces(): Promise<NamespaceStatistics[]> {
     });
 }
 
-export async function createQueue(data: QueueSelector) {
+export async function createQueue(data: CreateQueueRequest) {
   "use server";
 
   await fetch(`http://localhost:8080/queue/${data.namespace}/${data.name}`, {
@@ -59,7 +60,7 @@ export async function createQueue(data: QueueSelector) {
   revalidateTag("queues");
 }
 
-export async function deleteQueue(data: QueueSelector) {
+export async function deleteQueue(data: CreateQueueRequest) {
   "use server";
 
   await fetch(`http://localhost:8080/queue/${data.namespace}/${data.name}`, {
