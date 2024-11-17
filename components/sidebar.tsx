@@ -18,10 +18,12 @@ import { cn } from "@/lib/utils";
 import {
   Axis3D,
   Braces,
+  Key,
   Logs,
   PanelLeftClose,
   PanelLeftOpen,
   Plus,
+  Users,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -31,6 +33,8 @@ import { TooltipTrigger } from "@radix-ui/react-tooltip";
 import { useState, type MouseEventHandler } from "react";
 import CreateQueue from "./create-queue";
 import CreateNamespace from "./create-namespace";
+import CreateApiKey from "./create-api-key";
+import CreateUser from "./create-user";
 
 function SidebarItem({
   title,
@@ -74,7 +78,7 @@ export default function DashboardSidebar() {
   const pathName = usePathname();
   const { open } = useSidebar();
 
-  type Mode = "normal" | "create-queue" | "create-namespace";
+  type Mode = "normal" | "create-queue" | "create-namespace" | "create-api-key" | "create-user";
 
   const [mode, setMode] = useState<Mode>("normal");
 
@@ -86,6 +90,14 @@ export default function DashboardSidebar() {
       />
       <CreateNamespace
         open={mode === "create-namespace"}
+        close={() => setMode("normal")}
+      />
+      <CreateApiKey
+        open={mode === "create-api-key"}
+        close={() => setMode("normal")}
+      />
+      <CreateUser
+        open={mode === "create-user"}
         close={() => setMode("normal")}
       />
       <SidebarHeader
@@ -110,6 +122,20 @@ export default function DashboardSidebar() {
                 icon={Braces}
                 isActive={pathName.endsWith("/namespaces")}
                 onClick={() => setMode("create-namespace")}
+              />
+              <SidebarItem
+                title="API Keys"
+                url="/api-keys"
+                icon={Key}
+                isActive={pathName.endsWith("/api-keys")}
+                onClick={()=> setMode("create-api-key")}
+              />
+              <SidebarItem
+                title="Admin"
+                url="/admin"
+                icon={Users}
+                isActive={pathName.endsWith("/admin")}
+                onClick={() => setMode("create-user")}
               />
             </SidebarMenu>
           </SidebarGroupContent>
