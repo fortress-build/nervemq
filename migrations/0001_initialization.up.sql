@@ -47,4 +47,21 @@ create table if not exists api_keys (
 );
 create unique index if not exists api_keys_hash_idx on api_keys(key_id, hashed_key);
 
+create table if not exists sessions (
+  id integer not null,
+  session_key text not null,
+  ttl integer not null,
 
+  primary key (id)
+);
+create unique index if not exists sessions_key_idx on sessions(session_key);
+
+create table if not exists session_state (
+  session integer not null,
+  k text not null,
+  v text not null,
+
+  primary key (session, k),
+  foreign key (session) references sessions(id) on delete cascade
+);
+create unique index if not exists sessions_kv_idx on session_state(session, k);

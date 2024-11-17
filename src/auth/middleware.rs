@@ -11,7 +11,8 @@ use actix_web::{dev::ServiceRequest, dev::ServiceResponse, Error, HttpMessage};
 
 use actix_casbin_auth::CasbinVals;
 
-use super::authenticate_api_key;
+use super::data::authenticate_api_key;
+use super::header::AuthHeader;
 
 pub struct ApiKeyAuth;
 
@@ -64,7 +65,6 @@ where
                 .expect("SQLite pool not found. This is a bug.")
                 .clone();
 
-            // let req_data = req.extract::<web::Header<>>().await?;
             let Some(auth_header) = req.headers().get(header::AUTHORIZATION) else {
                 return Err(ErrorUnauthorized("API Key not provided"));
             };
@@ -81,7 +81,7 @@ where
                     .parse_str(auth_req)
                     .map_err(|_| ErrorUnauthorized("Invalid authorization"))?
             } {
-                super::AuthHeader::CreekApiV1 { key_id, secret } => {
+                AuthHeader::CreekApiV1 { key_id, secret } => {
                     match authenticate_api_key(api.db(), key_id.to_owned(), secret.to_owned()).await
                     {
                         Ok(_) => {
@@ -95,7 +95,7 @@ where
                         Err(e) => Err(ErrorUnauthorized(e)),
                     }
                 }
-                super::AuthHeader::Bearer { .. } => unimplemented!(),
+                AuthHeader::Bearer { .. } => Err(ErrorUnauthorized("unimplemented")),
             }
         })
     }
