@@ -2,7 +2,7 @@ import { nextui } from "@nextui-org/theme";
 import type { Config } from "tailwindcss";
 import Animate from "tailwindcss-animate";
 
-export default {
+const config: Config = {
   darkMode: ["class"],
   content: [
     "./pages/**/*.{js,ts,jsx,tsx,mdx}",
@@ -47,11 +47,11 @@ export default {
         input: "var(--input)",
         ring: "var(--ring)",
         chart: {
-          "1": "var(--chart-1)",
-          "2": "var(--chart-2)",
-          "3": "var(--chart-3)",
-          "4": "var(--chart-4)",
-          "5": "var(--chart-5)",
+          1: "var(--chart-1)",
+          2: "var(--chart-2)",
+          3: "var(--chart-3)",
+          4: "var(--chart-4)",
+          5: "var(--chart-5)",
         },
         sidebar: {
           DEFAULT: "var(--sidebar-background))",
@@ -72,4 +72,6 @@ export default {
     },
   },
   plugins: [Animate, nextui()],
-} satisfies Config;
+};
+
+export default config;

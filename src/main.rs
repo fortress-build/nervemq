@@ -1,18 +1,29 @@
-use actix_cors::Cors;
-use actix_identity::IdentityMiddleware;
-use actix_session::config::PersistentSession;
-use actix_session::storage::CookieSessionStore;
-use actix_session::SessionMiddleware;
-use actix_web::cookie::time::Duration;
-use actix_web::web::{self, JsonConfig};
-use actix_web::{web::Data, App, HttpServer};
+use std::future::Future;
 
+use actix_cors::Cors;
+use actix_identity::{Identity, IdentityExt, IdentityMiddleware};
+use actix_session::config::{CookieContentSecurity, PersistentSession};
+use actix_session::storage::CookieSessionStore;
+use actix_session::{Session, SessionExt, SessionMiddleware};
+use actix_web::cookie::time::Duration;
+use actix_web::cookie::SameSite;
+use actix_web::dev::{Service as ActixService, ServiceRequest};
+use actix_web::web::{self, FormConfig, Html, JsonConfig};
+use actix_web::{web::Data, App, HttpServer};
+use actix_web::{FromRequest, HttpMessage, HttpRequest, HttpResponse};
+
+use chrono::TimeDelta;
 use creek::auth;
 use creek::auth::middleware::ApiKeyAuth;
 use creek::auth::session::SqliteSessionStore;
 use creek::service::Service;
 use creek::{api, config::Config};
+use openssl::ssl::{SslAcceptor, SslFiletype, SslMethod};
 use tracing_actix_web::TracingLogger;
+
+fn ident<S: ActixService<HttpRequest>>(req: HttpRequest, srv: &S) -> S::Future {
+    srv.call(req)
+}
 
 #[tokio::main]
 async fn main() -> eyre::Result<()> {
@@ -27,31 +38,43 @@ async fn main() -> eyre::Result<()> {
 
     let data = Data::new(service);
 
-    // let ssl_acceptor = {
-    //     let mut builder = SslAcceptor::mozilla_intermediate(SslMethod::tls())?;
-    //
-    //     builder.set_private_key_file("key.pem", SslFiletype::PEM)?;
-    //     builder.set_certificate_chain_file("cert.pem")?;
-    //
-    //     builder
-    // };
+    let ssl_acceptor = {
+        let mut builder = SslAcceptor::mozilla_intermediate(SslMethod::tls())?;
+
+        builder.set_private_key_file("localhost-key.pem", SslFiletype::PEM)?;
+        builder.set_certificate_chain_file("localhost.pem")?;
+
+        builder
+    };
 
     // let casbin_middleware = CasbinService::new();
 
-    const SESSION_EXPIRATION: u64 = 24 * 60 * 60;
-    let deadline = std::time::Duration::from_secs(SESSION_EXPIRATION);
-    let session_ttl = Duration::new(SESSION_EXPIRATION as i64, 0);
+    const SESSION_EXPIRATION: TimeDelta = chrono::Duration::hours(6);
+
+    let deadline = SESSION_EXPIRATION.to_std().expect("valid duration");
+    let session_ttl = Duration::new(SESSION_EXPIRATION.num_seconds(), 0);
 
     HttpServer::new(move || {
-        let identity_middleware = IdentityMiddleware::builder()
-            // .visit_deadline(Some(deadline))
-            .logout_behaviour(actix_identity::config::LogoutBehaviour::PurgeSession)
-            .build();
+        let session_middleware = SessionMiddleware::builder(
+            // CookieSessionStore::default(),
+            session_store.clone(),
+            secret_key.clone(),
+        )
+        .cookie_secure(true)
+        // .cookie_same_site(SameSite::Strict)
+        .cookie_content_security(CookieContentSecurity::Private)
+        .session_lifecycle(PersistentSession::default().session_ttl(session_ttl))
+        .cookie_domain(Some("localhost".to_owned()))
+        .cookie_path("/".to_owned())
+        .cookie_http_only(true)
+        .cookie_name("nerve-session".to_owned())
+        .build();
 
-        let session_middleware =
-            SessionMiddleware::builder(session_store.clone(), secret_key.clone())
-                .session_lifecycle(PersistentSession::default().session_ttl(session_ttl))
-                .build();
+        let identity_middleware = IdentityMiddleware::builder()
+            .visit_deadline(Some(deadline))
+            .logout_behaviour(actix_identity::config::LogoutBehaviour::PurgeSession)
+            .id_key("nerve-id")
+            .build();
 
         let cors = Cors::default()
             // .send_wildcard()
@@ -61,27 +84,110 @@ async fn main() -> eyre::Result<()> {
             .allow_any_method();
 
         let json_cfg = JsonConfig::default().content_type_required(false);
+        let form_cfg = FormConfig::default();
 
         App::new()
             // .wrap(ApiKeyAuth)
-            .wrap(actix_web::middleware::Logger::default())
+            .wrap_fn(|req, srv| {
+                // match req.cookie("nerve-session") {
+                //     Some(cookie) => {
+                //         // req.cookies().unwrap()
+                //         // let cookies = req.cookies().unwrap();
+                //         println!("{cookies:?}");
+                //
+                //         let session = req.get_session();
+                //
+                //         println!("{:?}", session.entries());
+                //
+                //         // req.extensions()
+                //         // Session::extract(&req);
+                //         // req.ex
+                //         // Identity::extract(&req.get)
+                //     }
+                //     None => {}
+                // }
+
+                let session = req.get_session();
+
+                println!("{:?}", session.entries());
+
+                let id = req.get_identity().map(|e| e.id());
+                tracing::error!("IDENTITY: {:?}", id);
+
+                srv.call(req)
+            })
+            // .wrap(actix_web::middleware::Logger::default())
             .wrap(identity_middleware)
             .wrap(session_middleware)
             .wrap(cors)
-            // .wrap(TracingLogger::default())
-            .app_data(json_cfg)
-            .app_data(data.clone())
+            .wrap(TracingLogger::default())
             .service(creek::api::namespace::service())
             .service(creek::api::queue::service())
             .service(creek::api::data::service())
             .service(creek::api::admin::service())
             .service(creek::api::tokens::service())
             .service(creek::api::auth::service())
+            .app_data(json_cfg)
+            .app_data(data.clone())
+            .app_data(form_cfg)
     })
-    // .bind_openssl(("127.0.0.1", 443), ssl_acceptor)?
+    // .bind_openssl(("127.0.0.1", 8080), ssl_acceptor)?
     .bind(("127.0.0.1", 8080))?
     .run()
     .await?;
 
     Ok(())
+}
+
+#[actix_web::get("/")]
+async fn index(user: Option<actix_identity::Identity>) -> Html {
+    if let Some(user) = user {
+        let id = user.id().unwrap();
+
+        Html::new(format!(
+            r#"
+            <html>
+                <body>
+                    <h1>Welcome! {id}</h1>
+
+                    <form action="https://localhost:8081/logout" method="post" target="_blank">
+                         <input type="submit" value="Submit" />
+                    </form>
+                </body>
+            </html>
+            "#,
+        ))
+    } else {
+        Html::new(format!(
+            r#"
+            <html>
+                <body>
+                    <script>
+                        async function onSubmit() {{
+                            const data = {{
+                                email: document.getElementById("emailEntry").value,
+                                password: document.getElementById("passwordEntry").value
+                            }};
+                            const res = await fetch("http://localhost:8080/auth/login", {{
+                                method: "POST",
+                                body: JSON.stringify(data),
+                                headers: {{
+                                    "Content-Type": "application/json"
+                                }}
+                            }})
+                            console.log(res);
+                        }}
+                    </script>
+                    <h1>Welcome Anonymous!</h1>
+
+                    <form>
+                         <input type="text" id="emailEntry" name="email" value="e@e.e" /><br />
+                         <input type="text" id="passwordEntry" name="password" value="eeeeeeee" /><br />
+                         <input type="button" value="Submit" onclick="onSubmit()" />
+                    </form>
+                </body>
+            </html>
+            "#,
+        ))
+    }
 }

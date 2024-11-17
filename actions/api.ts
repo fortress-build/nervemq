@@ -1,9 +1,9 @@
+"use client";
 import type { NamespaceStatistics } from "@/components/namespaces/table";
 import type { QueueStatistics } from "@/components/queues/table";
 import type { CreateNamespaceRequest } from "@/schemas/create-namespace";
 import type { CreateQueueRequest } from "@/schemas/create-queue";
 import type { APIKey } from "@/components/create-api-key";
-import { revalidateTag } from "next/cache";
 import type { UserStatistics } from "@/components/create-user";
 import { SERVER_ENDPOINT } from "@/app/globals";
 import type { CreateUserRequest } from "@/schemas/create-user";
@@ -16,8 +16,6 @@ export async function createNamespace(data: CreateNamespaceRequest) {
       tags: ["namespaces"],
     },
   });
-
-  revalidateTag("namespaces");
 }
 
 export async function deleteNamespace(name: string) {
@@ -28,8 +26,6 @@ export async function deleteNamespace(name: string) {
       tags: ["namespaces"],
     },
   });
-
-  revalidateTag("namespaces");
 }
 
 export async function listNamespaces(): Promise<NamespaceStatistics[]> {
@@ -56,8 +52,6 @@ export async function createQueue(data: CreateQueueRequest) {
       tags: ["queues"],
     },
   });
-
-  revalidateTag("queues");
 }
 
 export async function deleteQueue(data: CreateQueueRequest) {
@@ -68,8 +62,6 @@ export async function deleteQueue(data: CreateQueueRequest) {
       tags: ["queues"],
     },
   });
-
-  revalidateTag("queues");
 }
 
 export async function listQueues(): Promise<QueueStatistics[]> {
@@ -85,14 +77,21 @@ export async function listQueues(): Promise<QueueStatistics[]> {
 }
 
 export async function listAPIKeys(): Promise<APIKey[]> {
+  "use client";
+  // window.Headers
+  // console.log(await cookies())
   return await fetch(`${SERVER_ENDPOINT}/tokens`, {
     method: "GET",
     credentials: "include",
+    mode: "cors",
     next: {
       tags: ["api-keys"],
     },
   })
-    .then((res) => res.json())
+    .then((res) => {
+      console.log(res);
+      return res.json();
+    })
     .catch(() => []);
 }
 
@@ -123,8 +122,6 @@ export async function deleteAPIKey(id: string) {
       tags: ["api-keys"],
     },
   });
-
-  revalidateTag("api-keys");
 }
 
 export async function createUser(data: CreateUserRequest): Promise<void> {
@@ -150,8 +147,6 @@ export async function deleteUser(id: string) {
       tags: ["users"],
     },
   });
-
-  revalidateTag("users");
 }
 
 export async function listUsers(): Promise<UserStatistics[]> {

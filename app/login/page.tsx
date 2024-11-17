@@ -16,16 +16,6 @@ import { yupValidator } from "@tanstack/yup-form-adapter";
 import { loginFormSchema } from "@/schemas/login-form";
 import { SERVER_ENDPOINT } from "../globals";
 
-type SessionResponse =
-  | {
-      type: "valid";
-      data: { email: string };
-    }
-  | {
-      type: "invalid";
-      data: undefined;
-    };
-
 export default function LoginPage() {
   const router = useRouter();
 
@@ -40,42 +30,37 @@ export default function LoginPage() {
       email: "",
       password: "",
     },
-    onSubmit: async ({ value }) => {
-      const response: SessionResponse | undefined = await fetch(
-        `${SERVER_ENDPOINT}/auth/login`,
-        {
+    onSubmit: async () => {
+      "use client";
+
+      const res = await window
+        .fetch(`${SERVER_ENDPOINT}/auth/login`, {
           method: "POST",
           body: JSON.stringify({
-            email: value.email,
-            password: value.password,
+            email: "e@e.e",
+            password: "eeeeeeee",
           }),
-        },
-      ).then((res) => {
-        if (!res.ok) {
-          switch (res.status) {
-            case 401: {
-              toast.error("Invalid email or password");
-              break;
-            }
-            default: {
-              toast.error("Something went wrong");
-              break;
-            }
-          }
-          return;
-        }
-        return res.json();
-      });
-      // if (response === undefined) {
-      //   return;
-      // }
+          credentials: "include",
+          mode: "cors",
+        })
+        .then((v) => {
+          console.log(v);
+          return v;
+        });
 
-      if (
-        response?.type !== "valid" ||
-        // This should never happen but... just to be safe
-        response.data.email !== value.email
-      ) {
-        toast.error("Invalid email or password");
+      console.log(res);
+
+      if (!res.ok) {
+        switch (res.status) {
+          case 401: {
+            toast.error("Invalid email or password");
+            break;
+          }
+          default: {
+            toast.error("Something went wrong");
+            break;
+          }
+        }
         return;
       }
 

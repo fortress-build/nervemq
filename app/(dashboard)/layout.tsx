@@ -1,5 +1,6 @@
 import Header from "@/components/header";
 import DashboardSidebar from "@/components/sidebar";
+import type React from "react";
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   return (

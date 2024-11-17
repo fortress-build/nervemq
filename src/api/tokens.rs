@@ -1,10 +1,13 @@
+use std::future::{ready, Ready};
+
 use actix_identity::Identity;
+use actix_session::Session;
 use actix_web::{
     delete,
     error::{ErrorInternalServerError, ErrorUnauthorized},
     get, post,
-    web::{self, Json},
-    Responder, Scope,
+    web::{self, Json, Payload},
+    FromRequest, HttpRequest, HttpResponse, Responder, Scope,
 };
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
@@ -59,15 +62,36 @@ struct ApiKey {
     name: String,
 }
 
+pub struct IdentityWrapped(pub actix_identity::Identity);
+
+impl FromRequest for IdentityWrapped {
+    type Error = <Identity as FromRequest>::Error;
+    type Future = Ready<Result<IdentityWrapped, Self::Error>>;
+
+    fn from_request(req: &HttpRequest, pl: &mut actix_web::dev::Payload) -> Self::Future {
+        if let Ok(identity) = Identity::from_request(req, pl).into_inner() {
+            return ready(Ok(IdentityWrapped(identity)));
+        }
+
+        ready(Err(ErrorUnauthorized("no identity found")))
+    }
+}
+
 #[get("")]
 pub async fn list_tokens(
     service: web::Data<Service>,
-    identity: Option<Identity>,
+    session: Session,
+    req: HttpRequest,
+    // IdentityWrapped(identity): IdentityWrapped,
+    identity: Identity,
 ) -> actix_web::Result<web::Json<Vec<ApiKey>>> {
-    let Some(identity) = identity else {
-        tracing::warn!("identity not found - access denied");
-        return Err(ErrorUnauthorized("not authenticated"));
-    };
+    tracing::error!("{:?}", req.cookies());
+
+    // let Some(identity) = identity else {
+    //     tracing::warn!("identity not found - access denied");
+    //     return Err(ErrorUnauthorized("not authenticated"));
+    // };
+    // let identity = Identity::from_request(&req, &mut payload);
 
     let email = match identity.id() {
         Ok(email) => email,

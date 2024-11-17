@@ -1,9 +1,9 @@
+use actix_identity::Identity;
 use actix_web::{delete, get, post, web, Responder, Scope};
 use serde::{Deserialize, Serialize};
 
 use crate::service::Service;
 
-#[get("")]
 async fn list_namespaces(service: web::Data<Service>) -> actix_web::Result<impl Responder> {
     let data = match service.list_namespaces().await {
         Ok(data) => data,
@@ -18,7 +18,6 @@ pub struct CreateNamespaceResponse {
     id: u64,
 }
 
-#[post("/{ns_name}")]
 async fn create_namespace(
     service: web::Data<Service>,
     path: web::Path<String>,
@@ -31,7 +30,6 @@ async fn create_namespace(
     Ok(web::Json(CreateNamespaceResponse { id }))
 }
 
-#[delete("/{ns_name}")]
 async fn delete_namespace(
     service: web::Data<Service>,
     path: web::Path<String>,
@@ -45,7 +43,10 @@ async fn delete_namespace(
 
 pub fn service() -> Scope {
     web::scope("/ns")
-        .service(list_namespaces)
-        .service(create_namespace)
-        .service(delete_namespace)
+        .route("", web::get().to(list_namespaces))
+        .service(
+            web::resource("/{ns_name}")
+                .post(create_namespace)
+                .delete(delete_namespace),
+        )
 }
