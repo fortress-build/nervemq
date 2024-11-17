@@ -9,13 +9,12 @@ import {
   DialogTitle,
 } from "./ui/dialog";
 
-import { type InferType, object, string, array } from "yup";
 import { useForm } from "@tanstack/react-form";
 import { yupValidator } from "@tanstack/yup-form-adapter";
 import { useQuery } from "@tanstack/react-query";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
-import { cn, isAlphaNumeric } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import { createUser, listNamespaces } from "@/actions/api";
 import { Spinner } from "@nextui-org/react";
 import { ChevronsUpDown, Plus, Check } from "lucide-react";
@@ -32,28 +31,16 @@ import { toast } from "sonner";
 import { useInvalidate } from "@/hooks/use-invalidate";
 import CreateNamespace from "./create-namespace";
 import { useState } from "react";
-
-export const userSelectorSchema = object({
-  name: string()
-    .required()
-    .max(32)
-    .min(1)
-    .test("name", "name should be alphanumeric", isAlphaNumeric),
-  namespaces: array().of(string()).required().min(1),
-});
-
-export type UserSelector = InferType<typeof userSelectorSchema>;
+import { createUserSchema } from "@/schemas/create-user";
 
 export interface UserStatistics {
-    id: string;
-    name: string;
-    email: string;
-    role: string;
-    createdAt: string;
-    lastLogin?: string;
-    namespaces: string[];
-  }
-  
+  email: string;
+  // role: string;
+  // createdAt: string;
+  // lastLogin?: string;
+  // namespaces: string[];
+}
+
 export default function CreateUser({
   open,
   close,
@@ -75,19 +62,25 @@ export default function CreateUser({
 
   const form = useForm({
     defaultValues: {
-      name: "",
-      namespaces: [] as string[],
+      email: "",
+      password: "",
+      namespaces: new Set() as Set<string>,
     },
     validatorAdapter: yupValidator(),
     validators: {
-      onChange: userSelectorSchema,
-      onMount: userSelectorSchema,
+      onChange: createUserSchema,
+      onMount: createUserSchema,
+      onSubmit: createUserSchema,
     },
     onSubmit: async ({ value: data }) => {
-      await createUser(data.name)
+      await createUser({
+        email: data.email,
+        password: data.password,
+        namespaces: [...data.namespaces.keys()],
+      })
         .then(() => {
           invalidate();
-          onSuccess?.(data.name);
+          onSuccess?.(data.email);
         })
         .catch(() => {
           toast.error("Something went wrong");
@@ -99,8 +92,10 @@ export default function CreateUser({
   });
 
   const handleNamespaceCreated = async (namespaceName: string) => {
-    const currentNamespaces = form.getFieldValue("namespaces") || [];
-    await form.setFieldValue("namespaces", [...currentNamespaces, namespaceName]);
+    form.setFieldValue("namespaces", (set) => {
+      set.add(namespaceName);
+      return set;
+    });
     await form.validateField("namespaces", "change");
     setShowCreateNamespace(false);
   };
@@ -130,15 +125,15 @@ export default function CreateUser({
                 Create a new user with access to selected namespaces.
               </DialogDescription>
             </DialogHeader>
-            <form.Field name="name">
+            <form.Field name="email">
               {(field) => (
                 <div className="flex flex-col gap-2">
                   <Label htmlFor={field.name}>Name</Label>
                   <Input
                     id={field.name}
                     name={field.name}
-                    value={field.state.value}
                     type="text"
+                    value={field.state.value}
                     onBlur={field.handleBlur}
                     onChange={(e) => field.handleChange(e.target.value)}
                     placeholder="Name"
@@ -156,7 +151,36 @@ export default function CreateUser({
                 </div>
               )}
             </form.Field>
-            <form.Field name="namespaces">
+            <form.Field name="password">
+              {(field) => (
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor={field.name}>Name</Label>
+                  <Input
+                    id={field.name}
+                    name={field.name}
+                    type="password"
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChange={(e) => field.handleChange(e.target.value)}
+                    placeholder="Password"
+                    data-1p-ignore
+                    className={cn(
+                      "focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0",
+                      "focus:border-primary focus:border transition-all",
+                    )}
+                  />
+                  {field.state.meta.errors ? (
+                    <span className="text-sm text-destructive">
+                      {field.state.meta.errors.join(", ")}
+                    </span>
+                  ) : null}
+                </div>
+              )}
+            </form.Field>
+            <form.Field
+              defaultValue={new Set() as Set<string>}
+              name="namespaces"
+            >
               {(field) => (
                 <div className="flex flex-col gap-2">
                   <Label htmlFor={field.name}>Namespaces</Label>
@@ -168,11 +192,20 @@ export default function CreateUser({
                         role="combobox"
                         className={cn(
                           "w-full justify-between",
-                          field.state.value?.length > 0 ? "" : "text-muted-foreground",
+                          field.state.value?.size > 0
+                            ? ""
+                            : "text-muted-foreground",
                         )}
                       >
-                        {field.state.value?.length > 0
-                          ? field.state.value.join(", ")
+                        {field.state.value?.size > 0
+                          ? (field.state.value
+                              .values()
+                              .reduce((acc, curr, idx) => {
+                                if (idx > 0) {
+                                  return `${acc}, ${curr}`;
+                                }
+                                return curr;
+                              }, "") as string)
                           : "Select namespaces"}
                         <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                       </Button>
@@ -199,20 +232,19 @@ export default function CreateUser({
                                 value={namespace.name}
                                 className="cursor-pointer"
                                 onSelect={(currentValue) => {
-                                  const currentNamespaces = field.state.value || [];
-                                  if (!currentNamespaces.includes(currentValue)) {
-                                    field.handleChange([...currentNamespaces, currentValue]);
+                                  const currentNamespaces = field.state.value;
+                                  if (!currentNamespaces.has(currentValue)) {
+                                    currentNamespaces.add(currentValue);
                                   } else {
-                                    field.handleChange(currentNamespaces.filter(ns => ns !== currentValue));
+                                    currentNamespaces.delete(currentValue);
                                   }
+                                  field.handleChange(currentNamespaces);
                                 }}
                               >
                                 <div className="flex items-center gap-2">
-                                  {(field.state.value || []).includes(namespace.name) && (
-                                    <Check
-                                      className="h-4 w-4"
-                                    />
-                                  )}
+                                  {field.state.value.has(namespace.name) ? (
+                                    <Check className="h-4 w-4" />
+                                  ) : null}
                                   {namespace.name}
                                 </div>
                               </CommandItem>

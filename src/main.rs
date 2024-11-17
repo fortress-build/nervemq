@@ -1,8 +1,9 @@
+use actix_cors::Cors;
 use actix_identity::IdentityMiddleware;
 use actix_session::config::PersistentSession;
 use actix_session::SessionMiddleware;
 use actix_web::cookie::time::Duration;
-use actix_web::web;
+use actix_web::web::{self, JsonConfig};
 use actix_web::{web::Data, App, HttpServer};
 
 use creek::auth;
@@ -51,18 +52,28 @@ async fn main() -> eyre::Result<()> {
                 .session_lifecycle(PersistentSession::default().session_ttl(session_ttl))
                 .build();
 
+        let cors = Cors::default()
+            .send_wildcard()
+            .allow_any_origin()
+            .allow_any_header()
+            .allow_any_method();
+
+        let json_cfg = JsonConfig::default().content_type_required(false);
+
         App::new()
-            .wrap(ApiKeyAuth)
+            // .wrap(ApiKeyAuth)
+            .wrap(cors)
             .wrap(identity_middleware)
             .wrap(session_middleware)
-            .wrap(TracingLogger::default())
-            // .wrap(actix_web::middleware::Logger::default())
+            // .wrap(TracingLogger::default())
+            .wrap(actix_web::middleware::Logger::default())
+            .app_data(json_cfg)
             .app_data(data.clone())
-            .configure(creek::api::namespace::config)
-            .configure(creek::api::queue::config)
-            .configure(creek::api::auth::config)
-            .configure(creek::api::data::config)
-            .configure(creek::api::admin::config)
+            .service(creek::api::namespace::service())
+            .service(creek::api::queue::service())
+            .service(creek::api::data::service())
+            .service(creek::api::admin::service())
+            .service(creek::api::auth::service())
     })
     // .bind_openssl(("127.0.0.1", 443), ssl_acceptor)?
     .bind(("127.0.0.1", 8080))?
