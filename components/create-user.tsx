@@ -35,10 +35,10 @@ import { createUserSchema } from "@/schemas/create-user";
 
 export interface UserStatistics {
   email: string;
-  // role: string;
-  // createdAt: string;
-  // lastLogin?: string;
-  // namespaces: string[];
+  role: string;
+  createdAt: string;
+  lastLogin?: string;
+  namespaces: string[];
 }
 
 export default function CreateUser({

@@ -78,10 +78,10 @@ export const columns: ColumnDef<UserStatistics>[] = [
           onClick={async (e) => {
             const meta = row.table.options.meta as
               | {
-                  handleDeleteUser: (id: string, e: unknown) => void;
+                  handleDeleteUser: (email: string, e: unknown) => void;
                 }
               | undefined;
-            meta?.handleDeleteUser(row.row.original.id, e);
+            meta?.handleDeleteUser(row.row.original.email, e);
           }}
         >
           <Trash2 className="h-4 w-4" />
