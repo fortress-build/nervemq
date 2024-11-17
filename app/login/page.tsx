@@ -1,6 +1,5 @@
 "use client";
 
-import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,6 +15,16 @@ import { useForm } from "@tanstack/react-form";
 import { yupValidator } from "@tanstack/yup-form-adapter";
 import { loginFormSchema } from "@/schemas/login-form";
 
+type SessionResponse =
+  | {
+      type: "valid";
+      data: { email: string };
+    }
+  | {
+      type: "invalid";
+      data: undefined;
+    };
+
 export default function LoginPage() {
   const router = useRouter();
 
@@ -30,19 +39,30 @@ export default function LoginPage() {
       password: "",
     },
     onSubmit: async ({ value }) => {
-      const response = await signIn("credentials", {
-        username: value.email,
-        password: value.password,
-        redirect: false,
+      const response: SessionResponse | undefined = await fetch(
+        "http://localhost:8080/auth/login",
+        {
+          method: "POST",
+          body: JSON.stringify(value),
+        },
+      ).then((res) => {
+        if (!res.ok) {
+          res.text().then((msg) => toast.error(msg ?? "Something went wrong"));
+          return;
+        }
+        return res.json();
       });
-
       if (response === undefined) {
         toast.error("Something went wrong");
         return;
       }
 
-      if (!response.ok) {
-        toast.error(response.error ?? "Something went wrong");
+      if (
+        response.type !== "valid" ||
+        // This should never happen but... just to be safe
+        response.data.email !== value.email
+      ) {
+        toast.error("Invalid email or password");
         return;
       }
 
