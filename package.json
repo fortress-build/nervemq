@@ -24,6 +24,8 @@
     "@tanstack/react-query": "^5.60.5",
     "@tanstack/react-table": "^8.20.5",
     "@tanstack/yup-form-adapter": "^0.35.0",
+    "@types/argon2-browser": "^1.18.4",
+    "argon2-browser": "^1.18.0",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
     "cmdk": "1.0.0",

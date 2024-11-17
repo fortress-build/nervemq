@@ -33,20 +33,24 @@ export const createApiKeySchema = object({
 export type CreateApiKey = InferType<typeof createApiKeySchema>;
 
 export interface APIKey {
-    id: string;
-    name: string;
-    created_at: string;
-    last_used?: string;
-    key?: string;
-  }
-  
+  id: string;
+  name: string;
+  created_at: string;
+  last_used?: string;
+  key?: string;
+}
+
 interface CreateApiKeyProps {
   open: boolean;
   close: () => void;
   onSuccess?: (keyName: string) => void;
 }
 
-export default function CreateApiKey({ open, close, onSuccess }: CreateApiKeyProps) {
+export default function CreateApiKey({
+  open,
+  close,
+  onSuccess,
+}: CreateApiKeyProps) {
   const [showKey, setShowKey] = useState(false);
   const [apiKey, setApiKey] = useState<APIKey | null>(null);
   const invalidate = useInvalidate(["apiKeys"]);
@@ -96,8 +100,8 @@ export default function CreateApiKey({ open, close, onSuccess }: CreateApiKeyPro
   });
 
   return (
-    <Dialog 
-      open={open} 
+    <Dialog
+      open={open}
       onOpenChange={(open) => {
         if (!open) {
           close();
@@ -184,7 +188,8 @@ export default function CreateApiKey({ open, close, onSuccess }: CreateApiKeyPro
             <DialogHeader>
               <DialogTitle>API Key Created</DialogTitle>
               <DialogDescription>
-                Please copy or download your API key now. You won&apos;t be able to see it again!
+                Please copy or download your API key now. You won&apos;t be able
+                to see it again!
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">

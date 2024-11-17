@@ -1,8 +1,8 @@
-use actix_web::{get, web};
+use actix_web::{get, web, Scope};
 
 use crate::{db::queue::QueueStatistics, service::Service};
 
-#[get("/stats")]
+#[get("")]
 async fn stats(service: web::Data<Service>) -> actix_web::Result<web::Json<Vec<QueueStatistics>>> {
     match service.statistics().await {
         Ok(val) => Ok(web::Json(val)),
@@ -10,6 +10,6 @@ async fn stats(service: web::Data<Service>) -> actix_web::Result<web::Json<Vec<Q
     }
 }
 
-pub fn config(cfg: &mut web::ServiceConfig) {
-    cfg.service(stats);
+pub fn service() -> Scope {
+    web::scope("/stats").service(stats)
 }
