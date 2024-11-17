@@ -45,24 +45,25 @@ export const columns: ColumnDef<ApiKey>[] = [
   },
   {
     id: "actions",
-    cell: ({ row, table }) => {
-      const meta = table.options.meta as {
-        handleDeleteKey: (id: string) => void;
-      };
-
-      return (
+    cell: (row) => (
+      <div className="flex items-center justify-end gap-2">
         <Button
           variant="ghost"
-          size="icon"
-          onClick={(e) => {
-            e.stopPropagation();
-            meta.handleDeleteKey(row.original.id);
+          size="sm"
+          className="text-destructive hover:text-destructive hover:bg-destructive/10"
+          onClick={async (e) => {
+            const meta = row.table.options.meta as
+              | {
+                  handleDeleteKey: (id: string, e: unknown) => void;
+                }
+              | undefined;
+            meta?.handleDeleteKey(row.row.original.id, e);
           }}
         >
-          <Trash2 className="h-4 w-4" />
+          <Trash2 className="h-4 w-4 text-destructive" />
         </Button>
-      );
-    },
+      </div>
+    ),
   },
 ];
 

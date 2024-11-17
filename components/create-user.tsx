@@ -122,13 +122,13 @@ export default function CreateUser({
             <DialogHeader>
               <DialogTitle>Create User</DialogTitle>
               <DialogDescription>
-                Create a new user with access to selected namespaces.
+                Create a new user and grant them access to specific namespaces.
               </DialogDescription>
             </DialogHeader>
             <form.Field name="email">
               {(field) => (
                 <div className="flex flex-col gap-2">
-                  <Label htmlFor={field.name}>Name</Label>
+                  <Label htmlFor={field.name}>Email</Label>
                   <Input
                     id={field.name}
                     name={field.name}
@@ -136,7 +136,7 @@ export default function CreateUser({
                     value={field.state.value}
                     onBlur={field.handleBlur}
                     onChange={(e) => field.handleChange(e.target.value)}
-                    placeholder="Name"
+                    placeholder="Email"
                     data-1p-ignore
                     className={cn(
                       "focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0",
@@ -183,7 +183,7 @@ export default function CreateUser({
             >
               {(field) => (
                 <div className="flex flex-col gap-2">
-                  <Label htmlFor={field.name}>Namespaces</Label>
+                  <Label htmlFor={field.name}>Grant Access to Namespaces</Label>
                   <Popover open={nsPopoverOpen} onOpenChange={setNsPopoverOpen}>
                     <PopoverTrigger asChild>
                       <Button
@@ -206,7 +206,7 @@ export default function CreateUser({
                                 }
                                 return curr;
                               }, "") as string)
-                          : "Select namespaces"}
+                          : "Select namespaces to grant access"}
                         <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                       </Button>
                     </PopoverTrigger>
