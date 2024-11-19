@@ -1,13 +1,12 @@
 use std::future::{ready, Ready};
 
 use actix_identity::Identity;
-use actix_session::Session;
 use actix_web::{
     delete,
     error::{ErrorInternalServerError, ErrorUnauthorized},
     get, post,
-    web::{self, Json, Payload},
-    FromRequest, HttpRequest, HttpResponse, Responder, Scope,
+    web::{self, Json},
+    FromRequest, HttpRequest, Responder, Scope,
 };
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
@@ -80,32 +79,21 @@ impl FromRequest for IdentityWrapped {
 #[get("")]
 pub async fn list_tokens(
     service: web::Data<Service>,
-    session: Session,
     req: HttpRequest,
-    // IdentityWrapped(identity): IdentityWrapped,
     identity: Identity,
 ) -> actix_web::Result<web::Json<Vec<ApiKey>>> {
     tracing::error!("{:?}", req.cookies());
 
-    // let Some(identity) = identity else {
-    //     tracing::warn!("identity not found - access denied");
-    //     return Err(ErrorUnauthorized("not authenticated"));
-    // };
-    // let identity = Identity::from_request(&req, &mut payload);
-
     let email = match identity.id() {
         Ok(email) => email,
         Err(err) => {
-            tracing::error!("id not found on identity: {err}");
             return Err(ErrorUnauthorized(err));
         }
     };
 
-    tracing::error!("id found on identity: {email}");
-
     let tokens = sqlx::query_as(
         "
-        SELECT email FROM users u
+        SELECT * FROM users u
         LEFT JOIN api_keys k ON u.id = k.user
         WHERE u.email = $1
     ",

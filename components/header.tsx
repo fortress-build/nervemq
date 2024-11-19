@@ -34,10 +34,12 @@ export default function Header({ className }: { className?: string }) {
 
   const session = useSession();
 
-  route.push({
-    label: session?.email ?? "anonymous",
-    href: "",
-  });
+  if (session) {
+    route.push({
+      label: session?.email ?? "anonymous",
+      href: "",
+    });
+  }
 
   return (
     <header

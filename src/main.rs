@@ -83,34 +83,6 @@ async fn main() -> eyre::Result<()> {
 
         App::new()
             // .wrap(ApiKeyAuth)
-            // .wrap_fn(|req, srv| {
-            //     // match req.cookie("nerve-session") {
-            //     //     Some(cookie) => {
-            //     //         // req.cookies().unwrap()
-            //     //         // let cookies = req.cookies().unwrap();
-            //     //         println!("{cookies:?}");
-            //     //
-            //     //         let session = req.get_session();
-            //     //
-            //     //         println!("{:?}", session.entries());
-            //     //
-            //     //         // req.extensions()
-            //     //         // Session::extract(&req);
-            //     //         // req.ex
-            //     //         // Identity::extract(&req.get)
-            //     //     }
-            //     //     None => {}
-            //     // }
-            //
-            //     let session = req.get_session();
-            //
-            //     println!("{:?}", session.entries());
-            //
-            //     let id = req.get_identity().map(|e| e.id());
-            //     tracing::error!("IDENTITY: {:?}", id);
-            //
-            //     srv.call(req)
-            // })
             // .wrap(actix_web::middleware::Logger::default())
             .wrap(TracingLogger::default())
             .wrap(identity_middleware)

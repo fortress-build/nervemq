@@ -15,6 +15,7 @@ import { useForm } from "@tanstack/react-form";
 import { yupValidator } from "@tanstack/yup-form-adapter";
 import { loginFormSchema } from "@/schemas/login-form";
 import { SERVER_ENDPOINT } from "../globals";
+import { useGlobalState } from "@/lib/state/global";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -30,39 +31,35 @@ export default function LoginPage() {
       email: "",
       password: "",
     },
-    onSubmit: async () => {
+    onSubmit: async ({ value }) => {
       "use client";
 
-      const res = await window
+      const data: { email: string } = await window
         .fetch(`${SERVER_ENDPOINT}/auth/login`, {
           method: "POST",
-          body: JSON.stringify({
-            email: "e@e.e",
-            password: "eeeeeeee",
-          }),
+          body: JSON.stringify(value),
           credentials: "include",
           mode: "cors",
         })
-        .then((v) => {
-          console.log(v);
-          return v;
+        .then((res) => {
+          if (!res.ok) {
+            switch (res.status) {
+              case 401: {
+                toast.error("Invalid email or password");
+                break;
+              }
+              default: {
+                toast.error("Something went wrong");
+                break;
+              }
+            }
+            return;
+          }
+
+          return res.json();
         });
 
-      console.log(res);
-
-      if (!res.ok) {
-        switch (res.status) {
-          case 401: {
-            toast.error("Invalid email or password");
-            break;
-          }
-          default: {
-            toast.error("Something went wrong");
-            break;
-          }
-        }
-        return;
-      }
+      useGlobalState.setState({ session: data });
 
       router.replace("/queues");
     },

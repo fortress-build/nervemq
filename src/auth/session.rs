@@ -40,8 +40,6 @@ impl SessionStore for SqliteSessionStore {
     ) -> impl ::core::future::Future<Output = Result<Option<SessionState>, LoadError>> {
         let db = self.db.clone();
         Box::pin(async move {
-            tracing::info!("Loading session");
-
             let session: Option<Session> =
                 sqlx::query_as("SELECT * from sessions WHERE session_key = $1")
                     .bind(session_key.as_ref())
@@ -70,12 +68,11 @@ impl SessionStore for SqliteSessionStore {
                     session
                 }
                 None => {
-                    tracing::warn!("No session found");
                     return Ok(None);
                 }
             };
 
-            tracing::info!("Loaded session: {session:?}");
+            tracing::error!("Loaded session: {:?}", session);
 
             Ok(Some(session.state))
         })
@@ -121,10 +118,7 @@ impl SessionStore for SqliteSessionStore {
                 )
                 .bind(id as i64)
                 .bind(k)
-                .bind(
-                    serde_json::to_string(&v)
-                        .map_err(|e| SaveError::Other(anyhow::Error::new(e)))?,
-                )
+                .bind(v)
                 .execute(tx.as_mut())
                 .await
                 .map_err(|e| SaveError::Other(anyhow::Error::new(e)))?;
@@ -147,7 +141,6 @@ impl SessionStore for SqliteSessionStore {
     {
         let db = self.db.clone();
         Box::pin(async move {
-            tracing::info!("Updating session");
             let mut tx = db
                 .begin()
                 .await
@@ -198,10 +191,7 @@ impl SessionStore for SqliteSessionStore {
                 )
                 .bind(session_id as i64)
                 .bind(k)
-                .bind(
-                    serde_json::to_string(&v)
-                        .map_err(|e| UpdateError::Other(anyhow::Error::new(e)))?,
-                )
+                .bind(v)
                 .execute(tx.as_mut())
                 .await
                 .map_err(|e| UpdateError::Other(anyhow::Error::new(e)))?;
@@ -267,7 +257,6 @@ impl SessionStore for SqliteSessionStore {
 mod tests {
     use super::*;
     use actix_web::cookie::time::Duration;
-    use serde_json::Value;
     use sqlx::sqlite::SqlitePoolOptions;
 
     async fn setup_db() -> SqlitePool {
@@ -315,7 +304,7 @@ mod tests {
         );
         state.insert(
             "username".to_string(),
-            Value::String("test_user".to_string()),
+            serde_json::Value::String("test_user".to_string()),
         );
         state
     }

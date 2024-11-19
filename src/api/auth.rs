@@ -1,18 +1,12 @@
-use std::{cell::RefCell, fmt::Display};
-
 use actix_identity::Identity;
-use actix_session::{storage::SessionKey, Session, SessionExt};
+use actix_session::SessionExt;
 use actix_web::{
-    error::{ErrorInternalServerError, ErrorUnauthorized, InternalError},
-    get,
-    http::StatusCode,
-    post,
-    web::{self, Json, JsonBody},
-    FromRequest, HttpMessage, HttpRequest, HttpResponse, Responder, ResponseError, Scope,
+    error::ErrorUnauthorized, get, http::StatusCode, post, web, HttpMessage, HttpRequest,
+    HttpResponse, Responder, ResponseError, Scope,
 };
 use argon2::{password_hash::PasswordHashString, Argon2, PasswordVerifier};
 use serde::{Deserialize, Serialize};
-use snafu::{Snafu, Whatever};
+use snafu::Snafu;
 
 use crate::service::Service;
 
@@ -23,10 +17,9 @@ pub struct LoginRequest {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-#[serde(tag = "type", content = "data", rename_all = "camelCase")]
-pub enum SessionResponse {
-    Valid { email: String },
-    Invalid,
+#[serde(rename_all = "camelCase")]
+pub struct SessionResponse {
+    email: String,
 }
 
 #[derive(Debug, Snafu)]
@@ -101,7 +94,7 @@ pub async fn login(
         }
     }
 
-    Ok(HttpResponse::Ok())
+    Ok(HttpResponse::Ok().json(SessionResponse { email: form.email }))
 }
 
 #[post("/logout")]
@@ -118,9 +111,9 @@ pub async fn get_session(identity: Option<Identity>) -> actix_web::Result<impl R
             let email = identity
                 .id()
                 .map_err(actix_web::error::ErrorInternalServerError)?;
-            Ok(web::Json(SessionResponse::Valid { email }))
+            Ok(web::Json(SessionResponse { email }))
         }
-        None => Ok(web::Json(SessionResponse::Invalid)),
+        None => Err(ErrorUnauthorized("Unauthorized")),
     }
 }
 
