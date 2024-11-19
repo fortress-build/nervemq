@@ -45,13 +45,17 @@ export function DataTable<TData, TValue>({
     data,
     columns,
     getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    onSortingChange: (updater) => setSorting?.(
-      typeof updater === 'function' ? updater(sorting ?? []) : updater
-    ),
-    state: {
-      sorting: sorting ?? [],
-    },
+    ...(sorting !== undefined && {
+      getSortedRowModel: getSortedRowModel(),
+      onSortingChange: setSorting 
+        ? (updater) => setSorting(
+            typeof updater === 'function' ? updater(sorting ?? []) : updater
+          )
+        : undefined,
+      state: {
+        sorting: sorting ?? [],
+      },
+    }),
     meta,
   });
 
