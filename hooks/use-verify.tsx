@@ -25,6 +25,7 @@ export function useVerifyUser(intervalMs: number = 300 * 1000) {
 
         const data = await response.json();
         useGlobalState.setState({ session: data });
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       } catch (error) {
         useGlobalState.setState({ session: undefined });
         router.push('/login');

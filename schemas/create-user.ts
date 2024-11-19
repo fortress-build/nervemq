@@ -7,6 +7,7 @@ export const createUserSchema = object({
     .of(string().required())
     .optional()
     .transform((v: Set<string>) => [...v.values()]),
+  role: string().required().oneOf(['admin', 'user']),
 });
 
 export type CreateUserRequest = InferType<typeof createUserSchema>;

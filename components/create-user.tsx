@@ -32,6 +32,13 @@ import { useInvalidate } from "@/hooks/use-invalidate";
 import CreateNamespace from "./create-namespace";
 import { useState } from "react";
 import { createUserSchema } from "@/schemas/create-user";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "./ui/select";
 
 export interface UserStatistics {
   email: string;
@@ -65,6 +72,7 @@ export default function CreateUser({
       email: "",
       password: "",
       namespaces: new Set() as Set<string>,
+      role: "user",
     },
     validatorAdapter: yupValidator(),
     validators: {
@@ -153,7 +161,7 @@ export default function CreateUser({
             <form.Field name="password">
               {(field) => (
                 <div className="flex flex-col gap-2">
-                  <Label htmlFor={field.name}>Name</Label>
+                  <Label htmlFor={field.name}>Password</Label>
                   <Input
                     id={field.name}
                     name={field.name}
@@ -168,6 +176,30 @@ export default function CreateUser({
                       "focus:border-primary focus:border transition-all",
                     )}
                   />
+                  {field.state.meta.errors ? (
+                    <span className="text-sm text-destructive">
+                      {field.state.meta.errors.join(", ")}
+                    </span>
+                  ) : null}
+                </div>
+              )}
+            </form.Field>
+            <form.Field name="role">
+              {(field) => (
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor={field.name}>Role</Label>
+                  <Select
+                    value={field.state.value}
+                    onValueChange={field.handleChange}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a role" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="user">User</SelectItem>
+                      <SelectItem value="admin">Admin</SelectItem>
+                    </SelectContent>
+                  </Select>
                   {field.state.meta.errors ? (
                     <span className="text-sm text-destructive">
                       {field.state.meta.errors.join(", ")}
