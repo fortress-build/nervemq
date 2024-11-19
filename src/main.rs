@@ -12,6 +12,7 @@ use creek::auth::middleware::protected_route::Protected;
 use creek::auth::session::SqliteSessionStore;
 use creek::config::Config;
 use creek::service::Service;
+use serde_email::Email;
 // use openssl::ssl::{SslAcceptor, SslFiletype, SslMethod};
 use tracing_actix_web::TracingLogger;
 
@@ -22,6 +23,20 @@ async fn main() -> eyre::Result<()> {
     let config = Config::load()?;
 
     let service = Service::connect_with(config).await?;
+
+    // FIXME: Remove after dev
+
+    match service
+        .create_user(
+            Email::from_str("admin@fortress.build").unwrap(),
+            "password".to_owned(),
+            None,
+        )
+        .await
+    {
+        Ok(_) => {}
+        Err(e) => tracing::warn!("{e}"),
+    };
 
     let session_store = SqliteSessionStore::new(service.db().clone());
     let secret_key = actix_web::cookie::Key::generate();

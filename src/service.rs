@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use serde_email::Email;
 use sqlx::{
     sqlite::{
         SqliteAutoVacuum, SqliteConnectOptions, SqliteJournalMode, SqliteLockingMode,
@@ -9,6 +10,7 @@ use sqlx::{
 };
 
 use crate::{
+    api::{admin::hash_password, auth::Role},
     config::Config,
     db::{
         message::Message,
@@ -87,6 +89,24 @@ impl Service {
     pub async fn list_queues(&self, namespace: Option<&str>) -> eyre::Result<Vec<Queue>> {
         let mut conn = self.db.acquire().await?;
         Queue::list(conn.acquire().await?, namespace).await
+    }
+
+    pub async fn create_user(
+        &self,
+        email: Email,
+        password: String,
+        role: Option<Role>,
+    ) -> eyre::Result<()> {
+        let hashed_password = hash_password(password).await?;
+
+        sqlx::query("INSERT INTO users (email, hashed_pass, role) VALUES ($1, $2, $3)")
+            .bind(email.as_str())
+            .bind(hashed_password.to_string())
+            .bind(role.unwrap_or(Role::User))
+            .execute(self.db())
+            .await?;
+
+        Ok(())
     }
 
     pub async fn send_message(
