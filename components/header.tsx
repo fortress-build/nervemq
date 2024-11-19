@@ -38,7 +38,10 @@ export default function Header({ className }: { className?: string }) {
   } else {
     const segments = pathName.split("/").filter((s) => s.length > 0);
     route = segments.map((s, i) => ({
-      label: s.charAt(0).toUpperCase() + s.slice(1),
+      label: s
+        .split("-")
+        .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
+        .join(" "),
       href: `/${segments.slice(0, i + 1).join("/")}`,
     }));
   }
