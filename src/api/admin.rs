@@ -1,6 +1,6 @@
 use actix_web::{
     delete,
-    error::ErrorInternalServerError,
+    error::{ErrorBadRequest, ErrorInternalServerError},
     get, post,
     web::{self, Json},
     HttpResponse, Responder, Scope,
@@ -10,6 +10,7 @@ use argon2::{
     Argon2,
 };
 use serde::{Deserialize, Serialize};
+use serde_email::Email;
 use sqlx::FromRow;
 
 use crate::service::Service;
@@ -18,6 +19,7 @@ use crate::service::Service;
 pub struct CreateUserRequest {
     email: String,
     password: String,
+    namespaces: Vec<String>,
 }
 
 pub async fn hash_password(password: String) -> eyre::Result<PasswordHashString> {
@@ -44,12 +46,15 @@ pub async fn create_user(
     service: web::Data<Service>,
 ) -> actix_web::Result<impl Responder> {
     let data = data.into_inner();
+
+    let email = Email::from_str(&data.email).map_err(|e| ErrorBadRequest(e))?;
+
     let hashed_password = hash_password(data.password)
         .await
         .map_err(actix_web::error::ErrorInternalServerError)?;
 
     sqlx::query("INSERT INTO users (email, hashed_pass) VALUES ($1, $2)")
-        .bind(&data.email)
+        .bind(email.as_str())
         .bind(hashed_password.to_string())
         .execute(service.db())
         .await
@@ -85,7 +90,7 @@ pub async fn delete_user(
     service: web::Data<Service>,
 ) -> actix_web::Result<impl Responder> {
     sqlx::query("DELETE FROM users WHERE email = $1")
-        .bind(&data.email)
+        .bind(data.email.as_str())
         .execute(service.db())
         .await
         .map_err(actix_web::error::ErrorInternalServerError)?;
