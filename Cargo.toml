@@ -1,14 +1,14 @@
 [package]
-name = "creek"
+name = "nervemq"
 version = "0.1.0"
 edition = "2021"
 
 [lib]
-name = "creek"
+name = "nervemq"
 path = "src/lib.rs"
 
 [[bin]]
-name = "creek"
+name = "nervemq"
 path = "src/main.rs"
 
 

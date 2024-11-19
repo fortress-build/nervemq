@@ -8,11 +8,11 @@ use actix_web::web::{FormConfig, Html, JsonConfig};
 use actix_web::{web::Data, App, HttpServer};
 
 use chrono::TimeDelta;
-use creek::api::auth::Role;
-use creek::auth::middleware::protected_route::Protected;
-use creek::auth::session::SqliteSessionStore;
-use creek::config::Config;
-use creek::service::Service;
+use nervemq::api::auth::Role;
+use nervemq::auth::middleware::protected_route::Protected;
+use nervemq::auth::session::SqliteSessionStore;
+use nervemq::config::Config;
+use nervemq::service::Service;
 use serde_email::Email;
 // use openssl::ssl::{SslAcceptor, SslFiletype, SslMethod};
 use tracing_actix_web::TracingLogger;
@@ -67,13 +67,13 @@ async fn main() -> eyre::Result<()> {
                 .cookie_domain(Some("localhost".to_owned()))
                 .cookie_path("/".to_owned())
                 .cookie_http_only(true)
-                .cookie_name("creek-session".to_owned())
+                .cookie_name("nervemq_session".to_owned())
                 .build();
 
         let identity_middleware = IdentityMiddleware::builder()
             .visit_deadline(Some(deadline))
             .logout_behaviour(actix_identity::config::LogoutBehaviour::PurgeSession)
-            .id_key("creek_user_id")
+            .id_key("nervemq_id")
             .build();
 
         let cors = Cors::default()
@@ -94,12 +94,12 @@ async fn main() -> eyre::Result<()> {
             .wrap(cors)
             .wrap(TracingLogger::default())
             .wrap(NormalizePath::new(TrailingSlash::Trim))
-            .service(creek::api::namespace::service().wrap(Protected))
-            .service(creek::api::queue::service().wrap(Protected))
-            .service(creek::api::data::service().wrap(Protected))
-            .service(creek::api::admin::service().wrap(Protected))
-            .service(creek::api::tokens::service().wrap(Protected))
-            .service(creek::api::auth::service())
+            .service(nervemq::api::namespace::service().wrap(Protected))
+            .service(nervemq::api::queue::service().wrap(Protected))
+            .service(nervemq::api::data::service().wrap(Protected))
+            .service(nervemq::api::admin::service().wrap(Protected))
+            .service(nervemq::api::tokens::service().wrap(Protected))
+            .service(nervemq::api::auth::service())
             .app_data(json_cfg)
             .app_data(data.clone())
             .app_data(form_cfg)
