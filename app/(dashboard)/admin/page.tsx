@@ -12,8 +12,10 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import type { UserStatistics } from "@/components/create-user";
 import CreateUser from "@/components/create-user";
-import { columns, type User } from "@/components/admin/table";
+import ModifyUser from "@/components/modify-user";
+import { columns } from "@/components/admin/table";
 import { toast } from "sonner";
 import { listUsers, deleteUser } from "@/actions/api";
 import { useIsAdmin } from "@/lib/state/global";
@@ -28,6 +30,7 @@ export default function AdminPanel() {
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<string | null>(null);
+  const [userToModify, setUserToModify] = useState<UserStatistics | null>(null);
 
   const {
     data = [],
@@ -40,9 +43,6 @@ export default function AdminPanel() {
       return users.map((user) => ({
         email: user.email,
         role: user.role,
-        // createdAt: user.createdAt,
-        // lastLogin: user.lastLogin,
-        // namespaces: user.namespaces,
       }));
     },
   });
@@ -63,6 +63,19 @@ export default function AdminPanel() {
     setUserToDelete(email);
   };
 
+  const handleModifyUser = async (user: UserStatistics, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const fullUser = {
+      email: user.email,
+      role: user.role,
+      password: "",
+      createdAt: user.createdAt,
+      lastLogin: user.lastLogin,
+      namespaces: user.namespaces || [],
+    };
+    setUserToModify(fullUser);
+  };
+
   return (
     <div className="h-full flex flex-col gap-4">
       <DataTable
@@ -72,11 +85,11 @@ export default function AdminPanel() {
           (user) =>
             ({
               ...user,
-              lastLogin: (user as User).lastLogin ?? null,
-            }) as User,
+              lastLogin: (user as UserStatistics).lastLogin ?? null,
+            }) as UserStatistics,
         )}
         isLoading={isLoading}
-        meta={{ handleDeleteUser }}
+        meta={{ handleDeleteUser, handleModifyUser }}
       />
 
       <div className="flex justify-end">
@@ -118,6 +131,16 @@ export default function AdminPanel() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ModifyUser
+        open={!!userToModify}
+        close={() => setUserToModify(null)}
+        onSuccess={() => {
+          refetch();
+          setUserToModify(null);
+        }}
+        user={userToModify as UserStatistics}
+      />
     </div>
   );
 }

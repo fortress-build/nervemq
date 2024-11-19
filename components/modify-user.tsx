@@ -12,10 +12,9 @@ import {
 import { useForm } from "@tanstack/react-form";
 import { yupValidator } from "@tanstack/yup-form-adapter";
 import { useQuery } from "@tanstack/react-query";
-import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { cn } from "@/lib/utils";
-import { createUser, listNamespaces } from "@/actions/api";
+import { listNamespaces, updateUser } from "@/actions/api";
 import { Spinner } from "@nextui-org/react";
 import { ChevronsUpDown, Plus, Check } from "lucide-react";
 import {
@@ -31,7 +30,9 @@ import { toast } from "sonner";
 import { useInvalidate } from "@/hooks/use-invalidate";
 import CreateNamespace from "./create-namespace";
 import { useState } from "react";
-import { createUserSchema } from "@/schemas/create-user";
+import { modifyUserSchema } from "@/schemas/modify-user";
+import type { UserStatistics } from "./create-user";
+
 import {
   Select,
   SelectContent,
@@ -40,23 +41,17 @@ import {
   SelectValue,
 } from "./ui/select";
 
-export interface UserStatistics {
-  email: string;
-  role: string;
-  createdAt: string;
-  lastLogin?: string;
-  namespaces: string[];
-  password: string;
-}
 
-export default function CreateUser({
+export default function ModifyUser({
   open,
   close,
   onSuccess,
+  user,
 }: {
   open: boolean;
   close: () => void;
   onSuccess?: (userName: string) => void;
+  user?: UserStatistics;
 }) {
   const [showCreateNamespace, setShowCreateNamespace] = useState(false);
   const [nsPopoverOpen, setNsPopoverOpen] = useState(false);
@@ -70,32 +65,32 @@ export default function CreateUser({
 
   const form = useForm({
     defaultValues: {
-      email: "",
+      email: user?.email ?? '',
       password: "",
-      namespaces: new Set() as Set<string>,
-      role: "user",
+      namespaces: new Set(user?.namespaces ?? []) as Set<string>,
+      role: user?.role ?? 'user',
     },
     validatorAdapter: yupValidator(),
     validators: {
-      onChange: createUserSchema,
-      onMount: createUserSchema,
-      onSubmit: createUserSchema,
+      onChange: modifyUserSchema,
+      onMount: modifyUserSchema,
+      onSubmit: modifyUserSchema,
     },
     onSubmit: async ({ value: data, formApi }) => {
-      await createUser({
-        email: data.email,
-        password: data.password,
+      await updateUser({
+        email: user?.email ?? '',
         namespaces: [...data.namespaces.keys()],
-        role: data.role
+        role: data.role,
+        password: user?.password ?? ''
       })
         .then(() => {
           invalidate();
-          onSuccess?.(data.email);
+          onSuccess?.(user?.email ?? '');
           close();
           formApi.reset();
         })
         .catch(() => {
-          toast.error("Something went wrong");
+          toast.error("Failed to update user");
         });
     },
   });
@@ -129,63 +124,11 @@ export default function CreateUser({
             className="flex flex-col gap-4"
           >
             <DialogHeader>
-              <DialogTitle>Create User</DialogTitle>
+              <DialogTitle>Modify User Access</DialogTitle>
               <DialogDescription>
-                Create a new user and grant them access to specific namespaces.
+                Modify namespace access for this user.
               </DialogDescription>
             </DialogHeader>
-            <form.Field name="email">
-              {(field) => (
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor={field.name}>Email</Label>
-                  <Input
-                    id={field.name}
-                    name={field.name}
-                    type="text"
-                    value={field.state.value}
-                    onBlur={field.handleBlur}
-                    onChange={(e) => field.handleChange(e.target.value)}
-                    placeholder="Email"
-                    data-1p-ignore
-                    className={cn(
-                      "focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0",
-                      "focus:border-primary focus:border transition-all",
-                    )}
-                  />
-                  {field.state.meta.errors ? (
-                    <span className="text-sm text-destructive">
-                      {field.state.meta.errors.join(", ")}
-                    </span>
-                  ) : null}
-                </div>
-              )}
-            </form.Field>
-            <form.Field name="password">
-              {(field) => (
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor={field.name}>Password</Label>
-                  <Input
-                    id={field.name}
-                    name={field.name}
-                    type="password"
-                    value={field.state.value}
-                    onBlur={field.handleBlur}
-                    onChange={(e) => field.handleChange(e.target.value)}
-                    placeholder="Password"
-                    data-1p-ignore
-                    className={cn(
-                      "focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0",
-                      "focus:border-primary focus:border transition-all",
-                    )}
-                  />
-                  {field.state.meta.errors ? (
-                    <span className="text-sm text-destructive">
-                      {field.state.meta.errors.join(", ")}
-                    </span>
-                  ) : null}
-                </div>
-              )}
-            </form.Field>
             <form.Field name="role">
               {(field) => (
                 <div className="flex flex-col gap-2">
@@ -313,17 +256,15 @@ export default function CreateUser({
                     <Button type="submit" disabled={!canSubmit}>
                       {isSubmitting ? (
                         <>
-                          {
-                            <Spinner
-                              className="absolute self-center"
-                              size="sm"
-                              color="current"
-                            />
-                          }
-                          <p className="text-transparent">Create</p>
+                          <Spinner
+                            className="absolute self-center"
+                            size="sm"
+                            color="current"
+                          />
+                          <p className="text-transparent">Save Changes</p>
                         </>
                       ) : (
-                        "Create"
+                        "Save Changes"
                       )}
                     </Button>
 

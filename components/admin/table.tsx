@@ -1,20 +1,8 @@
 "use client";
 import type { ColumnDef } from "@tanstack/react-table";
-import { Trash2, User, Mail, Shield } from "lucide-react";
+import { Trash2, Mail, Shield, Pencil } from "lucide-react";
 import { Button } from "../ui/button";
-
-// biome-ignore lint/suspicious/noRedeclare: <explanation>
-export type User = {
-  id: string;
-  name: string;
-  email: string;
-  role: string;
-  createdAt: string;
-  lastLogin: string | null;
-  namespaces: string[];
-};
-
-export type UserStatistics = User;
+import type { UserStatistics } from "../create-user";
 
 export const columns: ColumnDef<UserStatistics>[] = [
   // {
@@ -71,6 +59,21 @@ export const columns: ColumnDef<UserStatistics>[] = [
     id: "actions",
     cell: (row) => (
       <div className="flex items-center justify-end gap-2">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="hover:bg-secondary/80"
+          onClick={async (e) => {
+            const meta = row.table.options.meta as
+              | {
+                  handleModifyUser: (email: string, e: unknown) => void;
+                }
+              | undefined;
+            meta?.handleModifyUser(row.row.original.email, e);
+          }}
+        >
+          <Pencil className="h-4 w-4" />
+        </Button>
         <Button
           variant="ghost"
           size="sm"
