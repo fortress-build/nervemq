@@ -61,6 +61,7 @@ create table if not exists users (
   id integer not null,
   email text not null unique,
   hashed_pass text not null,
+  role text not null check (role in ('admin', 'user')),
 
   primary key(id)
 );
@@ -69,12 +70,13 @@ create unique index if not exists users_email_idx on users(email);
 create table if not exists permissions (
   id integer not null,
   user integer not null,
-  perm text not null,
+  namespace integer not null,
 
   primary key (id),
-  foreign key (user) references users(id)
+  foreign key (user) references users(id),
+  foreign key (namespace) references namespaces(id)
 );
-create unique index if not exists permissions_user_perm_idx on permissions(user, perm);
+create unique index if not exists permissions_user_namespace_idx on permissions(user, namespace);
 
 create table if not exists api_keys (
   id integer not null,
