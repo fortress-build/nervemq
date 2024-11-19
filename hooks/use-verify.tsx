@@ -40,4 +40,3 @@ export function useVerifyUser(intervalMs: number = 300 * 1000) {
     };
   }, [intervalMs, router]);
 }
-
