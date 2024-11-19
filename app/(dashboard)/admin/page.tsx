@@ -30,19 +30,18 @@ export default function AdminPanel() {
     queryFn: async () => {
       const users = await listUsers();
       return users.map((user) => ({
-        // id: user.id,
         email: user.email,
-        // role: user.role,
-        // createdAt: user.createdAt,
-        // lastLogin: user.lastLogin,
-        // namespaces: user.namespaces,
+        role: user.role,
+        createdAt: user.createdAt,
+        lastLogin: user.lastLogin,
+        namespaces: user.namespaces,
       }));
     },
   });
 
-  const confirmDeleteUser = async (id: string) => {
+  const confirmDeleteUser = async (email: string) => {
     try {
-      await deleteUser(id);
+      await deleteUser(email);
       await refetch();
       setUserToDelete(null);
       toast.success("User deleted successfully");
@@ -51,9 +50,9 @@ export default function AdminPanel() {
     }
   };
 
-  const handleDeleteUser = async (id: string, e: React.MouseEvent) => {
+  const handleDeleteUser = async (email: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    setUserToDelete(id);
+    setUserToDelete(email);
   };
 
   return (
