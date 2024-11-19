@@ -4,7 +4,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::service::Service;
 
-async fn list_namespaces(service: web::Data<Service>) -> actix_web::Result<impl Responder> {
+async fn list_namespaces(
+    identity: Identity,
+    service: web::Data<Service>,
+) -> actix_web::Result<impl Responder> {
     let data = match service.list_namespaces().await {
         Ok(data) => data,
         Err(e) => return Err(actix_web::error::ErrorInternalServerError(e)),
@@ -19,6 +22,7 @@ pub struct CreateNamespaceResponse {
 }
 
 async fn create_namespace(
+    identity: Identity,
     service: web::Data<Service>,
     path: web::Path<String>,
 ) -> actix_web::Result<impl Responder> {
@@ -31,6 +35,7 @@ async fn create_namespace(
 }
 
 async fn delete_namespace(
+    identity: Identity,
     service: web::Data<Service>,
     path: web::Path<String>,
 ) -> actix_web::Result<impl Responder> {

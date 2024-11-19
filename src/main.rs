@@ -3,6 +3,7 @@ use actix_identity::IdentityMiddleware;
 use actix_session::config::{CookieContentSecurity, PersistentSession};
 use actix_session::SessionMiddleware;
 use actix_web::cookie::time::Duration;
+use actix_web::middleware::{NormalizePath, TrailingSlash};
 use actix_web::web::{FormConfig, Html, JsonConfig};
 use actix_web::{web::Data, App, HttpServer};
 
@@ -10,7 +11,7 @@ use chrono::TimeDelta;
 use creek::auth::session::SqliteSessionStore;
 use creek::config::Config;
 use creek::service::Service;
-use openssl::ssl::{SslAcceptor, SslFiletype, SslMethod};
+// use openssl::ssl::{SslAcceptor, SslFiletype, SslMethod};
 use tracing_actix_web::TracingLogger;
 
 #[tokio::main]
@@ -26,14 +27,14 @@ async fn main() -> eyre::Result<()> {
 
     let data = Data::new(service);
 
-    let ssl_acceptor = {
-        let mut builder = SslAcceptor::mozilla_intermediate(SslMethod::tls())?;
-
-        builder.set_private_key_file("localhost-key.pem", SslFiletype::PEM)?;
-        builder.set_certificate_chain_file("localhost.pem")?;
-
-        builder
-    };
+    // let ssl_acceptor = {
+    //     let mut builder = SslAcceptor::mozilla_intermediate(SslMethod::tls())?;
+    //
+    //     builder.set_private_key_file("localhost-key.pem", SslFiletype::PEM)?;
+    //     builder.set_certificate_chain_file("localhost.pem")?;
+    //
+    //     builder
+    // };
 
     const SESSION_EXPIRATION: TimeDelta = chrono::Duration::hours(1);
 
@@ -43,7 +44,7 @@ async fn main() -> eyre::Result<()> {
     HttpServer::new(move || {
         let session_middleware =
             SessionMiddleware::builder(session_store.clone(), secret_key.clone())
-                .cookie_secure(false)
+                .cookie_secure(true)
                 .cookie_content_security(CookieContentSecurity::Signed)
                 .session_lifecycle(PersistentSession::default().session_ttl(session_ttl))
                 .cookie_domain(Some("localhost".to_owned()))
@@ -75,6 +76,7 @@ async fn main() -> eyre::Result<()> {
             .wrap(session_middleware)
             .wrap(cors)
             .wrap(TracingLogger::default())
+            .wrap(NormalizePath::new(TrailingSlash::Trim))
             .service(creek::api::namespace::service())
             .service(creek::api::queue::service())
             .service(creek::api::data::service())
