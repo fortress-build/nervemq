@@ -20,8 +20,7 @@ export default async function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body>
-        {//<AuthVerifier />
-        }
+        <AuthVerifier />
         <Providers sidebarOpen={defaultOpen}>{children}</Providers>
       </body>
     </html>

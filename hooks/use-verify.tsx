@@ -1,15 +1,16 @@
 import { useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useGlobalState } from "@/lib/state/global";
+import { SERVER_ENDPOINT } from "@/app/globals";
 
-export function useVerifyUser(intervalMs: number = 300 * 10) {
+export function useVerifyUser(intervalMs: number = 300 * 1000) {
   const router = useRouter();
   const intervalRef = useRef<NodeJS.Timeout>();
 
   useEffect(() => {
     const verify = async () => {
       try {
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/verify`, {
+        const response = await fetch(`${SERVER_ENDPOINT}/auth/verify`, {
             method: "POST",
             credentials: "include",
             mode: "cors",
