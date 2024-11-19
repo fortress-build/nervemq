@@ -52,6 +52,7 @@ pub async fn create_token(
 pub async fn delete_token(
     data: web::Json<DeleteTokenRequest>,
     service: web::Data<Service>,
+    identity: Identity,
 ) -> actix_web::Result<impl Responder> {
     Ok("")
 }
@@ -104,7 +105,10 @@ pub async fn list_tokens(
 }
 
 #[get("/client_id")]
-pub async fn client_id(service: web::Data<Service>) -> actix_web::Result<impl Responder> {
+pub async fn client_id(
+    identity: Identity,
+    service: web::Data<Service>,
+) -> actix_web::Result<impl Responder> {
     Ok("")
 }
 
