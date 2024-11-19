@@ -85,7 +85,7 @@ export default function CreateApiKey({
       onMount: createApiKeySchema,
     },
     onSubmit: async ({ value: data, formApi }) => {
-      await createAPIKey(data.name)
+      await createAPIKey(data)
         .then((result) => {
           setApiKey(result);
           setShowKey(true);
