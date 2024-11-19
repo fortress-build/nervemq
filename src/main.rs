@@ -1,29 +1,17 @@
-use std::future::Future;
-
 use actix_cors::Cors;
-use actix_identity::{Identity, IdentityExt, IdentityMiddleware};
+use actix_identity::IdentityMiddleware;
 use actix_session::config::{CookieContentSecurity, PersistentSession};
-use actix_session::storage::CookieSessionStore;
-use actix_session::{Session, SessionExt, SessionMiddleware};
+use actix_session::SessionMiddleware;
 use actix_web::cookie::time::Duration;
-use actix_web::cookie::SameSite;
-use actix_web::dev::{Service as ActixService, ServiceRequest};
-use actix_web::web::{self, FormConfig, Html, JsonConfig};
+use actix_web::web::{FormConfig, Html, JsonConfig};
 use actix_web::{web::Data, App, HttpServer};
-use actix_web::{FromRequest, HttpMessage, HttpRequest, HttpResponse};
 
 use chrono::TimeDelta;
-use creek::auth;
-use creek::auth::middleware::ApiKeyAuth;
 use creek::auth::session::SqliteSessionStore;
+use creek::config::Config;
 use creek::service::Service;
-use creek::{api, config::Config};
 use openssl::ssl::{SslAcceptor, SslFiletype, SslMethod};
 use tracing_actix_web::TracingLogger;
-
-fn ident<S: ActixService<HttpRequest>>(req: HttpRequest, srv: &S) -> S::Future {
-    srv.call(req)
-}
 
 #[tokio::main]
 async fn main() -> eyre::Result<()> {
@@ -47,7 +35,7 @@ async fn main() -> eyre::Result<()> {
         builder
     };
 
-    const SESSION_EXPIRATION: TimeDelta = chrono::Duration::hours(6);
+    const SESSION_EXPIRATION: TimeDelta = chrono::Duration::hours(1);
 
     let deadline = SESSION_EXPIRATION.to_std().expect("valid duration");
     let session_ttl = Duration::new(SESSION_EXPIRATION.num_seconds(), 0);
@@ -56,9 +44,8 @@ async fn main() -> eyre::Result<()> {
         let session_middleware =
             SessionMiddleware::builder(session_store.clone(), secret_key.clone())
                 .cookie_secure(false)
-                // .cookie_same_site(SameSite::None)
                 .cookie_content_security(CookieContentSecurity::Signed)
-                // .session_lifecycle(PersistentSession::default().session_ttl(session_ttl))
+                .session_lifecycle(PersistentSession::default().session_ttl(session_ttl))
                 .cookie_domain(Some("localhost".to_owned()))
                 .cookie_path("/".to_owned())
                 .cookie_http_only(true)
@@ -66,8 +53,8 @@ async fn main() -> eyre::Result<()> {
                 .build();
 
         let identity_middleware = IdentityMiddleware::builder()
-            // .visit_deadline(Some(deadline))
-            // .logout_behaviour(actix_identity::config::LogoutBehaviour::PurgeSession)
+            .visit_deadline(Some(deadline))
+            .logout_behaviour(actix_identity::config::LogoutBehaviour::PurgeSession)
             .id_key("creek_user_id")
             .build();
 
@@ -84,10 +71,10 @@ async fn main() -> eyre::Result<()> {
         App::new()
             // .wrap(ApiKeyAuth)
             // .wrap(actix_web::middleware::Logger::default())
-            .wrap(TracingLogger::default())
             .wrap(identity_middleware)
             .wrap(session_middleware)
             .wrap(cors)
+            .wrap(TracingLogger::default())
             .service(creek::api::namespace::service())
             .service(creek::api::queue::service())
             .service(creek::api::data::service())

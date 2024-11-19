@@ -79,7 +79,6 @@ impl FromRequest for IdentityWrapped {
 #[get("")]
 pub async fn list_tokens(
     service: web::Data<Service>,
-    req: HttpRequest,
     identity: Identity,
 ) -> actix_web::Result<web::Json<Vec<ApiKey>>> {
     let email = match identity.id() {
