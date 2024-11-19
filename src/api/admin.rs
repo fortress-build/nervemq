@@ -15,10 +15,13 @@ use sqlx::FromRow;
 
 use crate::service::Service;
 
+use super::auth::Role;
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CreateUserRequest {
     email: String,
     password: String,
+    role: Role,
     namespaces: Vec<String>,
 }
 
@@ -49,16 +52,10 @@ pub async fn create_user(
 
     let email = Email::from_str(&data.email).map_err(|e| ErrorBadRequest(e))?;
 
-    let hashed_password = hash_password(data.password)
+    service
+        .create_user(email, data.password, Some(data.role))
         .await
-        .map_err(actix_web::error::ErrorInternalServerError)?;
-
-    sqlx::query("INSERT INTO users (email, hashed_pass) VALUES ($1, $2)")
-        .bind(email.as_str())
-        .bind(hashed_password.to_string())
-        .execute(service.db())
-        .await
-        .map_err(actix_web::error::ErrorInternalServerError)?;
+        .map_err(|e| ErrorInternalServerError(e))?;
 
     // Return the plain API key (should be securely sent/stored by the user).
     Ok(HttpResponse::Ok())

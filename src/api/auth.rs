@@ -136,6 +136,7 @@ pub struct User {
     role: Role,
 }
 
+#[post("/verify")]
 pub async fn verify(
     identity: Option<Identity>,
     service: web::Data<Service>,
@@ -163,5 +164,5 @@ pub fn service() -> Scope {
     web::scope("/auth")
         .service(login)
         .service(logout)
-        .service(web::resource("/verify").wrap(Protected).post(verify))
+        .service(verify)
 }
