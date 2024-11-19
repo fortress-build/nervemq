@@ -15,7 +15,7 @@ import { useForm } from "@tanstack/react-form";
 import { yupValidator } from "@tanstack/yup-form-adapter";
 import { loginFormSchema } from "@/schemas/login-form";
 import { SERVER_ENDPOINT } from "../globals";
-import { useGlobalState } from "@/lib/state/global";
+import { type AdminSession, useGlobalState } from "@/lib/state/global";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -34,7 +34,7 @@ export default function LoginPage() {
     onSubmit: async ({ value }) => {
       "use client";
 
-      const data: { email: string } = await window
+      const data: AdminSession | undefined = await window
         .fetch(`${SERVER_ENDPOINT}/auth/login`, {
           method: "POST",
           body: JSON.stringify(value),
@@ -58,6 +58,10 @@ export default function LoginPage() {
 
           return res.json();
         });
+
+      if (data === undefined) {
+        return;
+      }
 
       useGlobalState.setState({ session: data });
 

@@ -4,11 +4,18 @@ use actix_identity::Identity;
 use actix_web::{
     delete,
     error::{ErrorInternalServerError, ErrorNotFound, ErrorUnauthorized},
-    get, post,
+    get,
+    // middleware::Identity,
+    post,
     web::{self, Json},
-    FromRequest, HttpRequest, HttpResponse, Responder, Scope,
+    FromRequest,
+    HttpRequest,
+    HttpResponse,
+    Responder,
+    Scope,
 };
 use serde::{Deserialize, Serialize};
+use sha2::Sha256;
 use sqlx::FromRow;
 
 use crate::{auth::data::gen_api_key, service::Service};
@@ -129,7 +136,17 @@ pub async fn list_tokens(
 }
 
 #[get("/client_id")]
-pub async fn client_id(service: web::Data<Service>) -> actix_web::Result<impl Responder> {
+pub async fn client_id(
+    service: web::Data<Service>,
+    identity: Identity,
+) -> actix_web::Result<impl Responder> {
+    let email = identity.id().map_err(|e| ErrorUnauthorized(e))?;
+
+    // use std::hash::Hash;
+    // use std::hash::Hasher;
+    //
+    // let mut hasher = Sha256::new();
+
     Ok("")
 }
 
