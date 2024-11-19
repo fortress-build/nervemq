@@ -1,5 +1,5 @@
-import { useEffect, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { useGlobalState } from "@/lib/state/global";
 import { SERVER_ENDPOINT } from "@/app/globals";
 
@@ -9,26 +9,24 @@ export function useVerifyUser(intervalMs: number = 300 * 1000) {
 
   useEffect(() => {
     const verify = async () => {
-      console.log('try')
       try {
         const response = await fetch(`${SERVER_ENDPOINT}/auth/verify`, {
-            method: "POST",
-            credentials: "include",
-            mode: "cors",
+          method: "POST",
+          credentials: "include",
+          mode: "cors",
         });
 
         if (!response.ok) {
           useGlobalState.setState({ session: undefined });
-          router.push('/login');
+          router.push("/login");
           return;
         }
 
         const data = await response.json();
         useGlobalState.setState({ session: data });
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      } catch (error) {
+      } catch {
         useGlobalState.setState({ session: undefined });
-        router.push('/login');
+        router.push("/login");
       }
     };
 

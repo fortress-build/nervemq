@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use sqlx::prelude::FromRow;
 
-use crate::{auth::middleware::protected_route::Protected, service::Service};
+use crate::service::Service;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct LoginRequest {
@@ -35,6 +35,14 @@ pub enum Role {
     #[serde(rename = "admin")]
     #[sqlx(rename = "admin")]
     Admin,
+}
+
+#[derive(Debug, Clone, Deserialize, FromRow)]
+pub struct Permission {
+    pub id: u64,
+    pub user: u64,
+    pub namespace: u64,
+    pub can_delete_ns: bool,
 }
 
 #[derive(Debug, Snafu)]
@@ -132,8 +140,9 @@ pub async fn logout(user: Identity) -> actix_web::Result<impl Responder> {
 #[derive(Debug, Serialize, Deserialize, FromRow)]
 #[serde(rename_all = "camelCase")]
 pub struct User {
-    email: String,
-    role: Role,
+    pub id: u64,
+    pub email: String,
+    pub role: Role,
 }
 
 #[post("/verify")]
@@ -147,7 +156,7 @@ pub async fn verify(
                 .id()
                 .map_err(actix_web::error::ErrorInternalServerError)?;
 
-            let User { email, role } = sqlx::query_as("SELECT * FROM users WHERE email = $1")
+            let User { email, role, .. } = sqlx::query_as("SELECT * FROM users WHERE email = $1")
                 .bind(&email)
                 .fetch_optional(service.db())
                 .await
