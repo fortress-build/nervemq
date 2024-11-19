@@ -5,6 +5,7 @@ import {
   Braces,
   KeySquare,
   Trash2,
+  ArrowUpDown,
 } from "lucide-react";
 import { ColumnHeader } from "../table-header";
 import { Button } from "../ui/button";
@@ -31,10 +32,17 @@ export const columns: ColumnDef<QueueStatistics>[] = [
   },
   {
     accessorKey: "ns",
-    header: () => (
+    header: ({ column }) => (
       <div className="flex items-center gap-2">
         <Braces className="h-4 w-4" />
-        <span>Namespace</span>
+        <Button
+          variant="ghost"
+          className="p-0 hover:bg-transparent"
+          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+        >
+          <span>Namespace</span>
+          <ArrowUpDown className="ml-2 h-4 w-4" />
+        </Button>
       </div>
     ),
     enableSorting: true,
