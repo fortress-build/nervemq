@@ -1,15 +1,16 @@
 "use client";
 import type { CellContext, ColumnDef } from "@tanstack/react-table";
-import { Trash2, KeySquare } from "lucide-react";
+import { Trash2, KeySquare, Copy } from "lucide-react";
 import { Button } from "../ui/button";
 import { useContext } from "react";
 import { KeyToDeleteContext } from "@/lib/contexts/key-to-delete";
 
+
 export type ApiKey = {
-  // id: string;
+  id: string;
   name: string;
-  // createdAt: string;
-  // lastUsed?: string;
+  createdAt: string;
+  lastUsed?: string;
 };
 
 function ActionsCell({

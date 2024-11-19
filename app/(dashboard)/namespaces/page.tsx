@@ -15,15 +15,17 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { deleteNamespace } from "@/actions/api";
+import { Input } from "@/components/ui/input";
 
 export default function Namespaces() {
   const [isOpen, setIsOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const {
     data = [],
     isLoading,
     refetch,
   } = useQuery({
-    queryKey: ["namespaces"],
+    queryKey: ["namespaces", searchQuery],
     queryFn: () => listNamespaces(),
   });
   const [namespaceToDelete, setNamespaceToDelete] = useState<string | null>(
@@ -35,12 +37,24 @@ export default function Namespaces() {
     setNamespaceToDelete(name);
   };
 
+  const filteredData = data.filter((namespace) =>
+    namespace.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   return (
     <div className="h-full flex flex-col gap-4">
+      <div className="flex w-full max-w-sm items-center space-x-2">
+        <Input
+          type="text"
+          placeholder="Search namespaces..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+        />
+      </div>
       <DataTable
         className="w-full"
         columns={columns}
-        data={data}
+        data={filteredData}
         isLoading={isLoading}
         meta={{ handleDeleteNamespace }}
       />

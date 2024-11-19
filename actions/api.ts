@@ -171,3 +171,18 @@ export async function listUsers(): Promise<UserStatistics[]> {
     .then((res) => res.json())
     .catch(() => toast.error("Something went wrong"));
 }
+
+//SUBJECT TO CHANGE
+export async function updateUser(data: CreateUserRequest): Promise<void> {
+  await fetch(`${SERVER_ENDPOINT}/admin/users`, {
+    method: "POST",
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(data),
+    next: {
+      tags: ["users"],
+    },
+  }).catch(() => toast.error("Something went wrong"));
+}

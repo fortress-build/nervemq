@@ -37,6 +37,7 @@ export const columns: ColumnDef<QueueStatistics>[] = [
         <span>Namespace</span>
       </div>
     ),
+    enableSorting: true,
   },
   {
     accessorKey: "messageCount",
