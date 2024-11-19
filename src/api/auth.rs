@@ -105,7 +105,7 @@ pub async fn login(
     match Identity::login(&request.extensions(), form.email.clone()) {
         Ok(id) => {
             session
-                .insert::<String>("creek_user_id", id.id().expect("identifier").to_string())
+                .insert::<String>("nervemq_id", id.id().expect("identifier").to_string())
                 .ok();
         }
         Err(e) => {

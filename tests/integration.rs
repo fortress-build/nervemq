@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::ops::Deref;
 
-use creek::{config::Config, db::namespace::Namespace, db::queue::Queue, service::Service};
+use nervemq::{config::Config, db::namespace::Namespace, db::queue::Queue, service::Service};
 use tempfile::TempDir;
 
 struct TmpService {
@@ -24,7 +24,7 @@ async fn setup() -> TmpService {
 
     TmpService {
         svc: Service::connect_with(Config {
-            db_path: Some(path.path().join("creek.db").to_string_lossy().to_string()),
+            db_path: Some(path.path().join("nervemq.db").to_string_lossy().to_string()),
         })
         .await
         .unwrap(),
