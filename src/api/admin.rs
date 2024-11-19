@@ -43,7 +43,7 @@ pub async fn hash_password(password: String) -> eyre::Result<PasswordHashString>
 pub async fn create_user(
     data: web::Json<CreateUserRequest>,
     service: web::Data<Service>,
-    identity: Identity,
+    // identity: Identity,
 ) -> actix_web::Result<impl Responder> {
     let data = data.into_inner();
     let hashed_password = hash_password(data.password)
