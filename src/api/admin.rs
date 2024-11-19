@@ -53,7 +53,7 @@ pub async fn create_user(
     let email = Email::from_str(&data.email).map_err(|e| ErrorBadRequest(e))?;
 
     service
-        .create_user(email, data.password, Some(data.role))
+        .create_user(email, data.password, Some(data.role), data.namespaces)
         .await
         .map_err(|e| ErrorInternalServerError(e))?;
 

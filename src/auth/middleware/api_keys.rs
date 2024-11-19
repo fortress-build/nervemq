@@ -81,9 +81,8 @@ where
                     .parse_str(auth_req)
                     .map_err(|_| ErrorUnauthorized("Invalid authorization"))?
             } {
-                AuthHeader::NerveMqApiV1 { key_id, secret } => {
-                    match authenticate_api_key(api.db(), key_id.to_owned(), secret.to_owned()).await
-                    {
+                AuthHeader::NerveMqApiV1 { token } => {
+                    match authenticate_api_key(api.db(), token).await {
                         Ok(_) => {
                             let vals = CasbinVals {
                                 subject: String::from("alice"),

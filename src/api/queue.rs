@@ -1,7 +1,15 @@
-use actix_web::{delete, get, post, web, Responder, Scope};
+use actix_identity::Identity;
+use actix_web::{
+    delete,
+    error::{ErrorInternalServerError, ErrorUnauthorized},
+    get, post, web, Responder, Scope,
+};
 use serde::{Deserialize, Serialize};
 
-use crate::{db::queue::Queue, service::Service};
+use crate::{
+    db::queue::Queue,
+    service::{Error, Service},
+};
 
 #[derive(Serialize, Deserialize)]
 pub struct ListQueuesResponse {
@@ -48,10 +56,14 @@ async fn delete_queue(
 async fn create_queue(
     service: web::Data<Service>,
     path: web::Path<(String, String)>,
+    identity: Identity,
 ) -> actix_web::Result<impl Responder> {
     let (namespace, name) = &*path;
-    if let Err(e) = service.create_queue(namespace, name).await {
-        return Err(actix_web::error::ErrorInternalServerError(e));
+
+    match service.create_queue(namespace, name, identity).await {
+        Ok(_) => {}
+        Err(Error::Unauthorized) => return Err(ErrorUnauthorized("Unauthorized")),
+        Err(e) => return Err(ErrorInternalServerError(e)),
     }
 
     Ok("OK")
