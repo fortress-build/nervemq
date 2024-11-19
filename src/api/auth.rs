@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use sqlx::prelude::FromRow;
 
-use crate::service::Service;
+use crate::{auth::middleware::protected_route::Protected, service::Service};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct LoginRequest {
@@ -137,7 +137,6 @@ pub struct User {
     role: Role,
 }
 
-#[get("/verify")]
 pub async fn verify(
     identity: Option<Identity>,
     service: web::Data<Service>,
@@ -165,5 +164,5 @@ pub fn service() -> Scope {
     web::scope("/auth")
         .service(login)
         .service(logout)
-        .service(verify)
+        .service(web::resource("/verify").wrap(Protected).post(verify))
 }
