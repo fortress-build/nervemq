@@ -9,12 +9,13 @@ import {
 } from "@/components/ui/breadcrumb";
 import { useSession } from "@/lib/state/global";
 import { cn } from "@/lib/utils";
-import { Slash } from "lucide-react";
+import { Slash, User } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 export default function Header({ className }: { className?: string }) {
   const pathName = usePathname();
+  const session = useSession();
 
   let route: { label: string; href: string }[];
   if (pathName === "/") {
@@ -30,15 +31,6 @@ export default function Header({ className }: { className?: string }) {
       label: s.charAt(0).toUpperCase() + s.slice(1),
       href: `/${segments.slice(0, i + 1).join("/")}`,
     }));
-  }
-
-  const session = useSession();
-
-  if (session) {
-    route.push({
-      label: session?.email ?? "anonymous",
-      href: "",
-    });
   }
 
   return (
@@ -68,6 +60,10 @@ export default function Header({ className }: { className?: string }) {
           ])}
         </BreadcrumbList>
       </Breadcrumb>
+      <div className="flex flex-row gap-2 text-sm items-center">
+        {session?.email ?? "Anonymous"}
+        <User />
+      </div>
     </header>
   );
 }
