@@ -11,11 +11,21 @@ import { useSession } from "@/lib/state/global";
 import { cn } from "@/lib/utils";
 import { Slash, User } from "lucide-react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import {
+  DropdownMenu,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+} from "./ui/dropdown-menu";
+import { SERVER_ENDPOINT } from "@/app/globals";
 
 export default function Header({ className }: { className?: string }) {
   const pathName = usePathname();
   const session = useSession();
+  const router = useRouter();
 
   let route: { label: string; href: string }[];
   if (pathName === "/") {
@@ -60,10 +70,28 @@ export default function Header({ className }: { className?: string }) {
           ])}
         </BreadcrumbList>
       </Breadcrumb>
-      <div className="flex flex-row gap-2 text-sm items-center">
-        {session?.email ?? "Anonymous"}
-        <User />
-      </div>
+      <DropdownMenu>
+        <DropdownMenuTrigger className="flex flex-row gap-2 text-sm items-center">
+          {session?.email ?? "Anonymous"}
+          <User />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent>
+          <DropdownMenuLabel>NerveMQ</DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            onClick={() => {
+              fetch(`${SERVER_ENDPOINT}/auth/logout`, {
+                method: "POST",
+                credentials: "include",
+              }).then(() => {
+                router.replace("/login");
+              });
+            }}
+          >
+            Log out
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </header>
   );
 }
