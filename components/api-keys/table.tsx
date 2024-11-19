@@ -1,12 +1,17 @@
 "use client";
 import type { CellContext, ColumnDef } from "@tanstack/react-table";
-import { Trash2, KeySquare } from "lucide-react";
+import { Trash2, KeySquare, Copy } from "lucide-react";
 import { Button } from "../ui/button";
 import { useContext } from "react";
 import { KeyToDeleteContext } from "@/lib/contexts/key-to-delete";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "../ui/tooltip";
 
 export type ApiKey = {
-  // id: string;
+  id: string;
   name: string;
   // createdAt: string;
   // lastUsed?: string;
@@ -21,6 +26,22 @@ function ActionsCell({
 
   return (
     <div className="flex items-center justify-end gap-2">
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              navigator.clipboard.writeText(row.original.id);
+            }}
+          >
+            <Copy className="h-4 w-4" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>
+          Copy ID
+        </TooltipContent>
+      </Tooltip>
       <Button
         variant="ghost"
         size="sm"
