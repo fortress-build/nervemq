@@ -40,17 +40,11 @@ export default function AdminPanel() {
     refetch,
   } = useQuery({
     queryKey: ["users", searchQuery],
-    queryFn: async () => {
-      const users = await listUsers();
-      return users.map((user) => ({
-        email: user.email,
-        role: user.role,
-      }));
-    },
+    queryFn: () => listUsers(),
   });
 
   const filteredData = data.filter((user) =>
-    user.email.toLowerCase().includes(searchQuery.toLowerCase())
+    user.email.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
   const confirmDeleteUser = async (email: string) => {
@@ -69,7 +63,10 @@ export default function AdminPanel() {
     setUserToDelete(email);
   };
 
-  const handleModifyUser = async (user: UserStatistics, e: React.MouseEvent) => {
+  const handleModifyUser = async (
+    user: UserStatistics,
+    e: React.MouseEvent,
+  ) => {
     e.stopPropagation();
     const fullUser = {
       email: user.email,
