@@ -9,7 +9,6 @@ export function useVerifyUser(intervalMs: number = 300 * 1000) {
 
   useEffect(() => {
     const verify = async () => {
-      console.log('try')
       try {
         const response = await fetch(`${SERVER_ENDPOINT}/auth/verify`, {
           method: "POST",
