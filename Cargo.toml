@@ -17,15 +17,11 @@ git = "https://github.com/fortress-build/actix-extras"
 branch = "master"
 
 [dependencies.actix-session]
-# version = "*"
 git = "https://github.com/fortress-build/actix-extras"
 branch = "master"
-# path = "../actix/actix-extras/actix-session/"
 features = ["cookie-session"]
 
 [dependencies.actix-identity]
-# version = "*"
-# path = "../actix/actix-extras/actix-identity/"
 git = "https://github.com/fortress-build/actix-extras"
 branch = "master"
 
