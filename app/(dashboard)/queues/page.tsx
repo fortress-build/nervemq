@@ -18,6 +18,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 
 export type Queue = {
   id: string;
@@ -26,13 +27,15 @@ export type Queue = {
 };
 
 export default function Queues() {
+  const [searchQuery, setSearchQuery] = useState("");
+
   const {
     data = [],
     isLoading,
     refetch,
   } = useQuery({
     queryFn: () => listQueues(),
-    queryKey: ["queues"],
+    queryKey: ["queues", searchQuery],
   });
   const [isOpen, setIsOpen] = useState(false);
   const router = useRouter();
@@ -50,12 +53,25 @@ export default function Queues() {
     setQueueToDelete({ name, ns });
   };
 
+  const filteredData = data.filter((queue) =>
+    queue.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   return (
     <div className="flex flex-col gap-4">
+      <div className="flex w-full max-w-sm items-center space-x-2">
+        <Input
+          type="text"
+          placeholder="Search queues..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+        />
+      </div>
+
       <DataTable
         className="w-full"
         columns={columns}
-        data={data}
+        data={filteredData}
         isLoading={isLoading}
         onRowClick={(row: QueueStatistics) =>
           router.push(`/queues/${row.name}`)
