@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use sqlx::prelude::FromRow;
 
-use crate::{auth::middleware::protected_route::Protected, service::Service};
+use crate::service::Service;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct LoginRequest {

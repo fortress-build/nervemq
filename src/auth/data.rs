@@ -3,7 +3,7 @@ use argon2::{
     password_hash::{PasswordHashString, SaltString},
     Argon2, PasswordHasher, PasswordVerifier,
 };
-use rand::Rng;
+use prefixed_api_key::{PrefixedApiKey, PrefixedApiKeyController};
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use sqlx::SqlitePool;
@@ -23,25 +23,32 @@ pub enum Error {
     IdentityNotFound { key_id: String },
 }
 
-pub async fn authenticate_api_key(
-    pool: &SqlitePool,
-    key_id: String,
-    api_key: String,
-) -> eyre::Result<()> {
+pub const API_KEY_PREFIX: &str = "nervemq";
+
+pub async fn authenticate_api_key(pool: &SqlitePool, token: PrefixedApiKey) -> eyre::Result<()> {
+    if token.prefix() != API_KEY_PREFIX {
+        return Err(Error::Unauthorized.into());
+    }
+
+    let key_id = token.short_token();
+
     let Some(hashed_key) =
         sqlx::query_scalar::<_, String>("SELECT hashed_key FROM api_keys WHERE key_id = $1")
-            .bind(&key_id)
+            .bind(key_id)
             .fetch_optional(pool)
             .await?
     else {
-        return Err(Error::IdentityNotFound { key_id }.into());
+        return Err(Error::IdentityNotFound {
+            key_id: key_id.to_string(),
+        }
+        .into());
     };
 
     let Ok(hashed_key) = PasswordHashString::new(&hashed_key) else {
         return Err(Error::InternalError.into());
     };
 
-    if let Err(e) = verify_api_key(api_key, hashed_key).await {
+    if let Err(e) = verify_api_key(token.long_token().to_owned(), hashed_key).await {
         tracing::warn!("Failed to authenticate key id {}: {}", key_id, e);
         return Err(Error::Unauthorized.into());
     }
@@ -49,23 +56,35 @@ pub async fn authenticate_api_key(
     return Ok(());
 }
 
-pub async fn gen_api_key() -> eyre::Result<(PasswordHashString, String)> {
-    match web::block(|| {
-        // Generate a random API key
-        let api_key: String = (0..32)
-            .map(|_| rand::thread_rng().gen_range(33..127) as u8 as char)
-            .collect();
+pub type ApiKeyGenerator = PrefixedApiKeyController<rand::rngs::OsRng, sha2::Sha256>;
+pub type ApiKey = PrefixedApiKey;
+
+pub struct GeneratedKey {
+    pub api_key: PrefixedApiKey,
+    pub short_token: String,
+    pub long_token_hash: PasswordHashString,
+}
+
+pub async fn gen_api_key(controller: web::Data<ApiKeyGenerator>) -> eyre::Result<GeneratedKey> {
+    match web::block(move || {
+        let api_key = controller.generate_key();
+
+        let short_token = api_key.short_token().to_owned();
+        let long_token = api_key.long_token();
 
         // Hash the API key using Argon2
         let argon2 = Argon2::default();
         let salt = SaltString::generate(&mut rand::thread_rng());
 
-        Ok((
-            argon2
-                .hash_password(api_key.as_bytes(), salt.as_salt())?
-                .serialize(),
+        let long_token_hash = argon2
+            .hash_password(long_token.as_bytes(), salt.as_salt())?
+            .serialize();
+
+        Ok(GeneratedKey {
             api_key,
-        ))
+            short_token,
+            long_token_hash,
+        })
     })
     .await
     {

@@ -82,9 +82,11 @@ create table if not exists api_keys (
   id integer not null,
   user integer not null,
   name string not null,
+  key_id text not null,
   hashed_key text not null,
 
   primary key (id),
   foreign key (user) references users(id)
 );
 create unique index if not exists api_keys_user_name_idx on api_keys(user, name);
+create unique index if not exists api_keys_key_id_idx on api_keys(key_id);
