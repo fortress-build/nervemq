@@ -1,4 +1,3 @@
-use actix_identity::Identity;
 use actix_web::{delete, get, post, web, Responder, Scope};
 use serde::{Deserialize, Serialize};
 
@@ -23,7 +22,6 @@ async fn list_all_queues(service: web::Data<Service>) -> actix_web::Result<impl 
 async fn list_ns_queues(
     service: web::Data<Service>,
     path: web::Path<String>,
-    identity: Identity,
 ) -> actix_web::Result<impl Responder> {
     let queues = match service.list_queues(Some(&*path)).await {
         Ok(q) => q,
@@ -37,7 +35,6 @@ async fn list_ns_queues(
 async fn delete_queue(
     service: web::Data<Service>,
     path: web::Path<(String, String)>,
-    identity: Identity,
 ) -> actix_web::Result<impl Responder> {
     let (namespace, name) = &*path;
     if let Err(e) = service.delete_queue(namespace, name).await {
@@ -51,7 +48,6 @@ async fn delete_queue(
 async fn create_queue(
     service: web::Data<Service>,
     path: web::Path<(String, String)>,
-    identity: Identity,
 ) -> actix_web::Result<impl Responder> {
     let (namespace, name) = &*path;
     if let Err(e) = service.create_queue(namespace, name).await {

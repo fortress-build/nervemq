@@ -58,6 +58,11 @@ sqlx = { version = "0.8.2", features = [
   "runtime-tokio",
   "sqlite",
   "tls-native-tls",
+  "uuid",
+  "chrono",
+  "json",
+  "time",
+  "macros",
 ] }
 tokio = { version = "1.41.1", features = ["full"] }
 tokio-stream = { version = "0.1.16", features = ["full"] }
