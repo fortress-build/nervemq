@@ -6,11 +6,9 @@ use actix_web::{
     HttpResponse, Responder, Scope,
 };
 use argon2::{
-    password_hash::{PasswordHashString, PasswordHasher, Salt, SaltString},
+    password_hash::{PasswordHashString, PasswordHasher, SaltString},
     Argon2,
 };
-use base64::{prelude::BASE64_STANDARD, Engine};
-use rand::Rng;
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 
