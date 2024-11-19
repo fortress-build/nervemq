@@ -10,8 +10,9 @@ export function useVerifyUser(intervalMs: number = 300 * 10) {
     const verify = async () => {
       try {
         const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/verify`, {
-          credentials: 'include',
-          mode: 'cors',
+            method: "POST",
+            credentials: "include",
+            mode: "cors",
         });
 
         if (!response.ok) {
