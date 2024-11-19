@@ -46,7 +46,6 @@ export interface UserStatistics {
   createdAt: string;
   lastLogin?: string;
   namespaces: string[];
-  password: string;
 }
 
 export default function CreateUser({
@@ -86,7 +85,7 @@ export default function CreateUser({
         email: data.email,
         password: data.password,
         namespaces: [...data.namespaces.keys()],
-        role: data.role
+        role: data.role,
       })
         .then(() => {
           invalidate();
@@ -231,13 +230,15 @@ export default function CreateUser({
                         )}
                       >
                         {field.state.value?.size > 0
-                          ? (Array.from(field.state.value)
-                              .reduce((acc: string, curr: string, idx: number) => {
+                          ? (Array.from(field.state.value).reduce(
+                              (acc: string, curr: string, idx: number) => {
                                 if (idx > 0) {
                                   return `${acc}, ${curr}`;
                                 }
                                 return curr;
-                              }, "") as string)
+                              },
+                              "",
+                            ) as string)
                           : "Select namespaces to grant access"}
                         <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                       </Button>
