@@ -11,7 +11,7 @@ use chrono::TimeDelta;
 use creek::auth::session::SqliteSessionStore;
 use creek::config::Config;
 use creek::service::Service;
-use openssl::ssl::{SslAcceptor, SslFiletype, SslMethod};
+// use openssl::ssl::{SslAcceptor, SslFiletype, SslMethod};
 use tracing_actix_web::TracingLogger;
 
 #[tokio::main]
@@ -27,14 +27,14 @@ async fn main() -> eyre::Result<()> {
 
     let data = Data::new(service);
 
-    let ssl_acceptor = {
-        let mut builder = SslAcceptor::mozilla_intermediate(SslMethod::tls())?;
-
-        builder.set_private_key_file("localhost-key.pem", SslFiletype::PEM)?;
-        builder.set_certificate_chain_file("localhost.pem")?;
-
-        builder
-    };
+    // let ssl_acceptor = {
+    //     let mut builder = SslAcceptor::mozilla_intermediate(SslMethod::tls())?;
+    //
+    //     builder.set_private_key_file("localhost-key.pem", SslFiletype::PEM)?;
+    //     builder.set_certificate_chain_file("localhost.pem")?;
+    //
+    //     builder
+    // };
 
     const SESSION_EXPIRATION: TimeDelta = chrono::Duration::hours(1);
 

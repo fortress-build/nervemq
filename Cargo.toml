@@ -37,7 +37,7 @@ actix-casbin-auth = { version = "1.1.0", default-features = false, features = [
 
 actix-web = { version = "4.9.0", features = [
   "actix-tls",
-  "openssl",
+  # "openssl",
   "cookies",
   "macros",
   "secure-cookies",
@@ -48,7 +48,7 @@ base64 = "0.22.1"
 chrono = "0.4.38"
 envy = "0.4.2"
 eyre = "0.6.12"
-openssl = "0.10.68"
+# openssl = "0.10.9"
 pom = "3.4.0"
 rand = "0.8.5"
 serde = { version = "1.0.215", features = ["derive"] }

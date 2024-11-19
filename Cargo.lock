@@ -93,7 +93,6 @@ dependencies = [
  "actix-codec",
  "actix-rt",
  "actix-service",
- "actix-tls",
  "actix-utils",
  "ahash",
  "base64 0.22.1",
@@ -230,10 +229,8 @@ dependencies = [
  "actix-utils",
  "futures-core",
  "impl-more",
- "openssl",
  "pin-project-lite",
  "tokio",
- "tokio-openssl",
  "tokio-util",
  "tracing",
 ]
@@ -811,7 +808,6 @@ dependencies = [
  "chrono",
  "envy",
  "eyre",
- "openssl",
  "pom",
  "rand",
  "serde",
@@ -2952,17 +2948,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
-]
-
-[[package]]
-name = "tokio-openssl"
-version = "0.6.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "59df6849caa43bb7567f9a36f863c447d95a11d5903c9cc334ba32576a27eadd"
-dependencies = [
- "openssl",
- "openssl-sys",
- "tokio",
 ]
 
 [[package]]
