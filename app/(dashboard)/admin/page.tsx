@@ -46,7 +46,7 @@ export default function AdminPanel() {
       await refetch();
       setUserToDelete(null);
       toast.success("User deleted successfully");
-    } catch (error) {
+    } catch {
       toast.error("Failed to delete user");
     }
   };

@@ -126,7 +126,6 @@ impl Queue {
         namespace: &str,
         queue: &str,
     ) -> eyre::Result<u64> {
-        tracing::warn!("ns: {namespace}, queue: {queue}");
         Ok(sqlx::query_scalar(
             "
             SELECT q.id FROM namespaces AS n

@@ -1,17 +1,12 @@
-use std::fmt::Display;
-
 use actix_identity::Identity;
+use actix_session::SessionExt;
 use actix_web::{
-    error::{ErrorInternalServerError, ErrorUnauthorized, InternalError},
-    get,
-    http::StatusCode,
-    post,
-    web::{self, Json, JsonBody},
-    FromRequest, HttpMessage, HttpRequest, HttpResponse, Responder, ResponseError, Scope,
+    error::ErrorUnauthorized, get, http::StatusCode, post, web, HttpMessage, HttpRequest,
+    HttpResponse, Responder, ResponseError, Scope,
 };
 use argon2::{password_hash::PasswordHashString, Argon2, PasswordVerifier};
 use serde::{Deserialize, Serialize};
-use snafu::{Snafu, Whatever};
+use snafu::Snafu;
 
 use crate::service::Service;
 
@@ -22,10 +17,9 @@ pub struct LoginRequest {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-#[serde(tag = "type", content = "data", rename_all = "camelCase")]
-pub enum SessionResponse {
-    Valid { email: String },
-    Invalid,
+#[serde(rename_all = "camelCase")]
+pub struct SessionResponse {
+    email: String,
 }
 
 #[derive(Debug, Snafu)]
@@ -48,12 +42,11 @@ impl ResponseError for Error {
     }
 }
 
-#[post("/login")]
 pub async fn login(
     request: HttpRequest,
     form: web::Json<LoginRequest>,
     service: web::Data<Service>,
-) -> HttpResponse {
+) -> Result<impl Responder, Error> {
     let form = form.into_inner();
 
     let Ok(Some(hashed_key)) =
@@ -62,7 +55,7 @@ pub async fn login(
             .fetch_optional(service.db())
             .await
     else {
-        return HttpResponse::from_error(Error::IdentityNotFound);
+        return Err(Error::IdentityNotFound);
     };
 
     match web::block(move || {
@@ -74,24 +67,34 @@ pub async fn login(
     {
         Ok(Err(e)) => {
             tracing::error!("{e}");
-            return HttpResponse::from_error(Error::Unauthorized);
+            return Err(Error::Unauthorized);
         }
         Err(e) => {
             tracing::error!("{e}");
-            return HttpResponse::from_error(Error::InternalError {
+            return Err(Error::InternalError {
                 source: eyre::eyre!(e),
             });
         }
         Ok(Ok(_)) => {}
     };
 
-    if let Err(e) = Identity::login(&request.extensions(), form.email.clone()) {
-        return HttpResponse::from_error(Error::InternalError {
-            source: eyre::eyre!(e),
-        });
+    let session = request.get_session();
+
+    match Identity::login(&request.extensions(), form.email.clone()) {
+        Ok(id) => {
+            session
+                .insert::<String>("creek_user_id", id.id().expect("identifier").to_string())
+                .ok();
+        }
+        Err(e) => {
+            tracing::error!("Failed to login: {e}");
+            return Err(Error::InternalError {
+                source: eyre::eyre!(e),
+            });
+        }
     }
 
-    HttpResponse::Ok().json(SessionResponse::Valid { email: form.email })
+    Ok(HttpResponse::Ok().json(SessionResponse { email: form.email }))
 }
 
 #[post("/logout")]
@@ -108,15 +111,15 @@ pub async fn get_session(identity: Option<Identity>) -> actix_web::Result<impl R
             let email = identity
                 .id()
                 .map_err(actix_web::error::ErrorInternalServerError)?;
-            Ok(web::Json(SessionResponse::Valid { email }))
+            Ok(web::Json(SessionResponse { email }))
         }
-        None => Ok(web::Json(SessionResponse::Invalid)),
+        None => Err(ErrorUnauthorized("Unauthorized")),
     }
 }
 
 pub fn service() -> Scope {
     web::scope("/auth")
-        .service(login)
+        .service(web::resource("/login").post(login))
         .service(logout)
         .service(get_session)
 }

@@ -46,3 +46,5 @@ next-env.d.ts
 /creek.db
 /creek.db-shm
 /creek.db-wal
+
+certificates

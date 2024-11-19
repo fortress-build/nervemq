@@ -15,16 +15,7 @@ import { useForm } from "@tanstack/react-form";
 import { yupValidator } from "@tanstack/yup-form-adapter";
 import { loginFormSchema } from "@/schemas/login-form";
 import { SERVER_ENDPOINT } from "../globals";
-
-type SessionResponse =
-  | {
-      type: "valid";
-      data: { email: string };
-    }
-  | {
-      type: "invalid";
-      data: undefined;
-    };
+import { useGlobalState } from "@/lib/state/global";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -41,43 +32,34 @@ export default function LoginPage() {
       password: "",
     },
     onSubmit: async ({ value }) => {
-      const response: SessionResponse | undefined = await fetch(
-        `${SERVER_ENDPOINT}/auth/login`,
-        {
-          method: "POST",
-          body: JSON.stringify({
-            email: value.email,
-            password: value.password,
-          }),
-        },
-      ).then((res) => {
-        if (!res.ok) {
-          switch (res.status) {
-            case 401: {
-              toast.error("Invalid email or password");
-              break;
-            }
-            default: {
-              toast.error("Something went wrong");
-              break;
-            }
-          }
-          return;
-        }
-        return res.json();
-      });
-      // if (response === undefined) {
-      //   return;
-      // }
+      "use client";
 
-      if (
-        response?.type !== "valid" ||
-        // This should never happen but... just to be safe
-        response.data.email !== value.email
-      ) {
-        toast.error("Invalid email or password");
-        return;
-      }
+      const data: { email: string } = await window
+        .fetch(`${SERVER_ENDPOINT}/auth/login`, {
+          method: "POST",
+          body: JSON.stringify(value),
+          credentials: "include",
+          mode: "cors",
+        })
+        .then((res) => {
+          if (!res.ok) {
+            switch (res.status) {
+              case 401: {
+                toast.error("Invalid email or password");
+                break;
+              }
+              default: {
+                toast.error("Something went wrong");
+                break;
+              }
+            }
+            return;
+          }
+
+          return res.json();
+        });
+
+      useGlobalState.setState({ session: data });
 
       router.replace("/queues");
     },
