@@ -7,6 +7,7 @@ import type { APIKey } from "@/components/create-api-key";
 import type { UserStatistics } from "@/components/create-user";
 import { SERVER_ENDPOINT } from "@/app/globals";
 import type { CreateUserRequest } from "@/schemas/create-user";
+import { toast } from "sonner";
 
 export async function createNamespace(data: CreateNamespaceRequest) {
   await fetch(`${SERVER_ENDPOINT}/ns/${data.name}`, {
@@ -15,7 +16,7 @@ export async function createNamespace(data: CreateNamespaceRequest) {
     next: {
       tags: ["namespaces"],
     },
-  });
+  }).catch(() => toast.error("Something went wrong"));
 }
 
 export async function deleteNamespace(name: string) {
@@ -25,7 +26,7 @@ export async function deleteNamespace(name: string) {
     next: {
       tags: ["namespaces"],
     },
-  });
+  }).catch(() => toast.error("Something went wrong"));
 }
 
 export async function listNamespaces(): Promise<NamespaceStatistics[]> {
@@ -37,8 +38,8 @@ export async function listNamespaces(): Promise<NamespaceStatistics[]> {
     },
   })
     .then((res) => res.json())
-    .catch((e) => {
-      console.error(e);
+    .catch(() => {
+      toast.error("Something went wrong");
 
       return [];
     });
@@ -51,7 +52,7 @@ export async function createQueue(data: CreateQueueRequest) {
     next: {
       tags: ["queues"],
     },
-  });
+  }).catch(() => toast.error("Something went wrong"));
 }
 
 export async function deleteQueue(data: CreateQueueRequest) {
@@ -61,7 +62,7 @@ export async function deleteQueue(data: CreateQueueRequest) {
     next: {
       tags: ["queues"],
     },
-  });
+  }).catch(() => toast.error("Something went wrong"));
 }
 
 export async function listQueues(): Promise<QueueStatistics[]> {
@@ -73,13 +74,14 @@ export async function listQueues(): Promise<QueueStatistics[]> {
     },
   })
     .then((res) => res.json())
-    .catch(() => []);
+    .catch(() => {
+      toast.error("Something went wrong");
+      return [];
+    });
 }
 
 export async function listAPIKeys(): Promise<APIKey[]> {
   "use client";
-  // window.Headers
-  // console.log(await cookies())
   return await fetch(`${SERVER_ENDPOINT}/tokens`, {
     method: "GET",
     credentials: "include",
@@ -88,11 +90,11 @@ export async function listAPIKeys(): Promise<APIKey[]> {
       tags: ["api-keys"],
     },
   })
-    .then((res) => {
-      console.log(res);
-      return res.json();
-    })
-    .catch(() => []);
+    .then((res) => res.json())
+    .catch(() => {
+      toast.error("Something went wrong");
+      return [];
+    });
 }
 
 export async function createAPIKey(name: string): Promise<APIKey> {
@@ -109,7 +111,7 @@ export async function createAPIKey(name: string): Promise<APIKey> {
   })
     .then((res) => res.json())
     .catch((e) => {
-      console.error(e);
+      toast.error("Something went wrong");
       throw e;
     });
 }
@@ -121,7 +123,7 @@ export async function deleteAPIKey(id: string) {
     next: {
       tags: ["api-keys"],
     },
-  });
+  }).catch(() => toast.error("Something went wrong"));
 }
 
 export async function createUser(data: CreateUserRequest): Promise<void> {
@@ -135,7 +137,7 @@ export async function createUser(data: CreateUserRequest): Promise<void> {
     next: {
       tags: ["users"],
     },
-  });
+  }).catch(() => toast.error("Something went wrong"));
 }
 
 export type DeleteUserRequest = {
@@ -150,7 +152,7 @@ export async function deleteUser(data: DeleteUserRequest) {
     next: {
       tags: ["users"],
     },
-  });
+  }).catch(() => toast.error("Something went wrong"));
 }
 
 export async function listUsers(): Promise<UserStatistics[]> {
@@ -160,5 +162,7 @@ export async function listUsers(): Promise<UserStatistics[]> {
     next: {
       tags: ["users"],
     },
-  }).then((res) => res.json());
+  })
+    .then((res) => res.json())
+    .catch(() => toast.error("Something went wrong"));
 }
