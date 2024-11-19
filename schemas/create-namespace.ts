@@ -9,6 +9,9 @@ export const createNamespaceSchema = object({
     .test("name", "name should be alphanumeric", (value: string) => {
       return isAlphaNumeric(value);
     }),
+  role: string()
+    .required()
+    .oneOf(["admin", "user"], "Role must be either 'admin' or 'user'"),
 });
 
 export type CreateNamespaceRequest = InferType<typeof createNamespaceSchema>;

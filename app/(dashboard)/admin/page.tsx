@@ -16,8 +16,16 @@ import CreateUser from "@/components/create-user";
 import { columns, type User } from "@/components/admin/table";
 import { toast } from "sonner";
 import { listUsers, deleteUser } from "@/actions/api";
+import { useIsAdmin } from "@/lib/state/global";
+import { redirect } from "next/navigation";
 
 export default function AdminPanel() {
+  const isAdmin = useIsAdmin();
+
+  if (!isAdmin) {
+    redirect("/");
+  }
+
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<string | null>(null);
 
