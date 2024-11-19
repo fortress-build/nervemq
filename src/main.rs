@@ -43,7 +43,7 @@ async fn main() -> eyre::Result<()> {
     HttpServer::new(move || {
         let session_middleware =
             SessionMiddleware::builder(session_store.clone(), secret_key.clone())
-                .cookie_secure(false)
+                .cookie_secure(true)
                 .cookie_content_security(CookieContentSecurity::Signed)
                 .session_lifecycle(PersistentSession::default().session_ttl(session_ttl))
                 .cookie_domain(Some("localhost".to_owned()))
