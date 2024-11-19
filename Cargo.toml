@@ -11,6 +11,20 @@ path = "src/lib.rs"
 name = "creek"
 path = "src/main.rs"
 
+
+[dependencies.actix-cors]
+git = "https://github.com/fortress-build/actix-extras"
+branch = "master"
+
+[dependencies.actix-session]
+git = "https://github.com/fortress-build/actix-extras"
+features = ["cookie-session"]
+branch = "master"
+
+[dependencies.actix-identity]
+git = "https://github.com/fortress-build/actix-extras"
+branch = "master"
+
 [dependencies]
 actix-casbin = { version = "1.1.0", default-features = false, features = [
   "runtime-tokio",
@@ -19,14 +33,6 @@ actix-casbin = { version = "1.1.0", default-features = false, features = [
 actix-casbin-auth = { version = "1.1.0", default-features = false, features = [
   "runtime-tokio",
   "tokio",
-] }
-# actix-cors = "0.7.0"
-actix-cors = { path = "../actix/actix-extras/actix-cors/" }
-actix-identity = { path = "../actix/actix-extras/actix-identity/" }
-# actix-identity = { git = "https://github.com/zignis/actix-extras" }
-# actix-session = { version = "0.10.1", features = ["cookie-session"] }
-actix-session = { path = "../actix/actix-extras/actix-session/", features = [
-  "cookie-session",
 ] }
 
 actix-web = { version = "4.9.0", features = [

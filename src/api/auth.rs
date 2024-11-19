@@ -1,7 +1,7 @@
-use std::fmt::Display;
+use std::{cell::RefCell, fmt::Display};
 
 use actix_identity::Identity;
-use actix_session::{storage::SessionKey, Session};
+use actix_session::{storage::SessionKey, Session, SessionExt};
 use actix_web::{
     error::{ErrorInternalServerError, ErrorUnauthorized, InternalError},
     get,
@@ -52,8 +52,6 @@ impl ResponseError for Error {
 pub async fn login(
     request: HttpRequest,
     form: web::Json<LoginRequest>,
-    session: Session,
-    // form: web::Form<LoginRequest>,
     service: web::Data<Service>,
 ) -> Result<impl Responder, Error> {
     let form = form.into_inner();
@@ -87,18 +85,23 @@ pub async fn login(
         Ok(Ok(_)) => {}
     };
 
+    let session = request.get_session();
+
     match Identity::login(&request.extensions(), form.email.clone()) {
         Ok(id) => {
-            session.insert("nerve-id", id.id().unwrap()).unwrap();
+            session
+                .insert::<String>("creek_user_id", id.id().expect("identifier").to_string())
+                .ok();
         }
         Err(e) => {
+            tracing::error!("Failed to login: {e}");
             return Err(Error::InternalError {
                 source: eyre::eyre!(e),
             });
         }
     }
 
-    Ok(HttpResponse::Ok().json(SessionResponse::Valid { email: form.email }))
+    Ok(HttpResponse::Ok())
 }
 
 #[post("/logout")]

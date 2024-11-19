@@ -73,6 +73,7 @@ dependencies = [
 [[package]]
 name = "actix-cors"
 version = "0.7.0"
+source = "git+https://github.com/fortress-build/actix-extras?branch=master#9c4662ac1f502cc78e5593625b5d417f2f642a5b"
 dependencies = [
  "actix-utils",
  "actix-web",
@@ -126,9 +127,10 @@ dependencies = [
 [[package]]
 name = "actix-identity"
 version = "0.8.0"
+source = "git+https://github.com/fortress-build/actix-extras?branch=master#9c4662ac1f502cc78e5593625b5d417f2f642a5b"
 dependencies = [
  "actix-service",
- "actix-session 0.10.1 (git+https://github.com/fortress-build/actix-extras?branch=master)",
+ "actix-session",
  "actix-utils",
  "actix-web",
  "derive_more 1.0.0",
@@ -199,21 +201,6 @@ dependencies = [
  "futures-core",
  "paste",
  "pin-project-lite",
-]
-
-[[package]]
-name = "actix-session"
-version = "0.10.1"
-dependencies = [
- "actix-service",
- "actix-utils",
- "actix-web",
- "anyhow",
- "derive_more 1.0.0",
- "rand",
- "serde",
- "serde_json",
- "tracing",
 ]
 
 [[package]]
@@ -661,9 +648,9 @@ dependencies = [
 
 [[package]]
 name = "cc"
-version = "1.2.0"
+version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1aeb932158bd710538c73702db6945cb68a8fb08c519e6e12706b94263b36db8"
+checksum = "fd9de9f2205d5ef3fd67e685b0df337994ddd4495e2a28d185500d0e1edfea47"
 dependencies = [
  "jobserver",
  "libc",
@@ -816,7 +803,7 @@ dependencies = [
  "actix-casbin-auth",
  "actix-cors",
  "actix-identity",
- "actix-session 0.10.1",
+ "actix-session",
  "actix-web",
  "anyhow",
  "argon2",
@@ -1084,9 +1071,9 @@ checksum = "0ce7134b9999ecaf8bcd65542e436736ef32ddca1b3e06094cb6ec5755203b80"
 
 [[package]]
 name = "flate2"
-version = "1.0.34"
+version = "1.0.35"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a1b589b4dc103969ad3cf85c950899926ec64300a1a46d76c03a6072957036f0"
+checksum = "c936bfdafb507ebbf50b8074c54fa31c5be9a1e7e5f467dd659697041407d07c"
 dependencies = [
  "crc32fast",
  "miniz_oxide",
@@ -1633,9 +1620,9 @@ dependencies = [
 
 [[package]]
 name = "libc"
-version = "0.2.162"
+version = "0.2.164"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "18d287de67fe55fd7e1581fe933d965a5a9477b38e949cfa9f8574ef01506398"
+checksum = "433bfe06b8c75da9b2e3fbea6e5329ff87748f0b144ef75306e674c3f6f7c13f"
 
 [[package]]
 name = "libm"
@@ -2285,9 +2272,9 @@ dependencies = [
 
 [[package]]
 name = "rustix"
-version = "0.38.40"
+version = "0.38.41"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "99e4ea3e1cdc4b559b8e5650f9c8e5998e3e5c1343b4eaf034565f32318d63c0"
+checksum = "d7f649912bc1495e167a6edee79151c84b1bad49748cb4f1f1167f459f6224f6"
 dependencies = [
  "bitflags",
  "errno",
@@ -2341,9 +2328,9 @@ dependencies = [
 
 [[package]]
 name = "security-framework-sys"
-version = "2.12.0"
+version = "2.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ea4a292869320c0272d7bc55a5a6aafaff59b4f63404a003887b679a2e05b4b6"
+checksum = "fa39c7303dc58b5543c94d22c1766b0d31f2ee58306363ea622b10bbc075eaa2"
 dependencies = [
  "core-foundation-sys",
  "libc",

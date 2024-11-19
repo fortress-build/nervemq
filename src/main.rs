@@ -47,33 +47,28 @@ async fn main() -> eyre::Result<()> {
         builder
     };
 
-    // let casbin_middleware = CasbinService::new();
-
     const SESSION_EXPIRATION: TimeDelta = chrono::Duration::hours(6);
 
     let deadline = SESSION_EXPIRATION.to_std().expect("valid duration");
     let session_ttl = Duration::new(SESSION_EXPIRATION.num_seconds(), 0);
 
     HttpServer::new(move || {
-        let session_middleware = SessionMiddleware::builder(
-            // CookieSessionStore::default(),
-            session_store.clone(),
-            secret_key.clone(),
-        )
-        .cookie_secure(true)
-        // .cookie_same_site(SameSite::Strict)
-        .cookie_content_security(CookieContentSecurity::Private)
-        .session_lifecycle(PersistentSession::default().session_ttl(session_ttl))
-        .cookie_domain(Some("localhost".to_owned()))
-        .cookie_path("/".to_owned())
-        .cookie_http_only(true)
-        .cookie_name("nerve-session".to_owned())
-        .build();
+        let session_middleware =
+            SessionMiddleware::builder(session_store.clone(), secret_key.clone())
+                .cookie_secure(false)
+                // .cookie_same_site(SameSite::None)
+                .cookie_content_security(CookieContentSecurity::Signed)
+                // .session_lifecycle(PersistentSession::default().session_ttl(session_ttl))
+                .cookie_domain(Some("localhost".to_owned()))
+                .cookie_path("/".to_owned())
+                .cookie_http_only(true)
+                .cookie_name("creek-session".to_owned())
+                .build();
 
         let identity_middleware = IdentityMiddleware::builder()
-            .visit_deadline(Some(deadline))
-            .logout_behaviour(actix_identity::config::LogoutBehaviour::PurgeSession)
-            .id_key("nerve-id")
+            // .visit_deadline(Some(deadline))
+            // .logout_behaviour(actix_identity::config::LogoutBehaviour::PurgeSession)
+            .id_key("creek_user_id")
             .build();
 
         let cors = Cors::default()
@@ -88,39 +83,39 @@ async fn main() -> eyre::Result<()> {
 
         App::new()
             // .wrap(ApiKeyAuth)
-            .wrap_fn(|req, srv| {
-                // match req.cookie("nerve-session") {
-                //     Some(cookie) => {
-                //         // req.cookies().unwrap()
-                //         // let cookies = req.cookies().unwrap();
-                //         println!("{cookies:?}");
-                //
-                //         let session = req.get_session();
-                //
-                //         println!("{:?}", session.entries());
-                //
-                //         // req.extensions()
-                //         // Session::extract(&req);
-                //         // req.ex
-                //         // Identity::extract(&req.get)
-                //     }
-                //     None => {}
-                // }
-
-                let session = req.get_session();
-
-                println!("{:?}", session.entries());
-
-                let id = req.get_identity().map(|e| e.id());
-                tracing::error!("IDENTITY: {:?}", id);
-
-                srv.call(req)
-            })
+            // .wrap_fn(|req, srv| {
+            //     // match req.cookie("nerve-session") {
+            //     //     Some(cookie) => {
+            //     //         // req.cookies().unwrap()
+            //     //         // let cookies = req.cookies().unwrap();
+            //     //         println!("{cookies:?}");
+            //     //
+            //     //         let session = req.get_session();
+            //     //
+            //     //         println!("{:?}", session.entries());
+            //     //
+            //     //         // req.extensions()
+            //     //         // Session::extract(&req);
+            //     //         // req.ex
+            //     //         // Identity::extract(&req.get)
+            //     //     }
+            //     //     None => {}
+            //     // }
+            //
+            //     let session = req.get_session();
+            //
+            //     println!("{:?}", session.entries());
+            //
+            //     let id = req.get_identity().map(|e| e.id());
+            //     tracing::error!("IDENTITY: {:?}", id);
+            //
+            //     srv.call(req)
+            // })
             // .wrap(actix_web::middleware::Logger::default())
+            .wrap(TracingLogger::default())
             .wrap(identity_middleware)
             .wrap(session_middleware)
             .wrap(cors)
-            .wrap(TracingLogger::default())
             .service(creek::api::namespace::service())
             .service(creek::api::queue::service())
             .service(creek::api::data::service())

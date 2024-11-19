@@ -1,7 +1,9 @@
-use actix_session::storage::{LoadError, SaveError, SessionKey, SessionStore, UpdateError};
+use actix_session::storage::{
+    LoadError, SaveError, SessionKey, SessionState, SessionStore, UpdateError,
+};
 use rand::distributions::{Alphanumeric, DistString};
 use serde::{Deserialize, Serialize};
-use sqlx::{Acquire, SqlitePool};
+use sqlx::SqlitePool;
 use tokio_stream::StreamExt;
 
 #[derive(Clone)]
@@ -14,9 +16,6 @@ impl SqliteSessionStore {
         Self { db }
     }
 }
-
-pub type SessionState = serde_json::Map<String, serde_json::Value>;
-// pub type SessionState = HashMap<String, String>;
 
 #[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
 pub struct Session {
@@ -32,7 +31,6 @@ struct SessionStateEntry {
     session: u64,
     k: String,
     v: serde_json::Value,
-    // v: String,
 }
 
 impl SessionStore for SqliteSessionStore {
@@ -54,33 +52,32 @@ impl SessionStore for SqliteSessionStore {
                         LoadError::Other(anyhow::Error::new(e))
                     })?;
 
+            let session = match session {
+                Some(mut session) => {
+                    let mut kv = sqlx::query_as::<_, SessionStateEntry>(
+                        "SELECT * FROM session_state WHERE session = $1",
+                    )
+                    .bind(session.id as i64)
+                    .fetch(&db);
+
+                    while let Some(pair) = kv.next().await.transpose().map_err(|e| {
+                        tracing::warn!("Load error: {e}");
+                        LoadError::Other(anyhow::Error::new(e))
+                    })? {
+                        session.state.insert(pair.k, pair.v);
+                    }
+
+                    session
+                }
+                None => {
+                    tracing::warn!("No session found");
+                    return Ok(None);
+                }
+            };
+
             tracing::info!("Loaded session: {session:?}");
 
-            let mut session = match session {
-                Some(session) => session,
-                None => return Ok(None),
-            };
-
-            let state = {
-                let mut kv = sqlx::query_as::<_, SessionStateEntry>(
-                    "SELECT * FROM session_state WHERE session = $1",
-                )
-                .bind(session.id as i64)
-                .fetch(&db);
-
-                while let Some(pair) = kv
-                    .next()
-                    .await
-                    .transpose()
-                    .map_err(|e| LoadError::Other(anyhow::Error::new(e)))?
-                {
-                    session.state.insert(pair.k, pair.v);
-                }
-
-                session.state
-            };
-
-            Ok(Some(state))
+            Ok(Some(session.state))
         })
     }
 
@@ -270,6 +267,7 @@ impl SessionStore for SqliteSessionStore {
 mod tests {
     use super::*;
     use actix_web::cookie::time::Duration;
+    use serde_json::Value;
     use sqlx::sqlite::SqlitePoolOptions;
 
     async fn setup_db() -> SqlitePool {
@@ -317,7 +315,7 @@ mod tests {
         );
         state.insert(
             "username".to_string(),
-            serde_json::Value::String("test_user".to_string()),
+            Value::String("test_user".to_string()),
         );
         state
     }
