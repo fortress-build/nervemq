@@ -127,6 +127,7 @@ dependencies = [
 [[package]]
 name = "actix-identity"
 version = "0.8.0"
+source = "git+https://github.com/fortress-build/actix-extras?branch=master#9c4662ac1f502cc78e5593625b5d417f2f642a5b"
 dependencies = [
  "actix-service",
  "actix-session 0.10.1 (git+https://github.com/fortress-build/actix-extras?branch=master)",
@@ -205,6 +206,7 @@ dependencies = [
 [[package]]
 name = "actix-session"
 version = "0.10.1"
+source = "git+https://github.com/fortress-build/actix-extras?branch=master#9c4662ac1f502cc78e5593625b5d417f2f642a5b"
 dependencies = [
  "actix-service",
  "actix-utils",
