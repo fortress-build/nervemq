@@ -793,39 +793,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "creek"
-version = "0.1.0"
-dependencies = [
- "actix-casbin",
- "actix-casbin-auth",
- "actix-cors",
- "actix-identity",
- "actix-session",
- "actix-web",
- "anyhow",
- "argon2",
- "base64 0.22.1",
- "chrono",
- "envy",
- "eyre",
- "pom",
- "rand",
- "serde",
- "serde-email",
- "serde_json",
- "sha2",
- "snafu",
- "sqlx",
- "tempfile",
- "tokio",
- "tokio-stream",
- "tracing",
- "tracing-actix-web",
- "tracing-subscriber",
- "zeroize",
-]
-
-[[package]]
 name = "crossbeam-channel"
 version = "0.5.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1779,6 +1746,39 @@ dependencies = [
  "security-framework",
  "security-framework-sys",
  "tempfile",
+]
+
+[[package]]
+name = "nervemq"
+version = "0.1.0"
+dependencies = [
+ "actix-casbin",
+ "actix-casbin-auth",
+ "actix-cors",
+ "actix-identity",
+ "actix-session",
+ "actix-web",
+ "anyhow",
+ "argon2",
+ "base64 0.22.1",
+ "chrono",
+ "envy",
+ "eyre",
+ "pom",
+ "rand",
+ "serde",
+ "serde-email",
+ "serde_json",
+ "sha2",
+ "snafu",
+ "sqlx",
+ "tempfile",
+ "tokio",
+ "tokio-stream",
+ "tracing",
+ "tracing-actix-web",
+ "tracing-subscriber",
+ "zeroize",
 ]
 
 [[package]]

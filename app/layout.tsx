@@ -4,8 +4,8 @@ import { cookies } from "next/headers";
 import Providers from "./providers";
 
 export const metadata: Metadata = {
-  title: "Creek UI",
-  description: "Creek admin panel",
+  title: "NerveMQ UI",
+  description: "NerveMQ admin panel",
 };
 
 export default async function RootLayout({
