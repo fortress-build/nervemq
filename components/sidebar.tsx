@@ -35,6 +35,7 @@ import CreateQueue from "./create-queue";
 import CreateNamespace from "./create-namespace";
 import CreateApiKey from "./create-api-key";
 import CreateUser from "./create-user";
+import { useIsAdmin } from "@/lib/state/global";
 
 function SidebarItem({
   title,
@@ -135,13 +136,15 @@ export default function DashboardSidebar() {
                 isActive={pathName.endsWith("/api-keys")}
                 onClick={() => setMode("create-api-key")}
               />
-              <SidebarItem
-                title="Admin"
-                url="/admin"
-                icon={Users}
-                isActive={pathName.endsWith("/admin")}
-                onClick={() => setMode("create-user")}
-              />
+              {useIsAdmin() && (
+                <SidebarItem
+                  title="Admin"
+                  url="/admin"
+                  icon={Users}
+                  isActive={pathName.endsWith("/admin")}
+                  onClick={() => setMode("create-user")}
+                />
+              )}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
