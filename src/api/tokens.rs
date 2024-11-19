@@ -82,8 +82,6 @@ pub async fn list_tokens(
     req: HttpRequest,
     identity: Identity,
 ) -> actix_web::Result<web::Json<Vec<ApiKey>>> {
-    tracing::error!("{:?}", req.cookies());
-
     let email = match identity.id() {
         Ok(email) => email,
         Err(err) => {

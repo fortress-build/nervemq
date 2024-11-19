@@ -72,7 +72,7 @@ impl SessionStore for SqliteSessionStore {
                 }
             };
 
-            tracing::error!("Loaded session: {:?}", session);
+            tracing::debug!("Loaded session: {:?}", session);
 
             Ok(Some(session.state))
         })
