@@ -11,8 +11,8 @@ use actix_web::{dev::ServiceRequest, dev::ServiceResponse, Error, HttpMessage};
 
 use actix_casbin_auth::CasbinVals;
 
-use super::data::authenticate_api_key;
-use super::header::AuthHeader;
+use crate::auth::data::authenticate_api_key;
+use crate::auth::header::AuthHeader;
 
 pub struct ApiKeyAuth;
 

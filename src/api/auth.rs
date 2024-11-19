@@ -1,12 +1,15 @@
 use actix_identity::Identity;
 use actix_session::SessionExt;
 use actix_web::{
-    error::ErrorUnauthorized, get, http::StatusCode, post, web, HttpMessage, HttpRequest,
-    HttpResponse, Responder, ResponseError, Scope,
+    error::{ErrorInternalServerError, ErrorUnauthorized},
+    get,
+    http::StatusCode,
+    post, web, HttpMessage, HttpRequest, HttpResponse, Responder, ResponseError, Scope,
 };
 use argon2::{password_hash::PasswordHashString, Argon2, PasswordVerifier};
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
+use sqlx::prelude::FromRow;
 
 use crate::service::Service;
 
@@ -20,6 +23,19 @@ pub struct LoginRequest {
 #[serde(rename_all = "camelCase")]
 pub struct SessionResponse {
     email: String,
+    role: Role,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, sqlx::Type, PartialEq, Eq)]
+#[sqlx(type_name = "text")]
+pub enum Role {
+    #[default]
+    #[serde(rename = "user")]
+    #[sqlx(rename = "user")]
+    User,
+    #[serde(rename = "admin")]
+    #[sqlx(rename = "admin")]
+    Admin,
 }
 
 #[derive(Debug, Snafu)]
@@ -42,6 +58,13 @@ impl ResponseError for Error {
     }
 }
 
+#[derive(Deserialize, FromRow)]
+struct LoginData {
+    hashed_pass: String,
+    role: Role,
+}
+
+#[post("/login")]
 pub async fn login(
     request: HttpRequest,
     form: web::Json<LoginRequest>,
@@ -49,8 +72,8 @@ pub async fn login(
 ) -> Result<impl Responder, Error> {
     let form = form.into_inner();
 
-    let Ok(Some(hashed_key)) =
-        sqlx::query_scalar::<_, String>("SELECT hashed_pass FROM users WHERE email = $1")
+    let Ok(Some(user_data)) =
+        sqlx::query_as::<_, LoginData>("SELECT hashed_pass, role FROM users WHERE email = $1")
             .bind(&form.email)
             .fetch_optional(service.db())
             .await
@@ -58,8 +81,8 @@ pub async fn login(
         return Err(Error::IdentityNotFound);
     };
 
-    match web::block(move || {
-        let pass_hash = PasswordHashString::new(&hashed_key)?;
+    match tokio::task::spawn_blocking(move || {
+        let pass_hash = PasswordHashString::new(&user_data.hashed_pass)?;
 
         Argon2::default().verify_password(form.password.as_bytes(), &pass_hash.password_hash())
     })
@@ -94,7 +117,10 @@ pub async fn login(
         }
     }
 
-    Ok(HttpResponse::Ok().json(SessionResponse { email: form.email }))
+    Ok(HttpResponse::Ok().json(SessionResponse {
+        email: form.email,
+        role: user_data.role,
+    }))
 }
 
 #[post("/logout")]
@@ -104,14 +130,32 @@ pub async fn logout(user: Identity) -> actix_web::Result<impl Responder> {
     Ok(HttpResponse::Ok())
 }
 
-#[get("/session")]
-pub async fn get_session(identity: Option<Identity>) -> actix_web::Result<impl Responder> {
+#[derive(Debug, Serialize, Deserialize, FromRow)]
+#[serde(rename_all = "camelCase")]
+pub struct User {
+    email: String,
+    role: Role,
+}
+
+#[get("/verify")]
+pub async fn verify(
+    identity: Option<Identity>,
+    service: web::Data<Service>,
+) -> actix_web::Result<impl Responder> {
     match identity {
         Some(identity) => {
             let email = identity
                 .id()
                 .map_err(actix_web::error::ErrorInternalServerError)?;
-            Ok(web::Json(SessionResponse { email }))
+
+            let User { email, role } = sqlx::query_as("SELECT * FROM users WHERE email = $1")
+                .bind(&email)
+                .fetch_optional(service.db())
+                .await
+                .map_err(|e| ErrorInternalServerError(e))?
+                .ok_or_else(|| ErrorUnauthorized("Unauthorized"))?;
+
+            Ok(web::Json(SessionResponse { email, role }))
         }
         None => Err(ErrorUnauthorized("Unauthorized")),
     }
@@ -119,7 +163,7 @@ pub async fn get_session(identity: Option<Identity>) -> actix_web::Result<impl R
 
 pub fn service() -> Scope {
     web::scope("/auth")
-        .service(web::resource("/login").post(login))
+        .service(login)
         .service(logout)
-        .service(get_session)
+        .service(verify)
 }
