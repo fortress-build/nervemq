@@ -8,6 +8,7 @@ use actix_web::web::{FormConfig, Html, JsonConfig};
 use actix_web::{web::Data, App, HttpServer};
 
 use chrono::TimeDelta;
+use creek::api::auth::Role;
 use creek::auth::middleware::protected_route::Protected;
 use creek::auth::session::SqliteSessionStore;
 use creek::config::Config;
@@ -30,7 +31,7 @@ async fn main() -> eyre::Result<()> {
         .create_user(
             Email::from_str("admin@fortress.build").unwrap(),
             "password".to_owned(),
-            None,
+            Some(Role::Admin),
         )
         .await
     {
