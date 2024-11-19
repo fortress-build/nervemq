@@ -3,6 +3,7 @@ use actix_identity::IdentityMiddleware;
 use actix_session::config::{CookieContentSecurity, PersistentSession};
 use actix_session::SessionMiddleware;
 use actix_web::cookie::time::Duration;
+use actix_web::middleware::{NormalizePath, TrailingSlash};
 use actix_web::web::{FormConfig, Html, JsonConfig};
 use actix_web::{web::Data, App, HttpServer};
 
@@ -75,6 +76,7 @@ async fn main() -> eyre::Result<()> {
             .wrap(session_middleware)
             .wrap(cors)
             .wrap(TracingLogger::default())
+            .wrap(NormalizePath::new(TrailingSlash::Trim))
             .service(creek::api::namespace::service())
             .service(creek::api::queue::service())
             .service(creek::api::data::service())

@@ -1,7 +1,9 @@
 "use client";
-import type { ColumnDef } from "@tanstack/react-table";
+import type { CellContext, ColumnDef } from "@tanstack/react-table";
 import { Trash2, KeySquare } from "lucide-react";
 import { Button } from "../ui/button";
+import { useContext } from "react";
+import { KeyToDeleteContext } from "@/lib/contexts/key-to-delete";
 
 export type ApiKey = {
   // id: string;
@@ -9,6 +11,29 @@ export type ApiKey = {
   // createdAt: string;
   // lastUsed?: string;
 };
+
+function ActionsCell({
+  context: { row },
+}: {
+  context: CellContext<ApiKey, unknown>;
+}) {
+  const cx = useContext(KeyToDeleteContext);
+
+  return (
+    <div className="flex items-center justify-end gap-2">
+      <Button
+        variant="ghost"
+        size="sm"
+        className="text-destructive hover:text-destructive hover:bg-destructive/10"
+        onClick={() => {
+          cx?.setKey(row.original.name);
+        }}
+      >
+        <Trash2 className="h-4 w-4 text-destructive" />
+      </Button>
+    </div>
+  );
+}
 
 export const columns: ColumnDef<ApiKey>[] = [
   {
@@ -45,24 +70,8 @@ export const columns: ColumnDef<ApiKey>[] = [
   // },
   {
     id: "actions",
-    cell: (row) => (
-      <div className="flex items-center justify-end gap-2">
-        <Button
-          variant="ghost"
-          size="sm"
-          className="text-destructive hover:text-destructive hover:bg-destructive/10"
-          onClick={async (e) => {
-            const meta = row.table.options.meta as
-              | {
-                  handleDeleteKey: (id: string, e: unknown) => void;
-                }
-              | undefined;
-            meta?.handleDeleteKey(row.row.original.name, e);
-          }}
-        >
-          <Trash2 className="h-4 w-4 text-destructive" />
-        </Button>
-      </div>
-    ),
+    cell: (row) => {
+      return <ActionsCell context={row} />;
+    },
   },
 ];

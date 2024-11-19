@@ -97,28 +97,33 @@ export async function listAPIKeys(): Promise<APIKey[]> {
     });
 }
 
-export async function createAPIKey(name: string): Promise<APIKey> {
+export type CreateTokenRequest = {
+  name: string;
+};
+
+export async function createAPIKey(req: CreateTokenRequest): Promise<APIKey> {
   return await fetch(`${SERVER_ENDPOINT}/tokens`, {
     method: "POST",
     credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ name }),
+    body: JSON.stringify(req),
     next: {
       tags: ["api-keys"],
     },
   })
     .then((res) => res.json())
-    .catch((e) => {
+    .catch(() => {
       toast.error("Something went wrong");
-      throw e;
     });
 }
 
-export async function deleteAPIKey(id: string) {
-  await fetch(`${SERVER_ENDPOINT}/tokens/${id}`, {
+export type DeleteTokenRequest = {
+  name: string;
+};
+
+export async function deleteAPIKey(req: DeleteTokenRequest) {
+  await fetch(`${SERVER_ENDPOINT}/tokens`, {
     method: "DELETE",
+    body: JSON.stringify(req),
     credentials: "include",
     next: {
       tags: ["api-keys"],

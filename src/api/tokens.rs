@@ -3,10 +3,10 @@ use std::future::{ready, Ready};
 use actix_identity::Identity;
 use actix_web::{
     delete,
-    error::{ErrorInternalServerError, ErrorUnauthorized},
+    error::{ErrorInternalServerError, ErrorNotFound, ErrorUnauthorized},
     get, post,
     web::{self, Json},
-    FromRequest, HttpRequest, Responder, Scope,
+    FromRequest, HttpRequest, HttpResponse, Responder, Scope,
 };
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
@@ -36,13 +36,18 @@ pub async fn create_token(
 ) -> actix_web::Result<Json<CreateTokenResponse>> {
     let (hashed_key, raw_key) = gen_api_key().await.map_err(ErrorInternalServerError)?;
 
-    sqlx::query("INSERT INTO api_keys (name, user, hashed_key) VALUES ($1, $2)")
-        .bind(&data.name)
-        .bind(identity.id().map_err(ErrorUnauthorized)?)
-        .bind(hashed_key.to_string())
-        .execute(service.db())
-        .await
-        .map_err(ErrorInternalServerError)?;
+    sqlx::query(
+        "
+        INSERT INTO api_keys (name, user, hashed_key)
+        VALUES ($1, (SELECT id FROM users WHERE email = $2), $3)
+        ",
+    )
+    .bind(&data.name)
+    .bind(identity.id().map_err(ErrorUnauthorized)?)
+    .bind(hashed_key.to_string())
+    .execute(service.db())
+    .await
+    .map_err(ErrorInternalServerError)?;
 
     // Return the plain API key (should be securely sent/stored by the user).
     Ok(web::Json(CreateTokenResponse { secret: raw_key }))
@@ -50,11 +55,30 @@ pub async fn create_token(
 
 #[delete("")]
 pub async fn delete_token(
-    data: web::Json<DeleteTokenRequest>,
     service: web::Data<Service>,
+    data: web::Json<DeleteTokenRequest>,
     identity: Identity,
 ) -> actix_web::Result<impl Responder> {
-    Ok("")
+    let res = sqlx::query(
+        "
+        DELETE FROM api_keys
+        WHERE
+            name = $1
+        AND
+            user IN (SELECT id FROM users WHERE email = $2)
+    ",
+    )
+    .bind(&data.name)
+    .bind(&identity.id().map_err(ErrorUnauthorized)?)
+    .execute(service.db())
+    .await
+    .map_err(|e| ErrorInternalServerError(e))?;
+
+    if res.rows_affected() == 0 {
+        return Err(ErrorNotFound(format!("No such api key {}", data.name)));
+    }
+
+    Ok(HttpResponse::Ok())
 }
 
 #[derive(Debug, Serialize, Deserialize, FromRow)]
@@ -92,7 +116,7 @@ pub async fn list_tokens(
     let tokens = sqlx::query_as(
         "
         SELECT * FROM users u
-        LEFT JOIN api_keys k ON u.id = k.user
+        INNER JOIN api_keys k ON u.id = k.user
         WHERE u.email = $1
     ",
     )
