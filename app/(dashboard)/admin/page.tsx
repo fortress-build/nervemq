@@ -12,12 +12,15 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import type { UserStatistics } from "@/components/create-user";
 import CreateUser from "@/components/create-user";
-import { columns, type User } from "@/components/admin/table";
+import ModifyUser from "@/components/modify-user";
+import { columns } from "@/components/admin/table";
 import { toast } from "sonner";
 import { listUsers, deleteUser } from "@/actions/api";
 import { useIsAdmin } from "@/lib/state/global";
 import { redirect } from "next/navigation";
+import { Input } from "@/components/ui/input";
 
 export default function AdminPanel() {
   const isAdmin = useIsAdmin();
@@ -28,24 +31,27 @@ export default function AdminPanel() {
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<string | null>(null);
+  const [userToModify, setUserToModify] = useState<UserStatistics | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const {
     data = [],
     isLoading,
     refetch,
   } = useQuery({
-    queryKey: ["users"],
+    queryKey: ["users", searchQuery],
     queryFn: async () => {
       const users = await listUsers();
       return users.map((user) => ({
         email: user.email,
         role: user.role,
-        // createdAt: user.createdAt,
-        // lastLogin: user.lastLogin,
-        // namespaces: user.namespaces,
       }));
     },
   });
+
+  const filteredData = data.filter((user) =>
+    user.email.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   const confirmDeleteUser = async (email: string) => {
     try {
@@ -63,20 +69,36 @@ export default function AdminPanel() {
     setUserToDelete(email);
   };
 
+  const handleModifyUser = async (user: UserStatistics, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const fullUser = {
+      email: user.email,
+      role: user.role,
+      password: "",
+      createdAt: user.createdAt,
+      lastLogin: user.lastLogin,
+      namespaces: user.namespaces || [],
+    };
+    setUserToModify(fullUser);
+  };
+
   return (
     <div className="h-full flex flex-col gap-4">
+      <div className="flex w-full max-w-sm items-center space-x-2">
+        <Input
+          type="text"
+          placeholder="Search users..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+        />
+      </div>
+
       <DataTable
         className="w-full"
         columns={columns}
-        data={data.map(
-          (user) =>
-            ({
-              ...user,
-              lastLogin: (user as User).lastLogin ?? null,
-            }) as User,
-        )}
+        data={filteredData}
         isLoading={isLoading}
-        meta={{ handleDeleteUser }}
+        meta={{ handleDeleteUser, handleModifyUser }}
       />
 
       <div className="flex justify-end">
@@ -118,6 +140,16 @@ export default function AdminPanel() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ModifyUser
+        open={!!userToModify}
+        close={() => setUserToModify(null)}
+        onSuccess={() => {
+          refetch();
+          setUserToModify(null);
+        }}
+        user={userToModify as UserStatistics}
+      />
     </div>
   );
 }

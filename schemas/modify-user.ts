@@ -1,8 +1,6 @@
 import { type InferType, array, object, string } from "yup";
 
-export const createUserSchema = object({
-  email: string().required().email(),
-  password: string().required().min(8).max(32),
+export const modifyUserSchema = object({
   namespaces: array()
     .of(string().required())
     .optional()
@@ -10,4 +8,4 @@ export const createUserSchema = object({
   role: string().required().oneOf(['admin', 'user']),
 });
 
-export type CreateUserRequest = InferType<typeof createUserSchema>;
+export type ModifyUserRequest = InferType<typeof modifyUserSchema>;

@@ -21,21 +21,27 @@ import {
   type DeleteTokenRequest,
 } from "@/actions/api";
 import { KeyToDeleteContext } from "@/lib/contexts/key-to-delete";
+import { Input } from "@/components/ui/input";
 
 export default function ApiKeys() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [keyToDelete, setKeyToDelete] = useState<string | undefined>(undefined);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const {
     data = [],
     isLoading,
     refetch,
   } = useQuery({
-    queryKey: ["apiKeys"],
+    queryKey: ["apiKeys", searchQuery],
     queryFn: () => {
       return listAPIKeys();
     },
   });
+
+  const filteredData = data.filter((apiKey) =>
+    apiKey.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   const handleDeleteKey = async (data: DeleteTokenRequest) => {
     try {
@@ -50,6 +56,15 @@ export default function ApiKeys() {
 
   return (
     <div className="h-full flex flex-col gap-4">
+      <div className="flex w-full max-w-sm items-center space-x-2">
+        <Input
+          type="text"
+          placeholder="Search API keys..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+        />
+      </div>
+
       <KeyToDeleteContext.Provider
         value={{
           key: keyToDelete,
@@ -59,7 +74,7 @@ export default function ApiKeys() {
         <DataTable
           className="w-full"
           columns={columns}
-          data={data}
+          data={filteredData}
           isLoading={isLoading}
         />
 

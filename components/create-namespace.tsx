@@ -110,29 +110,6 @@ export default function CreateNamespace({
             )}
           </form.Field>
 
-          <form.Field name="role">
-            {(field) => (
-              <div className="flex flex-col gap-2">
-                <Label htmlFor={field.name}>Role</Label>
-                <select
-                  id={field.name}
-                  name={field.name}
-                  value={field.state.value}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  onBlur={field.handleBlur}
-                >
-                  <option value="user">User</option>
-                  <option value="admin">Admin</option>
-                </select>
-                {field.state.meta.errors ? (
-                  <span className="text-sm text-destructive">
-                    {field.state.meta.errors.join(", ")}
-                  </span>
-                ) : null}
-              </div>
-            )}
-          </form.Field>
-
           <DialogFooter>
             <form.Subscribe
               selector={(state) => [state.canSubmit, state.isSubmitting]}
