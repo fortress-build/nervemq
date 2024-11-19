@@ -8,6 +8,7 @@ use actix_web::web::{FormConfig, Html, JsonConfig};
 use actix_web::{web::Data, App, HttpServer};
 
 use chrono::TimeDelta;
+use creek::auth::middleware::protected_route::Protected;
 use creek::auth::session::SqliteSessionStore;
 use creek::config::Config;
 use creek::service::Service;
@@ -77,11 +78,11 @@ async fn main() -> eyre::Result<()> {
             .wrap(cors)
             .wrap(TracingLogger::default())
             .wrap(NormalizePath::new(TrailingSlash::Trim))
-            .service(creek::api::namespace::service())
-            .service(creek::api::queue::service())
-            .service(creek::api::data::service())
-            .service(creek::api::admin::service())
-            .service(creek::api::tokens::service())
+            .service(creek::api::namespace::service().wrap(Protected))
+            .service(creek::api::queue::service().wrap(Protected))
+            .service(creek::api::data::service().wrap(Protected))
+            .service(creek::api::admin::service().wrap(Protected))
+            .service(creek::api::tokens::service().wrap(Protected))
             .service(creek::api::auth::service())
             .app_data(json_cfg)
             .app_data(data.clone())

@@ -1,4 +1,3 @@
-use actix_identity::Identity;
 use actix_web::{
     delete,
     error::ErrorInternalServerError,
@@ -43,7 +42,6 @@ pub async fn hash_password(password: String) -> eyre::Result<PasswordHashString>
 pub async fn create_user(
     data: web::Json<CreateUserRequest>,
     service: web::Data<Service>,
-    // identity: Identity,
 ) -> actix_web::Result<impl Responder> {
     let data = data.into_inner();
     let hashed_password = hash_password(data.password)
@@ -67,10 +65,7 @@ pub struct UserInfo {
 }
 
 #[get("/users")]
-pub async fn list_users(
-    identity: Identity,
-    service: web::Data<Service>,
-) -> actix_web::Result<impl Responder> {
+pub async fn list_users(service: web::Data<Service>) -> actix_web::Result<impl Responder> {
     let users: Vec<UserInfo> = sqlx::query_as("SELECT email FROM users")
         .fetch_all(service.db())
         .await
@@ -86,7 +81,6 @@ pub struct DeleteUserRequest {
 
 #[delete("/users")]
 pub async fn delete_user(
-    identity: Identity,
     data: web::Json<DeleteUserRequest>,
     service: web::Data<Service>,
 ) -> actix_web::Result<impl Responder> {

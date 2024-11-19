@@ -129,10 +129,7 @@ pub async fn list_tokens(
 }
 
 #[get("/client_id")]
-pub async fn client_id(
-    identity: Identity,
-    service: web::Data<Service>,
-) -> actix_web::Result<impl Responder> {
+pub async fn client_id(service: web::Data<Service>) -> actix_web::Result<impl Responder> {
     Ok("")
 }
 
