@@ -5,8 +5,7 @@ export const createUserSchema = object({
   password: string().required().min(8).max(32),
   namespaces: array()
     .of(string().required())
-    .required()
-    .min(1)
+    .optional()
     .transform((v: Set<string>) => [...v.values()]),
 });
 
