@@ -2,9 +2,11 @@
 import type { ColumnDef } from "@tanstack/react-table";
 import { Trash2, Mail, Shield, Pencil } from "lucide-react";
 import { Button } from "../ui/button";
-import type { UserStatistics } from "../create-user";
+//import type { UserStatistics } from "../create-user";
 
-export const columns: ColumnDef<UserStatistics>[] = [
+
+//export const columns: ColumnDef<UserStatistics>[] = [
+  export const columns: ColumnDef<{email: string; role: string}>[] = [
   // {
   //   accessorKey: "name",
   //   header: () => (

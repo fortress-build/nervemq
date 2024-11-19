@@ -20,6 +20,7 @@ import { toast } from "sonner";
 import { listUsers, deleteUser } from "@/actions/api";
 import { useIsAdmin } from "@/lib/state/global";
 import { redirect } from "next/navigation";
+import { Input } from "@/components/ui/input";
 
 export default function AdminPanel() {
   const isAdmin = useIsAdmin();
@@ -31,13 +32,14 @@ export default function AdminPanel() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<string | null>(null);
   const [userToModify, setUserToModify] = useState<UserStatistics | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const {
     data = [],
     isLoading,
     refetch,
   } = useQuery({
-    queryKey: ["users"],
+    queryKey: ["users", searchQuery],
     queryFn: async () => {
       const users = await listUsers();
       return users.map((user) => ({
@@ -46,6 +48,10 @@ export default function AdminPanel() {
       }));
     },
   });
+
+  const filteredData = data.filter((user) =>
+    user.email.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   const confirmDeleteUser = async (email: string) => {
     try {
@@ -78,16 +84,19 @@ export default function AdminPanel() {
 
   return (
     <div className="h-full flex flex-col gap-4">
+      <div className="flex w-full max-w-sm items-center space-x-2">
+        <Input
+          type="text"
+          placeholder="Search users..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+        />
+      </div>
+
       <DataTable
         className="w-full"
         columns={columns}
-        data={data.map(
-          (user) =>
-            ({
-              ...user,
-              lastLogin: (user as UserStatistics).lastLogin ?? null,
-            }) as UserStatistics,
-        )}
+        data={filteredData}
         isLoading={isLoading}
         meta={{ handleDeleteUser, handleModifyUser }}
       />

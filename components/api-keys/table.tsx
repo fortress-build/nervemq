@@ -13,8 +13,8 @@ import {
 export type ApiKey = {
   id: string;
   name: string;
-  // createdAt: string;
-  // lastUsed?: string;
+  createdAt: string;
+  lastUsed?: string;
 };
 
 function ActionsCell({
