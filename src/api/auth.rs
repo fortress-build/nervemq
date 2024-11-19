@@ -2,7 +2,6 @@ use actix_identity::Identity;
 use actix_session::SessionExt;
 use actix_web::{
     error::{ErrorInternalServerError, ErrorUnauthorized},
-    get,
     http::StatusCode,
     post, web, HttpMessage, HttpRequest, HttpResponse, Responder, ResponseError, Scope,
 };
