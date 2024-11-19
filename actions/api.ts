@@ -138,11 +138,15 @@ export async function createUser(data: CreateUserRequest): Promise<void> {
   });
 }
 
-export async function deleteUser(id: string) {
-  await fetch(`${SERVER_ENDPOINT}/admin/users/${id}`, {
+export type DeleteUserRequest = {
+  email: string;
+};
+
+export async function deleteUser(data: DeleteUserRequest) {
+  await fetch(`${SERVER_ENDPOINT}/admin/users`, {
     method: "DELETE",
     credentials: "include",
-    headers: {},
+    body: JSON.stringify(data),
     next: {
       tags: ["users"],
     },
@@ -156,7 +160,5 @@ export async function listUsers(): Promise<UserStatistics[]> {
     next: {
       tags: ["users"],
     },
-  })
-    .then((res) => res.json())
-    .catch(() => []);
+  }).then((res) => res.json());
 }

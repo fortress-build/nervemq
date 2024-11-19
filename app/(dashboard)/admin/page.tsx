@@ -32,16 +32,16 @@ export default function AdminPanel() {
       return users.map((user) => ({
         email: user.email,
         role: user.role,
-        createdAt: user.createdAt,
-        lastLogin: user.lastLogin,
-        namespaces: user.namespaces,
+        // createdAt: user.createdAt,
+        // lastLogin: user.lastLogin,
+        // namespaces: user.namespaces,
       }));
     },
   });
 
   const confirmDeleteUser = async (email: string) => {
     try {
-      await deleteUser(email);
+      await deleteUser({ email });
       await refetch();
       setUserToDelete(null);
       toast.success("User deleted successfully");
@@ -83,7 +83,7 @@ export default function AdminPanel() {
 
       <Dialog
         open={!!userToDelete}
-        onOpenChange={(open) => !open && setUserToDelete(null)}
+        onOpenChange={(open) => (!open ? setUserToDelete(null) : null)}
       >
         <DialogContent>
           <DialogHeader>
