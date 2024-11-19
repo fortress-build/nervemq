@@ -43,8 +43,8 @@ next-env.d.ts
 
 /target
 
-/creek.db
-/creek.db-shm
-/creek.db-wal
+/nervemq.db
+/nervemq.db-shm
+/nervemq.db-wal
 
 certificates
