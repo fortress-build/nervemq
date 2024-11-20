@@ -323,9 +323,62 @@ impl Service {
         Ok(())
     }
 
-    // pub async fn recv_message(&self, namespace: impl AsRef<str>, queue: impl AsRef<[u8]>) {
-    //
-    // }
+    pub async fn recv(
+        &self,
+        namespace: impl AsRef<str>,
+        queue: impl AsRef<str>,
+    ) -> eyre::Result<Option<Message>> {
+        let mut tx = self.db.begin().await?;
+
+        // Get the first undelivered message and mark it as delivered in one atomic operation
+        let message: Option<Message> = sqlx::query_as(
+            r#"
+            WITH next_message AS (
+                SELECT m.*
+                FROM messages m
+                JOIN queues q ON m.queue = q.id
+                JOIN namespaces n ON q.ns = n.id
+                WHERE n.name = $1
+                AND q.name = $2
+                AND m.delivered_at IS NULL
+                ORDER BY m.id ASC
+                LIMIT 1
+                FOR UPDATE SKIP LOCKED
+            )
+            UPDATE messages
+            SET delivered_at = datetime('now')
+            WHERE id IN (SELECT id FROM next_message)
+            RETURNING *
+            "#,
+        )
+        .bind(namespace.as_ref())
+        .bind(queue.as_ref())
+        .fetch_optional(&mut *tx)
+        .await?;
+
+        tx.commit().await?;
+
+        Ok(message)
+    }
+
+    pub async fn peek(&self, namespace: &str, queue: &str, message_id: u64) -> Option<Message> {
+        let mut db = self.db.acquire().await.ok()?;
+
+        sqlx::query_as(
+            r#"
+            SELECT m.* FROM messages m
+            JOIN queues q ON m.queue = q.id
+            JOIN namespaces n ON q.ns = n.id
+            WHERE n.name = $1 AND q.name = $2 AND m.id = $3
+            "#,
+        )
+        .bind(namespace)
+        .bind(queue)
+        .bind(message_id as i64)
+        .fetch_optional(&mut *db)
+        .await
+        .ok()?
+    }
 
     pub async fn list_messages(&self, namespace: &str, queue: &str) -> eyre::Result<Vec<Message>> {
         let mut db = self.db.acquire().await?;

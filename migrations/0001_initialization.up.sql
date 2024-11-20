@@ -34,7 +34,7 @@ create table if not exists messages (
   id    integer not null,
   queue integer not null,
   body  blob    not null,
-  delivered_at  integer not null default 0,
+  delivered_at  integer,
   sent_by       integer,
 
   primary key (id),
