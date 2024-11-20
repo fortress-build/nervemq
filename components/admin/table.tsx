@@ -1,6 +1,6 @@
 "use client";
 import type { ColumnDef } from "@tanstack/react-table";
-import { Trash2, Mail, Shield, Pencil } from "lucide-react";
+import { Trash2, Mail, Shield, Pencil, ArrowUpDown } from "lucide-react";
 import { Button } from "../ui/button";
 import type { UserStatistics } from "../create-user";
 
@@ -16,21 +16,37 @@ export const columns: ColumnDef<UserStatistics>[] = [
   // },
   {
     accessorKey: "email",
-    header: () => (
+    header: ({ column }) => (
       <div className="flex items-center gap-2">
         <Mail className="h-4 w-4" />
-        <span>Email</span>
+        <Button
+          variant="ghost"
+          className="p-0 hover:bg-transparent"
+          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+        >
+          <span>Email</span>
+          <ArrowUpDown className="ml-2 h-4 w-4" />
+        </Button>
       </div>
     ),
+    enableSorting: true,
   },
   {
     accessorKey: "role",
-    header: () => (
+    header: ({ column }) => (
       <div className="flex items-center gap-2">
         <Shield className="h-4 w-4" />
-        <span>Role</span>
+        <Button
+          variant="ghost"
+          className="p-0 hover:bg-transparent"
+          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+        >
+          <span>Role</span>
+          <ArrowUpDown className="ml-2 h-4 w-4" />
+        </Button>
       </div>
     ),
+    enableSorting: true,
   },
   // {
   //   accessorKey: "createdAt",

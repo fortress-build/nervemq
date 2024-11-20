@@ -81,7 +81,7 @@ export default function ModifyUser({
         email: user?.email ?? '',
         namespaces: [...data.namespaces.keys()],
         role: data.role,
-        password: user?.password ?? ''
+        password: data?.password ?? ''
       })
         .then(() => {
           invalidate();
