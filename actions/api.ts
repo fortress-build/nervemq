@@ -8,6 +8,7 @@ import type { UserStatistics } from "@/components/create-user";
 import { SERVER_ENDPOINT } from "@/app/globals";
 import type { CreateUserRequest } from "@/schemas/create-user";
 import { toast } from "sonner";
+import type { ApiKey } from "@/components/api-keys/table";
 
 export async function createNamespace(data: CreateNamespaceRequest) {
   await fetch(`${SERVER_ENDPOINT}/ns/${data.name}`, {
@@ -80,7 +81,7 @@ export async function listQueues(): Promise<QueueStatistics[]> {
     });
 }
 
-export async function listAPIKeys(): Promise<APIKey[]> {
+export async function listAPIKeys(): Promise<ApiKey[]> {
   "use client";
   return await fetch(`${SERVER_ENDPOINT}/tokens`, {
     method: "GET",
@@ -186,4 +187,3 @@ export async function updateUser(data: CreateUserRequest): Promise<void> {
     },
   }).catch(() => toast.error("Something went wrong"));
 }
-

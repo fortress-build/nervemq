@@ -4,18 +4,11 @@ import { Trash2, KeySquare, Copy } from "lucide-react";
 import { Button } from "../ui/button";
 import { useContext } from "react";
 import { KeyToDeleteContext } from "@/lib/contexts/key-to-delete";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "../ui/tooltip";
-
+import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 
 export type ApiKey = {
-  id: string;
   name: string;
   createdAt: string;
-  lastUsed?: string;
 };
 
 function ActionsCell({
@@ -33,15 +26,13 @@ function ActionsCell({
             variant="ghost"
             size="sm"
             onClick={() => {
-              navigator.clipboard.writeText(row.original.id);
+              navigator.clipboard.writeText(row.original.name);
             }}
           >
             <Copy className="h-4 w-4" />
           </Button>
         </TooltipTrigger>
-        <TooltipContent>
-          Copy ID
-        </TooltipContent>
+        <TooltipContent>Copy ID</TooltipContent>
       </Tooltip>
       <Button
         variant="ghost"
