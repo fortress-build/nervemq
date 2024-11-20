@@ -496,16 +496,10 @@ impl Service {
 
         Ok(sqlx::query_as(
             "
-            -- SELECT ns.*, nu.email as created_by, count(q.id) as queue_count FROM namespaces ns
-            -- JOIN user_permissions p ON p.namespace = ns.id
-            -- LEFT JOIN queues q ON q.ns = ns.id
-            -- JOIN users u ON p.user = u.id
-            -- JOIN users nu ON ns.created_by = nu.id
-            -- WHERE u.email = $1
-            SELECT 
+            SELECT
                 ns.*,
                 nu.email as created_by,
-                COUNT(q.id) as queue_count 
+                COUNT(q.id) as queue_count
             FROM namespaces ns
             JOIN user_permissions p ON p.namespace = ns.id
             JOIN users u ON p.user = u.id
