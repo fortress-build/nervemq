@@ -6,6 +6,8 @@ import {
   flexRender,
   getCoreRowModel,
   getSortedRowModel,
+  getFilteredRowModel,
+  type ColumnFiltersState,
   useReactTable,
 } from "@tanstack/react-table";
 
@@ -29,6 +31,9 @@ interface DataTableProps<TData, TValue> {
   meta?: Record<string, unknown>;
   sorting?: SortingState;
   setSorting?: (sorting: SortingState) => void;
+  onFilter?: (filters: ColumnFiltersState) => void;
+  columnFilters?: ColumnFiltersState;
+  setColumnFilters?: (filters: ColumnFiltersState) => void;
 }
 
 export function DataTable<TData, TValue>({
@@ -40,6 +45,8 @@ export function DataTable<TData, TValue>({
   meta,
   sorting,
   setSorting,
+  columnFilters,
+  setColumnFilters,
 }: DataTableProps<TData, TValue>) {
   const table = useReactTable({
     data,
@@ -56,6 +63,21 @@ export function DataTable<TData, TValue>({
         sorting: sorting ?? [],
       },
     }),
+    ...(columnFilters !== undefined && {
+      getFilteredRowModel: getFilteredRowModel(),
+      onColumnFiltersChange: setColumnFilters
+        ? (updater) => setColumnFilters(
+            typeof updater === 'function' ? updater(columnFilters ?? []) : updater
+          )
+        : undefined,
+      state: {
+        columnFilters: columnFilters ?? [],
+      },
+    }),
+    state: {
+      sorting: sorting ?? [],
+      columnFilters: columnFilters ?? [],
+    },
     meta,
   });
 

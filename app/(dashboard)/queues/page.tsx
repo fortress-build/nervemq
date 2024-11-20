@@ -19,7 +19,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import type { SortingState } from "@tanstack/react-table";
+import type { SortingState, ColumnFiltersState } from "@tanstack/react-table";
 
 export type Queue = {
   id: string;
@@ -45,6 +45,7 @@ export default function Queues() {
     ns: string;
   } | null>(null);
   const [sorting, setSorting] = useState<SortingState>([]);
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
 
   const handleDeleteQueue = async (
     name: string,
@@ -84,6 +85,8 @@ export default function Queues() {
         meta={{ handleDeleteQueue }}
         sorting={sorting}
         setSorting={setSorting}
+        columnFilters={columnFilters}
+        setColumnFilters={setColumnFilters}
       />
 
       <div className="flex justify-end">
