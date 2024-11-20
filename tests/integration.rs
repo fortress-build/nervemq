@@ -72,7 +72,7 @@ async fn test_list_namespace() {
         vec![Namespace {
             id: 1,
             name: "testing".to_owned(),
-            created_by: "test@user.com".to_owned()
+            created_by: "test@user.com".to_owned(),
         }]
     );
 }
@@ -95,7 +95,7 @@ async fn test_delete_namespace() {
         vec![Namespace {
             id: 1,
             name: "testing".to_owned(),
-            created_by: "test@user.com".into()
+            created_by: "test@user.com".into(),
         }]
     );
 

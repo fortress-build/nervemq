@@ -19,7 +19,7 @@ use crate::{
     config::Config,
     db::{
         message::Message,
-        namespace::Namespace,
+        namespace::{Namespace, NamespaceStatistics},
         queue::{Queue, QueueStatistics},
     },
 };
@@ -480,8 +480,43 @@ impl Service {
         Message::list(db.acquire().await?, namespace, queue).await
     }
 
-    pub async fn statistics(&self, identity: Identity) -> Result<Vec<QueueStatistics>, Error> {
+    pub async fn queue_statistics(
+        &self,
+        identity: Identity,
+    ) -> Result<Vec<QueueStatistics>, Error> {
         let mut db = self.db.acquire().await?;
         Queue::statistics(db.acquire().await?, identity).await
+    }
+
+    pub async fn namespace_statistics(
+        &self,
+        identity: Identity,
+    ) -> Result<Vec<NamespaceStatistics>, Error> {
+        let email = identity.id()?;
+
+        Ok(sqlx::query_as(
+            "
+            -- SELECT ns.*, nu.email as created_by, count(q.id) as queue_count FROM namespaces ns
+            -- JOIN user_permissions p ON p.namespace = ns.id
+            -- LEFT JOIN queues q ON q.ns = ns.id
+            -- JOIN users u ON p.user = u.id
+            -- JOIN users nu ON ns.created_by = nu.id
+            -- WHERE u.email = $1
+            SELECT 
+                ns.*,
+                nu.email as created_by,
+                COUNT(q.id) as queue_count 
+            FROM namespaces ns
+            JOIN user_permissions p ON p.namespace = ns.id
+            JOIN users u ON p.user = u.id
+            JOIN users nu ON ns.created_by = nu.id
+            LEFT JOIN queues q ON q.ns = ns.id
+            WHERE u.email = 'admin@fortress.build'
+            GROUP BY ns.id, nu.email
+        ",
+        )
+        .bind(email)
+        .fetch_all(&self.db)
+        .await?)
     }
 }

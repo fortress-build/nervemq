@@ -10,7 +10,7 @@ export type Namespace = {
 };
 
 export type NamespaceStatistics = Namespace & {
-  messageCount: number;
+  queueCount: number;
 };
 
 export const columns: ColumnDef<NamespaceStatistics>[] = [
