@@ -2,8 +2,12 @@
 
 import {
   type ColumnDef,
+  type SortingState,
   flexRender,
   getCoreRowModel,
+  getSortedRowModel,
+  getFilteredRowModel,
+  type ColumnFiltersState,
   useReactTable,
 } from "@tanstack/react-table";
 
@@ -25,6 +29,11 @@ interface DataTableProps<TData, TValue> {
   isLoading?: boolean;
   onRowClick?: (row: TData) => void;
   meta?: Record<string, unknown>;
+  sorting?: SortingState;
+  setSorting?: (sorting: SortingState) => void;
+  onFilter?: (filters: ColumnFiltersState) => void;
+  columnFilters?: ColumnFiltersState;
+  setColumnFilters?: (filters: ColumnFiltersState) => void;
 }
 
 export function DataTable<TData, TValue>({
@@ -34,11 +43,41 @@ export function DataTable<TData, TValue>({
   className,
   onRowClick,
   meta,
+  sorting,
+  setSorting,
+  columnFilters,
+  setColumnFilters,
 }: DataTableProps<TData, TValue>) {
   const table = useReactTable({
     data,
     columns,
     getCoreRowModel: getCoreRowModel(),
+    ...(sorting !== undefined && {
+      getSortedRowModel: getSortedRowModel(),
+      onSortingChange: setSorting 
+        ? (updater) => setSorting(
+            typeof updater === 'function' ? updater(sorting ?? []) : updater
+          )
+        : undefined,
+      state: {
+        sorting: sorting ?? [],
+      },
+    }),
+    ...(columnFilters !== undefined && {
+      getFilteredRowModel: getFilteredRowModel(),
+      onColumnFiltersChange: setColumnFilters
+        ? (updater) => setColumnFilters(
+            typeof updater === 'function' ? updater(columnFilters ?? []) : updater
+          )
+        : undefined,
+      state: {
+        columnFilters: columnFilters ?? [],
+      },
+    }),
+    state: {
+      sorting: sorting ?? [],
+      columnFilters: columnFilters ?? [],
+    },
     meta,
   });
 
