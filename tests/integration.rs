@@ -1,5 +1,5 @@
-use std::collections::HashMap;
 use std::ops::Deref;
+use std::{collections::HashMap, rc::Rc};
 
 use actix_identity::Identity;
 use nervemq::{
@@ -10,10 +10,11 @@ use nervemq::{
 };
 use tempfile::TempDir;
 
+#[derive(Clone)]
 struct TmpService {
     svc: Service,
     #[allow(unused)]
-    tmpdir: TempDir,
+    tmpdir: Rc<TempDir>,
 }
 
 impl Deref for TmpService {
@@ -43,7 +44,10 @@ async fn setup() -> TmpService {
     .await
     .unwrap();
 
-    TmpService { svc, tmpdir: path }
+    TmpService {
+        svc,
+        tmpdir: Rc::new(path),
+    }
 }
 
 fn mock_id() -> Identity {
@@ -208,7 +212,11 @@ async fn test_send_message() {
     let message = "Hello, World!".as_bytes().to_vec();
     let kv = HashMap::new();
     service
-        .send_message("testing", "test-queue", &message, kv)
+        .send_message(
+            service.get_queue_id("testing", "test-queue").await.unwrap(),
+            &message,
+            kv,
+        )
         .await
         .unwrap();
 
@@ -239,7 +247,11 @@ async fn test_list_messages() {
     let message = "Hello, World!".as_bytes().to_vec();
     let kv = HashMap::new();
     service
-        .send_message("testing", "test-queue", &message, kv)
+        .send_message(
+            service.get_queue_id("testing", "test-queue").await.unwrap(),
+            &message,
+            kv,
+        )
         .await
         .unwrap();
 
@@ -250,4 +262,123 @@ async fn test_list_messages() {
         .unwrap();
     assert_eq!(messages.len(), 1);
     assert_eq!(messages[0].body, message);
+}
+
+#[tokio::test]
+async fn test_batch_send_and_receive() {
+    let service = setup().await;
+    let id = mock_id();
+
+    // Setup namespace and queue
+    service.create_namespace("testing", id).await.unwrap();
+
+    let id = mock_id();
+    service
+        .create_queue("testing", "test-queue", id)
+        .await
+        .unwrap();
+
+    // Prepare batch of messages
+    let messages = vec![
+        ("Message 1".as_bytes().to_vec(), HashMap::new()),
+        ("Message 2".as_bytes().to_vec(), HashMap::new()),
+        ("Message 3".as_bytes().to_vec(), HashMap::new()),
+    ];
+
+    // Send batch
+    let message_ids = service
+        .send_batch("testing", "test-queue", messages.clone())
+        .await
+        .unwrap();
+
+    assert_eq!(message_ids.len(), 3);
+
+    // Receive batch with smaller size than sent
+    let received = service
+        .recv_batch("testing", "test-queue", 2)
+        .await
+        .unwrap();
+
+    assert_eq!(received.len(), 2);
+    assert_eq!(received[0].body, messages[0].0);
+    assert_eq!(received[1].body, messages[1].0);
+    assert!(received.iter().all(|m| m.delivered_at.is_some()));
+
+    // Receive remaining message
+    let received = service
+        .recv_batch("testing", "test-queue", 2)
+        .await
+        .unwrap();
+
+    assert_eq!(received.len(), 1);
+    assert_eq!(received[0].body, messages[2].0);
+    assert!(received[0].delivered_at.is_some());
+
+    // Verify no more messages
+    let received = service
+        .recv_batch("testing", "test-queue", 10)
+        .await
+        .unwrap();
+    assert!(received.is_empty());
+}
+
+#[tokio::test]
+async fn test_concurrent_batch_recv() {
+    let service = setup().await;
+    let id = mock_id();
+
+    // Setup namespace and queue
+    service.create_namespace("testing", id).await.unwrap();
+
+    let id = mock_id();
+    service
+        .create_queue("testing", "test-queue", id)
+        .await
+        .unwrap();
+
+    // Prepare and send 10 messages
+    let messages: Vec<_> = (0..10)
+        .map(|i| (format!("Message {}", i).as_bytes().to_vec(), HashMap::new()))
+        .collect();
+
+    service
+        .send_batch("testing", "test-queue", messages)
+        .await
+        .unwrap();
+
+    // Spawn three concurrent batch receivers
+    let service1 = service.clone();
+    let service2 = service.clone();
+    let service3 = service.clone();
+
+    let (batch1, batch2, batch3) = tokio::join!(
+        service1.recv_batch("testing", "test-queue", 4),
+        service2.recv_batch("testing", "test-queue", 4),
+        service3.recv_batch("testing", "test-queue", 4)
+    );
+
+    let batch1 = batch1.unwrap();
+    let batch2 = batch2.unwrap();
+    let batch3 = batch3.unwrap();
+
+    // Verify we got all messages with no duplicates
+    assert_eq!(batch1.len() + batch2.len() + batch3.len(), 10);
+
+    // Collect all message IDs
+    let mut received_ids: Vec<_> = batch1.iter().map(|m| m.id).collect();
+    received_ids.extend(batch2.iter().map(|m| m.id));
+    received_ids.extend(batch3.iter().map(|m| m.id));
+    received_ids.sort();
+
+    // Verify no duplicates
+    let mut deduped = received_ids.clone();
+    deduped.dedup();
+    assert_eq!(received_ids, deduped);
+
+    // Verify all messages were marked as delivered
+    let messages = service
+        .list_messages("testing", "test-queue")
+        .await
+        .unwrap();
+    assert!(messages.iter().all(|m| m.delivered_at.is_some()));
 }

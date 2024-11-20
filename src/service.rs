@@ -61,6 +61,7 @@ impl From<GetIdentityError> for Error {
     }
 }
 
+#[derive(Clone)]
 pub struct Service {
     db: SqlitePool,
     #[allow(unused)]
@@ -196,6 +197,20 @@ impl Service {
         }
     }
 
+    pub async fn get_queue_id<'a>(&self, namespace: &str, name: &str) -> Result<u64, Error> {
+        Ok(sqlx::query_scalar(
+            "
+            SELECT q.id FROM queues q
+            JOIN namespaces n ON q.ns = n.id
+            WHERE n.name = $1 AND q.name = $2
+            ",
+        )
+        .bind(namespace)
+        .bind(name)
+        .fetch_one(&self.db)
+        .await?)
+    }
+
     pub async fn create_queue(
         &self,
         namespace: &str,
@@ -309,18 +324,50 @@ impl Service {
 
     pub async fn send_message(
         &self,
-        namespace: &str,
-        queue: &str,
+        queue: u64,
         message: &[u8],
         kv: HashMap<String, String>,
-    ) -> eyre::Result<()> {
+    ) -> eyre::Result<u64> {
         let mut tx = self.db.begin().await?;
 
-        Message::insert(tx.acquire().await?, namespace, queue, message, kv).await?;
+        let msg_id = Message::insert(tx.acquire().await?, queue, message, kv).await?;
 
         tx.commit().await?;
 
-        Ok(())
+        Ok(msg_id)
+    }
+
+    pub async fn send_batch(
+        &self,
+        namespace: &str,
+        queue: &str,
+        messages: Vec<(Vec<u8>, HashMap<String, String>)>,
+    ) -> eyre::Result<Vec<u64>> {
+        let mut tx = self.db.begin().await?;
+
+        // Get queue ID once for all messages
+        let queue_id: u64 = sqlx::query_scalar(
+            r#"
+            SELECT q.id FROM queues q
+            JOIN namespaces n ON q.ns = n.id
+            WHERE n.name = $1 AND q.name = $2
+            "#,
+        )
+        .bind(namespace)
+        .bind(queue)
+        .fetch_one(&mut *tx)
+        .await?;
+
+        let mut message_ids = Vec::with_capacity(messages.len());
+
+        // Insert all messages in the batch
+        for (message, kv) in messages {
+            message_ids.push(Message::insert(tx.acquire().await?, queue_id, &message, kv).await?);
+        }
+
+        tx.commit().await?;
+
+        Ok(message_ids)
     }
 
     pub async fn recv(
@@ -334,7 +381,12 @@ impl Service {
         let message: Option<Message> = sqlx::query_as(
             r#"
             WITH next_message AS (
-                SELECT m.*
+                SELECT
+                    m.id,
+                    m.body,
+                    m.delivered_at,
+                    m.sent_by,
+                    q.name as queue
                 FROM messages m
                 JOIN queues q ON m.queue = q.id
                 JOIN namespaces n ON q.ns = n.id
@@ -343,10 +395,9 @@ impl Service {
                 AND m.delivered_at IS NULL
                 ORDER BY m.id ASC
                 LIMIT 1
-                FOR UPDATE SKIP LOCKED
             )
             UPDATE messages
-            SET delivered_at = datetime('now')
+            SET delivered_at = unixepoch('now')
             WHERE id IN (SELECT id FROM next_message)
             RETURNING *
             "#,
@@ -359,6 +410,50 @@ impl Service {
         tx.commit().await?;
 
         Ok(message)
+    }
+
+    pub async fn recv_batch(
+        &self,
+        namespace: &str,
+        queue: &str,
+        max_messages: usize,
+    ) -> eyre::Result<Vec<Message>> {
+        let mut tx = self.db.begin().await?;
+
+        // Get multiple undelivered messages and mark them as delivered in one atomic operation
+        let messages: Vec<Message> = sqlx::query_as(
+            r#"
+            WITH next_messages AS (
+                SELECT
+                    m.id,
+                    m.body,
+                    m.delivered_at,
+                    m.sent_by,
+                    q.name as queue_name
+                FROM messages m
+                JOIN queues q ON m.queue = q.id
+                JOIN namespaces n ON q.ns = n.id
+                WHERE n.name = $1
+                AND q.name = $2
+                AND m.delivered_at IS NULL
+                ORDER BY m.id ASC
+                LIMIT $3
+            )
+            UPDATE messages
+            SET delivered_at = unixepoch('now')
+            WHERE id IN (SELECT id FROM next_messages)
+            RETURNING *, (SELECT queue_name FROM next_messages WHERE next_messages.id = messages.id) as queue
+            "#,
+        )
+        .bind(namespace)
+        .bind(queue)
+        .bind(max_messages as i64)
+        .fetch_all(&mut *tx)
+        .await?;
+
+        tx.commit().await?;
+
+        Ok(messages)
     }
 
     pub async fn peek(&self, namespace: &str, queue: &str, message_id: u64) -> Option<Message> {
