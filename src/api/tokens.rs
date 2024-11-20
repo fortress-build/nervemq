@@ -25,7 +25,8 @@ pub struct CreateTokenRequest {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CreateTokenResponse {
-    secret: String,
+    name: String,
+    token: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -40,6 +41,8 @@ pub async fn create_token(
     service: web::Data<Service>,
     identity: Identity,
 ) -> actix_web::Result<Json<CreateTokenResponse>> {
+    let data = data.into_inner();
+
     let GeneratedKey {
         api_key,
         short_token,
@@ -51,7 +54,7 @@ pub async fn create_token(
     sqlx::query(
         "
         INSERT INTO api_keys (name, user, key_id, hashed_key)
-        VALUES ($1, (SELECT id FROM users WHERE email = $2), $3)
+        VALUES ($1, (SELECT id FROM users WHERE email = $2), $3, $4)
         ",
     )
     .bind(&data.name)
@@ -64,7 +67,8 @@ pub async fn create_token(
 
     // Return the plain API key (should be securely sent/stored by the user).
     Ok(web::Json(CreateTokenResponse {
-        secret: api_key.to_string(),
+        name: data.name,
+        token: api_key.to_string(),
     }))
 }
 

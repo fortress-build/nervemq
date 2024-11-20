@@ -34,11 +34,8 @@ export const createApiKeySchema = object({
 export type CreateApiKey = InferType<typeof createApiKeySchema>;
 
 export interface APIKey {
-  // id: string;
   name: string;
-  // created_at: string;
-  // last_used?: string;
-  key?: string;
+  secret?: string;
 }
 
 interface CreateApiKeyProps {
@@ -55,25 +52,6 @@ export default function CreateApiKey({
   const [showKey, setShowKey] = useState(false);
   const [apiKey, setApiKey] = useState<APIKey | null>(null);
   const invalidate = useInvalidate(["apiKeys"]);
-
-  const copyToClipboard = useCallback(() => {
-    if (apiKey?.key) {
-      navigator.clipboard.writeText(apiKey.key);
-      toast.success("API key copied to clipboard");
-    }
-  }, [apiKey]);
-
-  const downloadKey = useCallback(() => {
-    if (apiKey?.key) {
-      const blob = new Blob([apiKey.key], { type: "text/plain" });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `api-key-${apiKey.name}.txt`;
-      a.click();
-      window.URL.revokeObjectURL(url);
-    }
-  }, [apiKey]);
 
   const form = useForm({
     defaultValues: {
@@ -100,6 +78,25 @@ export default function CreateApiKey({
         });
     },
   });
+
+  const copyToClipboard = useCallback(() => {
+    if (apiKey?.secret) {
+      navigator.clipboard.writeText(apiKey.secret);
+      toast.success("API key copied to clipboard");
+    }
+  }, [apiKey]);
+
+  const downloadKey = useCallback(() => {
+    if (apiKey?.secret) {
+      const blob = new Blob([apiKey.secret], { type: "text/plain" });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `api-key-${apiKey.name}.txt`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+    }
+  }, [apiKey]);
 
   return (
     <Dialog
@@ -198,7 +195,7 @@ export default function CreateApiKey({
               <div className="flex items-center gap-2">
                 <Input
                   readOnly
-                  value={apiKey?.key}
+                  value={apiKey?.secret}
                   type="text"
                   className="font-mono"
                 />
