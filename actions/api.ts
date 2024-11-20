@@ -66,7 +66,7 @@ export async function deleteQueue(data: CreateQueueRequest) {
 }
 
 export async function listQueues(): Promise<QueueStatistics[]> {
-  return await fetch(`${SERVER_ENDPOINT}/stats`, {
+  return await fetch(`${SERVER_ENDPOINT}/stats/`, {
     method: "GET",
     credentials: "include",
     next: {
@@ -186,3 +186,4 @@ export async function updateUser(data: CreateUserRequest): Promise<void> {
     },
   }).catch(() => toast.error("Something went wrong"));
 }
+

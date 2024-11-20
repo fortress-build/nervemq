@@ -17,8 +17,11 @@ pub struct ListQueuesResponse {
 }
 
 #[get("")]
-async fn list_all_queues(service: web::Data<Service>) -> actix_web::Result<impl Responder> {
-    let queues = match service.list_queues(None).await {
+async fn list_all_queues(
+    service: web::Data<Service>,
+    identity: Identity,
+) -> actix_web::Result<impl Responder> {
+    let queues = match service.list_queues(None, identity).await {
         Ok(q) => q,
         Err(e) => return Err(actix_web::error::ErrorInternalServerError(e)),
     };
@@ -30,8 +33,9 @@ async fn list_all_queues(service: web::Data<Service>) -> actix_web::Result<impl 
 async fn list_ns_queues(
     service: web::Data<Service>,
     path: web::Path<String>,
+    identity: Identity,
 ) -> actix_web::Result<impl Responder> {
-    let queues = match service.list_queues(Some(&*path)).await {
+    let queues = match service.list_queues(Some(&*path), identity).await {
         Ok(q) => q,
         Err(e) => return Err(actix_web::error::ErrorInternalServerError(e)),
     };
@@ -43,9 +47,10 @@ async fn list_ns_queues(
 async fn delete_queue(
     service: web::Data<Service>,
     path: web::Path<(String, String)>,
+    identity: Identity,
 ) -> actix_web::Result<impl Responder> {
     let (namespace, name) = &*path;
-    if let Err(e) = service.delete_queue(namespace, name).await {
+    if let Err(e) = service.delete_queue(namespace, name, identity).await {
         return Err(actix_web::error::ErrorInternalServerError(e));
     }
 

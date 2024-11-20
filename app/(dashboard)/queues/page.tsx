@@ -47,7 +47,7 @@ export default function Queues() {
   const [searchQuery, setSearchQuery] = useState("");
 
   const filteredData = data.filter((queue) =>
-    queue.name.toLowerCase().includes(searchQuery.toLowerCase())
+    queue.name.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
   const handleDeleteQueue = async (
