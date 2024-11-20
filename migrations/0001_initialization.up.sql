@@ -22,11 +22,11 @@ create table if not exists queues (
   id   integer not null,
   ns   integer not null,
   name string  not null,
-  created_by integer not null,
+  created_by integer,
 
   primary key (id),
   foreign key (ns) references namespaces(id) on delete cascade,
-  foreign key (created_by) references users(id)
+  foreign key (created_by) references users(id) on delete set null
 );
 create unique index if not exists queues_ns_name_idx on queues(ns, name);
 
