@@ -78,10 +78,11 @@ export default function Header({ className }: { className?: string }) {
           {session?.email ?? "Anonymous"}
           <User />
         </DropdownMenuTrigger>
-        <DropdownMenuContent>
+        <DropdownMenuContent align="end">
           <DropdownMenuLabel>NerveMQ</DropdownMenuLabel>
           <DropdownMenuSeparator />
           <DropdownMenuItem
+            className="cursor-pointer"
             onClick={() => {
               fetch(`${SERVER_ENDPOINT}/auth/logout`, {
                 method: "POST",
