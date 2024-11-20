@@ -22,11 +22,13 @@ import {
 } from "@/actions/api";
 import { KeyToDeleteContext } from "@/lib/contexts/key-to-delete";
 import { Input } from "@/components/ui/input";
+import type { SortingState } from "@tanstack/react-table";
 
 export default function ApiKeys() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [keyToDelete, setKeyToDelete] = useState<string | undefined>(undefined);
   const [searchQuery, setSearchQuery] = useState("");
+  const [sorting, setSorting] = useState<SortingState>([]);
 
   const {
     data = [],
@@ -76,6 +78,8 @@ export default function ApiKeys() {
           columns={columns}
           data={filteredData}
           isLoading={isLoading}
+          sorting={sorting}
+          setSorting={setSorting}
         />
 
         <Dialog

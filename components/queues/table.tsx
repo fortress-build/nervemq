@@ -14,7 +14,6 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "../ui/popover";
-import { ColumnHeader } from "../table-header";
 import { Button } from "../ui/button";
 import React from "react";
 import {
@@ -41,12 +40,20 @@ export type QueueStatistics = Queue & {
 export const columns: ColumnDef<QueueStatistics>[] = [
   {
     accessorKey: "name",
-    header: () => (
+    header: ({ column }) => (
       <div className="flex items-center gap-2">
         <KeySquare className="h-4 w-4" />
-        <span>Name</span>
+        <Button
+          variant="ghost"
+          className="p-0 hover:bg-transparent"
+          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+        >
+          <span>Name</span>
+          <ArrowUpDown className="ml-2 h-4 w-4" />
+        </Button>
       </div>
     ),
+    enableSorting: true,
   },
   {
     accessorKey: "ns",
@@ -119,7 +126,20 @@ export const columns: ColumnDef<QueueStatistics>[] = [
   },
   {
     accessorKey: "messageCount",
-    header: () => <ColumnHeader label="Inflight" icon={Activity} />,
+    header: ({ column }) => (
+      <div className="flex items-center gap-2">
+        <Activity className="h-4 w-4" />
+        <Button
+          variant="ghost"
+          className="p-0 hover:bg-transparent"
+          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+        >
+          <span>Inflight</span>
+          <ArrowUpDown className="ml-2 h-4 w-4" />
+        </Button>
+      </div>
+    ),
+    enableSorting: true,
   },
   {
     id: "actions",

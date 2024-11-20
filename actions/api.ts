@@ -31,7 +31,7 @@ export async function deleteNamespace(name: string) {
 }
 
 export async function listNamespaces(): Promise<NamespaceStatistics[]> {
-  return await fetch(`${SERVER_ENDPOINT}/ns`, {
+  return await fetch(`${SERVER_ENDPOINT}/stats/ns`, {
     method: "GET",
     credentials: "include",
     next: {
@@ -67,7 +67,7 @@ export async function deleteQueue(data: CreateQueueRequest) {
 }
 
 export async function listQueues(): Promise<QueueStatistics[]> {
-  return await fetch(`${SERVER_ENDPOINT}/stats/`, {
+  return await fetch(`${SERVER_ENDPOINT}/stats/queue`, {
     method: "GET",
     credentials: "include",
     next: {
