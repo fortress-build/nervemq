@@ -35,7 +35,7 @@ export type CreateApiKey = InferType<typeof createApiKeySchema>;
 
 export interface APIKey {
   name: string;
-  secret?: string;
+  token?: string;
 }
 
 interface CreateApiKeyProps {
@@ -65,6 +65,7 @@ export default function CreateApiKey({
     onSubmit: async ({ value: data, formApi }) => {
       await createAPIKey(data)
         .then((result) => {
+          console.log(result);
           setApiKey(result);
           setShowKey(true);
           invalidate();
@@ -80,15 +81,15 @@ export default function CreateApiKey({
   });
 
   const copyToClipboard = useCallback(() => {
-    if (apiKey?.secret) {
-      navigator.clipboard.writeText(apiKey.secret);
+    if (apiKey?.token) {
+      navigator.clipboard.writeText(apiKey.token);
       toast.success("API key copied to clipboard");
     }
   }, [apiKey]);
 
   const downloadKey = useCallback(() => {
-    if (apiKey?.secret) {
-      const blob = new Blob([apiKey.secret], { type: "text/plain" });
+    if (apiKey?.token) {
+      const blob = new Blob([apiKey.token], { type: "text/plain" });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -195,7 +196,7 @@ export default function CreateApiKey({
               <div className="flex items-center gap-2">
                 <Input
                   readOnly
-                  value={apiKey?.secret}
+                  value={apiKey?.token}
                   type="text"
                   className="font-mono"
                 />
