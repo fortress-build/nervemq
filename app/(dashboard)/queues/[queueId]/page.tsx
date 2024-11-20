@@ -1,43 +1,168 @@
+'use client'
 import ClientList from "../list";
+import { Line } from "react-chartjs-2";
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+} from "chart.js";
+import { useState } from 'react';
+import { Button } from "@/components/ui/button";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+
+// Register ChartJS components
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend
+);
 
 export default function QueuePage() {
+  // Add state for visibility toggles
+  const [visibleDatasets, setVisibleDatasets] = useState({
+    pending: true,
+    processing: true,
+    completed: true,
+    failed: true,
+  });
+
+  // Sample data - replace with real data
+  const chartData = {
+    labels: ["1h ago", "45m ago", "30m ago", "15m ago", "Now"],
+    datasets: [
+      {
+        label: "Pending",
+        data: [4, 3, 5, 6, 5],
+        borderColor: "rgb(75, 192, 192)",
+        tension: 0.1,
+      },
+      {
+        label: "Processing",
+        data: [2, 4, 3, 4, 5],
+        borderColor: "rgb(54, 162, 235)",
+        tension: 0.1,
+      },
+      {
+        label: "Completed",
+        data: [1, 3, 4, 4, 5],
+        borderColor: "rgb(75, 192, 75)",
+        tension: 0.1,
+      },
+      {
+        label: "Failed",
+        data: [1, 2, 3, 4, 5],
+        borderColor: "rgb(255, 99, 132)",
+        tension: 0.1,
+      },
+    ],
+  };
+
+  // Filter datasets based on visibility state
+  const filteredChartData = {
+    ...chartData,
+    datasets: chartData.datasets.filter((dataset) => {
+      const label = dataset.label.toLowerCase();
+      return label in visibleDatasets && visibleDatasets[label as keyof typeof visibleDatasets];
+    }),
+  };
+
+  // Add toggle handler
+  const toggleDataset = (datasetName: string) => {
+    setVisibleDatasets((prev) => ({
+      ...prev,
+      [datasetName]: !prev[datasetName as keyof typeof prev],
+    }));
+  };
+
   return (
     <div className="container mx-auto">
       <div className="grid gap-4">
         {/* Queue Status Section */}
-        <section className="border rounded-lg p-4">
-          <h2 className="text-xl font-medium mb-2">Queue Status</h2>
-          <div className="grid grid-cols-3 gap-4">
-            <div>
-              <p className="text-gray-600">Pending</p>
-              <p className="text-2xl font-medium">5</p>
+        <Card>
+          <CardHeader>
+            <CardTitle>Queue Status</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-4 gap-4">
+              <div>
+                <p className="text-gray-600">Pending</p>
+                <p className="text-2xl font-medium">5</p>
+              </div>
+              <div>
+                <p className="text-gray-600">Processing</p>
+                <p className="text-2xl font-medium">5</p>
+              </div>
+              <div>
+                <p className="text-gray-600">Completed</p>
+                <p className="text-2xl font-medium">5</p>
+              </div>
+              <div>
+                <p className="text-gray-600">Failed</p>
+                <p className="text-2xl font-medium">5</p>
+              </div>
             </div>
-            <div>
-              <p className="text-gray-600">Processing</p>
-              <p className="text-2xl font-medium">5</p>
+          </CardContent>
+        </Card>
+
+        {/* Queue History Graph */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Queue History</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex gap-2 mb-4">
+              <Button
+                onClick={() => toggleDataset('pending')}
+                variant={visibleDatasets.pending ? 'default' : 'secondary'}
+                style={visibleDatasets.pending ? { backgroundColor: 'rgb(75, 192, 192)' } : {}}
+              >
+                Pending
+              </Button>
+              <Button
+                onClick={() => toggleDataset('processing')}
+                variant={visibleDatasets.processing ? 'default' : 'secondary'}
+                style={visibleDatasets.processing ? { backgroundColor: 'rgb(54, 162, 235)' } : {}}
+              >
+                Processing
+              </Button>
+              <Button
+                onClick={() => toggleDataset('completed')}
+                variant={visibleDatasets.completed ? 'default' : 'secondary'}
+                style={visibleDatasets.completed ? { backgroundColor: 'rgb(75, 192, 75)' } : {}}
+              >
+                Completed
+              </Button>
+              <Button
+                onClick={() => toggleDataset('failed')}
+                variant={visibleDatasets.failed ? 'default' : 'secondary'}
+                style={visibleDatasets.failed ? { backgroundColor: 'rgb(255, 99, 132)' } : {}}
+              >
+                Failed
+              </Button>
             </div>
-            <div>
-              <p className="text-gray-600">Completed</p>
-              <p className="text-2xl font-medium">5</p>
-            </div>
-            <div>
-              <p className="text-gray-600">Failed</p>
-              <p className="text-2xl font-medium">5</p>
-            </div>
-          </div>
-        </section>
+            <Line data={filteredChartData} />
+          </CardContent>
+        </Card>
 
         {/* Current Queue Items */}
-        <section className="border rounded-lg p-4">
-          <h2 className="text-xl font-medium mb-2">Current Items</h2>
-          <ClientList />
-        </section>
+        <Card>
+          <CardHeader>
+            <CardTitle>Current Items</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ClientList />
+          </CardContent>
+        </Card>
 
-        {/* Queue Controls */}
-        <section className="border rounded-lg p-4">
-          <h2 className="text-xl font-medium mb-2">Controls</h2>
-          {/* Add queue control buttons */}
-        </section>
       </div>
     </div>
   );
