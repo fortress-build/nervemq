@@ -3,15 +3,13 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use sqlx::{prelude::FromRow, SqliteConnection};
 
-use super::queue::Queue;
-
 #[derive(Serialize, Deserialize, FromRow)]
 pub struct Message {
     pub id: u64,
     pub queue: String,
 
-    pub delivered_at: u64,
-
+    pub delivered_at: Option<u64>,
+    pub sent_by: Option<u64>,
     pub body: Vec<u8>,
 
     #[sqlx(skip)]
@@ -21,14 +19,11 @@ pub struct Message {
 impl Message {
     pub async fn insert(
         db: &mut SqliteConnection,
-        namespace: &str,
-        queue: &str,
+        queue_id: u64,
         body: &[u8],
         kv: HashMap<String, String>,
-    ) -> eyre::Result<()> {
-        let queue_id = Queue::get_id(&mut *db, namespace, queue).await?;
-
-        let msg_id: i64 =
+    ) -> eyre::Result<u64> {
+        let msg_id: u64 =
             sqlx::query_scalar("INSERT INTO messages (queue, body) VALUES ($1, $2) RETURNING id")
                 .bind(queue_id as i64)
                 .bind(body)
@@ -37,14 +32,14 @@ impl Message {
 
         for (k, v) in kv.into_iter() {
             sqlx::query("INSERT INTO kv_pairs (message, k, v) VALUES ($1, $2, $3)")
-                .bind(msg_id)
+                .bind(msg_id as i64)
                 .bind(k)
                 .bind(v)
                 .execute(&mut *db)
                 .await?;
         }
 
-        Ok(())
+        Ok(msg_id)
     }
 
     pub async fn list(
