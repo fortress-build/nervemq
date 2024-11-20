@@ -18,6 +18,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import type { SortingState, ColumnFiltersState } from "@tanstack/react-table";
 import { Input } from "@/components/ui/input";
 
 export type Queue = {
@@ -27,15 +28,13 @@ export type Queue = {
 };
 
 export default function Queues() {
-  const [searchQuery, setSearchQuery] = useState("");
-
   const {
     data = [],
     isLoading,
     refetch,
   } = useQuery({
     queryFn: () => listQueues(),
-    queryKey: ["queues", searchQuery],
+    queryKey: ["queues"],
   });
   const [isOpen, setIsOpen] = useState(false);
   const router = useRouter();
@@ -43,6 +42,13 @@ export default function Queues() {
     name: string;
     ns: string;
   } | null>(null);
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const filteredData = data.filter((queue) =>
+    queue.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   const handleDeleteQueue = async (
     name: string,
@@ -52,10 +58,6 @@ export default function Queues() {
     e.stopPropagation();
     setQueueToDelete({ name, ns });
   };
-
-  const filteredData = data.filter((queue) =>
-    queue.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
 
   return (
     <div className="flex flex-col gap-4">
@@ -77,6 +79,10 @@ export default function Queues() {
           router.push(`/queues/${row.name}`)
         }
         meta={{ handleDeleteQueue }}
+        sorting={sorting}
+        setSorting={setSorting}
+        columnFilters={columnFilters}
+        setColumnFilters={setColumnFilters}
       />
 
       <div className="flex justify-end">
