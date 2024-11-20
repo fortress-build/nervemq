@@ -2,11 +2,8 @@ drop index api_keys_key_id_idx;
 drop index api_keys_user_name_idx;
 drop table api_keys;
 
-drop index permissions_user_namespace_idx;
-drop table permissions;
-
-drop index users_email_idx;
-drop table users;
+drop index user_permissions_user_namespace_idx;
+drop table user_permissions;
 
 drop index sessions_kv_idx;
 drop table session_state;
@@ -26,4 +23,5 @@ drop table queues;
 drop index namespaces_name_idx;
 drop table namespaces;
 
-
+drop index users_email_idx;
+drop table users;

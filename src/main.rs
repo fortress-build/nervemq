@@ -35,6 +35,7 @@ async fn main() -> eyre::Result<()> {
             Email::from_str("admin@fortress.build").unwrap(),
             "password".to_owned(),
             Some(Role::Admin),
+            vec![],
         )
         .await
     {

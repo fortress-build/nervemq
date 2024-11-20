@@ -5,6 +5,7 @@ use sqlx::{FromRow, SqliteConnection};
 pub struct Namespace {
     pub id: u64,
     pub name: String,
+    pub created_by: String,
 }
 
 impl Namespace {
