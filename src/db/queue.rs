@@ -1,6 +1,9 @@
+use actix_identity::Identity;
 use serde::{Deserialize, Serialize};
 use sqlx::{prelude::FromRow, SqliteConnection};
 use tokio_stream::StreamExt;
+
+use crate::service::Error;
 
 use super::namespace::Namespace;
 
@@ -9,6 +12,7 @@ pub struct Queue {
     pub id: u64,
     pub ns: String,
     pub name: String,
+    pub created_by: String,
 }
 
 impl PartialEq for Queue {
@@ -22,6 +26,7 @@ pub struct QueueStatistics {
     id: u64,
     ns: String,
     name: String,
+    created_by: String,
     message_count: u64,
 }
 
@@ -31,7 +36,9 @@ impl Queue {
         namespace: &str,
         name: &str,
     ) -> eyre::Result<()> {
-        let namespace = Namespace::ensure(db, namespace).await?;
+        let namespace = Namespace::get_id(db, namespace)
+            .await?
+            .ok_or_else(|| eyre::eyre!("Namespace {namespace} does not exist"))?;
 
         sqlx::query("INSERT INTO queues (ns, name) VALUES ($1, $2)")
             .bind(namespace as i64)
@@ -57,17 +64,22 @@ impl Queue {
         Ok(())
     }
 
-    async fn list_all(db: &mut SqliteConnection) -> eyre::Result<Vec<Queue>> {
-        let mut stream = sqlx::query_as(
-            "SELECT q.id, q.name, n.name as ns FROM queues q JOIN namespaces n ON q.ns = n.id",
+    async fn list_all(db: &mut SqliteConnection, identity: Identity) -> Result<Vec<Queue>, Error> {
+        let email = identity.id()?;
+
+        let queues = sqlx::query_as(
+            "
+            SELECT q.id, q.name, qu.email as created_by, n.name as ns FROM queues q
+            JOIN user_permissions p ON p.namespace = q.ns
+            JOIN namespaces n ON n.id = q.ns
+            JOIN users u ON u.id = p.user
+            JOIN users qu ON q.id = q.created_by
+            WHERE u.email = $1
+            ",
         )
-        .fetch(db);
-
-        let mut queues = Vec::new();
-
-        while let Some(res) = stream.next().await.transpose()? {
-            queues.push(res);
-        }
+        .bind(email)
+        .fetch_all(db)
+        .await?;
 
         Ok(queues)
     }
@@ -75,7 +87,7 @@ impl Queue {
     async fn list_for_namespace(
         db: &mut SqliteConnection,
         namespace: &str,
-    ) -> eyre::Result<Vec<Queue>> {
+    ) -> Result<Vec<Queue>, Error> {
         let mut stream = sqlx::query_as(
             "SELECT q.id, q.name, n.name as ns FROM queues q JOIN namespaces n ON q.ns = n.id WHERE n.name = $1",
         )
@@ -91,20 +103,31 @@ impl Queue {
         Ok(queues)
     }
 
-    pub async fn statistics(db: &mut SqliteConnection) -> eyre::Result<Vec<QueueStatistics>> {
+    pub async fn statistics(
+        db: &mut SqliteConnection,
+        identity: Identity,
+    ) -> Result<Vec<QueueStatistics>, Error> {
+        let email = identity.id()?;
+
         let res = sqlx::query_as(
             "
             SELECT
-                q.id   AS id,
+                q.id,
+                q.name,
+                qu.email as created_by,
                 n.name as ns,
-                q.name AS name,
                 COUNT(m.id) AS message_count
             FROM queues q
             LEFT JOIN messages m ON q.id = m.queue
-            LEFT JOIN namespaces n ON q.ns = n.id
-            GROUP BY q.id, q.name;
+            JOIN user_permissions p ON p.namespace = q.ns
+            JOIN namespaces n ON n.id = q.ns
+            JOIN users u ON u.id = p.user
+            JOIN users qu ON q.created_by = qu.id
+            WHERE u.email = $1
+            GROUP BY q.id, q.name
         ",
         )
+        .bind(email)
         .fetch_all(db)
         .await?;
 
@@ -114,10 +137,11 @@ impl Queue {
     pub async fn list(
         db: &mut SqliteConnection,
         namespace: Option<&str>,
-    ) -> eyre::Result<Vec<Queue>> {
+        identity: Identity,
+    ) -> Result<Vec<Queue>, Error> {
         match namespace {
             Some(ns) => Self::list_for_namespace(db, ns).await,
-            None => Self::list_all(db).await,
+            None => Self::list_all(db, identity).await,
         }
     }
 

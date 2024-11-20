@@ -37,8 +37,9 @@ async fn create_namespace(
 async fn delete_namespace(
     service: web::Data<Service>,
     path: web::Path<String>,
+    identity: Identity,
 ) -> actix_web::Result<impl Responder> {
-    if let Err(e) = service.delete_namespace(&*path).await {
+    if let Err(e) = service.delete_namespace(&*path, identity).await {
         return Err(actix_web::error::ErrorInternalServerError(e));
     }
 
