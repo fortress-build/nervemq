@@ -21,6 +21,7 @@ import { listUsers, deleteUser } from "@/actions/api";
 import { useIsAdmin } from "@/lib/state/global";
 import { redirect } from "next/navigation";
 import { Input } from "@/components/ui/input";
+import type { SortingState } from "@tanstack/react-table";
 
 export default function AdminPanel() {
   const isAdmin = useIsAdmin();
@@ -33,6 +34,7 @@ export default function AdminPanel() {
   const [userToDelete, setUserToDelete] = useState<string | null>(null);
   const [userToModify, setUserToModify] = useState<UserStatistics | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [sorting, setSorting] = useState<SortingState>([]);
 
   const {
     data = [],
@@ -96,6 +98,8 @@ export default function AdminPanel() {
         data={filteredData}
         isLoading={isLoading}
         meta={{ handleDeleteUser, handleModifyUser }}
+        sorting={sorting}
+        setSorting={setSorting}
       />
 
       <div className="flex justify-end">

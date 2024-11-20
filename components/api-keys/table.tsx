@@ -1,6 +1,6 @@
 "use client";
 import type { CellContext, ColumnDef } from "@tanstack/react-table";
-import { Trash2, KeySquare } from "lucide-react";
+import { Trash2, KeySquare, ArrowUpDown } from "lucide-react";
 import { Button } from "../ui/button";
 import { useContext } from "react";
 import { KeyToDeleteContext } from "@/lib/contexts/key-to-delete";
@@ -36,12 +36,20 @@ function ActionsCell({
 export const columns: ColumnDef<ApiKey>[] = [
   {
     accessorKey: "name",
-    header: () => (
+    header: ({ column }) => (
       <div className="flex items-center gap-2">
         <KeySquare className="h-4 w-4" />
-        <span>Name</span>
+        <Button
+          variant="ghost"
+          className="p-0 hover:bg-transparent"
+          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+        >
+          <span>Name</span>
+          <ArrowUpDown className="ml-2 h-4 w-4" />
+        </Button>
       </div>
     ),
+    enableSorting: true,
   },
   // {
   //   accessorKey: "createdAt",

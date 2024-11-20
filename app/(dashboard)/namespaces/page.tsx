@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import { deleteNamespace } from "@/actions/api";
 import { Input } from "@/components/ui/input";
+import type { SortingState } from "@tanstack/react-table";
 
 export default function Namespaces() {
   const [isOpen, setIsOpen] = useState(false);
@@ -31,6 +32,7 @@ export default function Namespaces() {
   const [namespaceToDelete, setNamespaceToDelete] = useState<string | null>(
     null,
   );
+  const [sorting, setSorting] = useState<SortingState>([]);
 
   const handleDeleteNamespace = async (name: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -57,6 +59,8 @@ export default function Namespaces() {
         data={filteredData}
         isLoading={isLoading}
         meta={{ handleDeleteNamespace }}
+        sorting={sorting}
+        setSorting={setSorting}
       />
       <div className="flex justify-end">
         <Button onClick={() => setIsOpen(true)}>Create Namespace</Button>
