@@ -18,8 +18,8 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import type { SortingState, ColumnFiltersState } from "@tanstack/react-table";
+import { Input } from "@/components/ui/input";
 
 export type Queue = {
   id: string;
@@ -28,15 +28,13 @@ export type Queue = {
 };
 
 export default function Queues() {
-  const [searchQuery, setSearchQuery] = useState("");
-
   const {
     data = [],
     isLoading,
     refetch,
   } = useQuery({
     queryFn: () => listQueues(),
-    queryKey: ["queues", searchQuery],
+    queryKey: ["queues"],
   });
   const [isOpen, setIsOpen] = useState(false);
   const router = useRouter();
@@ -46,6 +44,11 @@ export default function Queues() {
   } | null>(null);
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const filteredData = data.filter((queue) =>
+    queue.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   const handleDeleteQueue = async (
     name: string,
@@ -55,13 +58,6 @@ export default function Queues() {
     e.stopPropagation();
     setQueueToDelete({ name, ns });
   };
-
-  const filteredData = data.filter((queue) =>
-    queue.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-
-  
 
   return (
     <div className="flex flex-col gap-4">

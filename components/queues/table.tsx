@@ -7,16 +7,26 @@ import {
   Trash2,
   ArrowUpDown,
   Filter,
+  Check,
 } from "lucide-react";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "../ui/popover";
-import { Input } from "../ui/input";
 import { ColumnHeader } from "../table-header";
 import { Button } from "../ui/button";
 import React from "react";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "../ui/command";
+import { useQuery } from "@tanstack/react-query";
+import { listNamespaces } from "@/actions/api"; // adjust import path as needed
 
 export type Queue = {
   id: string;
@@ -42,7 +52,12 @@ export const columns: ColumnDef<QueueStatistics>[] = [
     accessorKey: "ns",
     header: ({ column }) => {
       // eslint-disable-next-line react-hooks/rules-of-hooks
-      const [filterValue, setFilterValue] = React.useState("");
+      const { data: namespaces = [] } = useQuery({
+        queryFn: () => listNamespaces(),
+        queryKey: ["namespaces"],
+      });
+
+      const selectedNamespaces = (column.getFilterValue() as string[]) || [];
 
       return (
         <div className="flex items-center gap-2">
@@ -61,20 +76,35 @@ export const columns: ColumnDef<QueueStatistics>[] = [
                 <Filter className="h-4 w-4" />
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-60">
-              <div className="space-y-2">
-                <h4 className="font-medium leading-none">Filter Namespace</h4>
-                <Input
-                  placeholder="Search namespaces..."
-                  value={filterValue}
-                  onChange={(event) => {
-                    const value = event.target.value;
-                    setFilterValue(value);
-                    column.setFilterValue(value);
-                  }}
-                  className="h-8"
-                />
-              </div>
+            <PopoverContent className="w-[200px] p-0">
+              <Command className="bg-background">
+                <CommandInput placeholder="Search namespaces..." />
+                <CommandList>
+                  <CommandEmpty>No namespaces found</CommandEmpty>
+                  <CommandGroup>
+                    {namespaces.map((namespace) => (
+                      <CommandItem
+                        key={namespace.name}
+                        value={namespace.name}
+                        onSelect={(value) => {
+                          const currentFilters = column.getFilterValue() as string[] || [];
+                          const newFilters = currentFilters.includes(value)
+                            ? currentFilters.filter((f) => f !== value)
+                            : [...currentFilters, value];
+                          column.setFilterValue(newFilters.length ? newFilters : undefined);
+                        }}
+                      >
+                        <Check
+                          className={`mr-2 h-4 w-4 ${
+                            selectedNamespaces.includes(namespace.name) ? "opacity-100" : "opacity-0"
+                          }`}
+                        />
+                        {namespace.name}
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
             </PopoverContent>
           </Popover>
         </div>
@@ -82,7 +112,10 @@ export const columns: ColumnDef<QueueStatistics>[] = [
     },
     enableSorting: true,
     enableColumnFilter: true,
-    filterFn: "includesString",
+    filterFn: (row, columnId, filterValue: string[]) => {
+      if (!filterValue?.length) return true;
+      return filterValue.includes(row.getValue(columnId));
+    },
   },
   {
     accessorKey: "messageCount",
