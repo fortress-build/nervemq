@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use actix_identity::{error::GetIdentityError, Identity};
 use serde_email::Email;
-use snafu::{whatever, Snafu, Whatever};
+use snafu::Snafu;
 use sqlx::{
     sqlite::{
         SqliteAutoVacuum, SqliteConnectOptions, SqliteJournalMode, SqliteLockingMode,
@@ -13,7 +13,7 @@ use sqlx::{
 
 use crate::{
     api::{
-        admin::{hash_password, UserInfo},
+        admin::hash_password,
         auth::{Permission, Role, User},
     },
     config::Config,
@@ -148,14 +148,31 @@ impl Service {
         Ok(user.id)
     }
 
-    pub async fn delete_namespace(&self, name: &str) -> eyre::Result<()> {
-        let mut db = self.db.acquire().await?;
-        Namespace::delete(db.acquire().await?, name).await
+    pub async fn delete_namespace(&self, name: &str, identity: Identity) -> Result<(), Error> {
+        let mut tx = self.db.begin().await?;
+
+        let namespace = Namespace::get_id(tx.acquire().await?, name)
+            .await?
+            .ok_or_else(|| eyre::eyre!("Namespace {name} does not exist"))?;
+
+        let (_user_id, can_delete) = self
+            .check_user_access(&identity, namespace, tx.acquire().await?)
+            .await?;
+
+        if !can_delete {
+            return Err(Error::Unauthorized);
+        }
+
+        Namespace::delete(tx.acquire().await?, name).await?;
+
+        tx.commit().await?;
+
+        Ok(())
     }
 
     pub async fn check_user_access<'a>(
         &self,
-        identity: Identity,
+        identity: &Identity,
         ns: u64,
         executor: impl Executor<'a, Database = Sqlite>,
     ) -> Result<(u64, bool), Error> {
@@ -187,10 +204,12 @@ impl Service {
     ) -> Result<(), Error> {
         let mut tx = self.db.begin().await?;
 
-        let namespace = Namespace::ensure(tx.acquire().await?, namespace).await?;
+        let namespace = Namespace::get_id(tx.acquire().await?, namespace)
+            .await?
+            .ok_or_else(|| eyre::eyre!("Namespace {namespace} does not exist"))?;
 
         let (user_id, _) = self
-            .check_user_access(identity, namespace, &mut *tx)
+            .check_user_access(&identity, namespace, &mut *tx)
             .await?;
 
         sqlx::query("INSERT INTO queues (ns, name, created_by) VALUES ($1, $2, $3)")
@@ -205,8 +224,20 @@ impl Service {
         Ok(())
     }
 
-    pub async fn delete_queue(&self, namespace: &str, name: &str) -> eyre::Result<()> {
+    pub async fn delete_queue(
+        &self,
+        namespace: &str,
+        name: &str,
+        identity: Identity,
+    ) -> eyre::Result<()> {
         let mut tx = self.db.begin().await?;
+
+        let namespace_id = Namespace::get_id(tx.acquire().await?, namespace)
+            .await?
+            .ok_or_else(|| eyre::eyre!("Namespace {namespace} does not exist"))?;
+
+        self.check_user_access(&identity, namespace_id, &mut *tx)
+            .await?;
 
         Queue::delete(tx.acquire().await?, namespace, name).await?;
 
@@ -215,9 +246,23 @@ impl Service {
         Ok(())
     }
 
-    pub async fn list_queues(&self, namespace: Option<&str>) -> eyre::Result<Vec<Queue>> {
+    pub async fn list_queues(
+        &self,
+        namespace: Option<&str>,
+        identity: Identity,
+    ) -> Result<Vec<Queue>, Error> {
         let mut conn = self.db.acquire().await?;
-        Queue::list(conn.acquire().await?, namespace).await
+
+        if let Some(namespace) = namespace {
+            let namespace_id = Namespace::get_id(conn.acquire().await?, namespace)
+                .await?
+                .ok_or_else(|| eyre::eyre!("Namespace {namespace} does not exist"))?;
+
+            self.check_user_access(&identity, namespace_id, &mut *conn)
+                .await?;
+        }
+
+        Queue::list(conn.acquire().await?, namespace, identity).await
     }
 
     pub async fn create_user(
@@ -287,8 +332,8 @@ impl Service {
         Message::list(db.acquire().await?, namespace, queue).await
     }
 
-    pub async fn statistics(&self) -> eyre::Result<Vec<QueueStatistics>> {
+    pub async fn statistics(&self, identity: Identity) -> Result<Vec<QueueStatistics>, Error> {
         let mut db = self.db.acquire().await?;
-        Queue::statistics(db.acquire().await?).await
+        Queue::statistics(db.acquire().await?, identity).await
     }
 }
