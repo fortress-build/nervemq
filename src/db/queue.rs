@@ -89,7 +89,11 @@ impl Queue {
         namespace: &str,
     ) -> Result<Vec<Queue>, Error> {
         let mut stream = sqlx::query_as(
-            "SELECT q.id, q.name, n.name as ns FROM queues q JOIN namespaces n ON q.ns = n.id WHERE n.name = $1",
+            "
+            SELECT q.id, q.name, n.name as ns, u.email as created_by FROM queues q
+            JOIN namespaces n ON q.ns = n.id
+            JOIN users u on q.created_by = u.id
+            WHERE n.name = $1",
         )
         .bind(namespace)
         .fetch(db);
