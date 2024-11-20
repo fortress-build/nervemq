@@ -2,7 +2,6 @@ use std::collections::HashMap;
 use std::ops::Deref;
 
 use actix_identity::Identity;
-use actix_web::FromRequest;
 use nervemq::{
     api::auth::Role,
     config::Config,
