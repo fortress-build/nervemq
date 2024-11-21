@@ -149,7 +149,22 @@ export default function QueuePage() {
                 Failed
               </Button>
             </div>
-            <Line data={filteredChartData} />
+            <div className="h-[300px]">
+              <Line 
+                data={filteredChartData} 
+                options={{ 
+                  maintainAspectRatio: false,
+                  scales: {
+                    y: {
+                      ticks: {
+                        stepSize: 2, // Show labels at intervals of 2
+                        maxTicksLimit: 6 // Maximum number of ticks to display
+                      }
+                    }
+                  }
+                }} 
+              />
+            </div>
           </CardContent>
         </Card>
 
