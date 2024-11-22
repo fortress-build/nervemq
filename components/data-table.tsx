@@ -9,6 +9,8 @@ import {
   getFilteredRowModel,
   type ColumnFiltersState,
   useReactTable,
+  getExpandedRowModel,
+  type Row,
 } from "@tanstack/react-table";
 
 import {
@@ -21,6 +23,7 @@ import {
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { Spinner } from "@nextui-org/spinner";
+import React from "react";
 
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
@@ -34,6 +37,7 @@ interface DataTableProps<TData, TValue> {
   onFilter?: (filters: ColumnFiltersState) => void;
   columnFilters?: ColumnFiltersState;
   setColumnFilters?: (filters: ColumnFiltersState) => void;
+  renderSubComponent?: ({ row }: { row: Row<TData> }) => React.ReactNode;
 }
 
 export function DataTable<TData, TValue>({
@@ -47,11 +51,14 @@ export function DataTable<TData, TValue>({
   setSorting,
   columnFilters,
   setColumnFilters,
+  renderSubComponent,
 }: DataTableProps<TData, TValue>) {
   const table = useReactTable({
     data,
     columns,
     getCoreRowModel: getCoreRowModel(),
+    getRowCanExpand: () => true,
+    getExpandedRowModel: getExpandedRowModel(),
     ...(sorting !== undefined && {
       getSortedRowModel: getSortedRowModel(),
       onSortingChange: setSorting 
@@ -105,18 +112,26 @@ export function DataTable<TData, TValue>({
         <TableBody>
           {table.getRowModel().rows?.length ? (
             table.getRowModel().rows.map((row) => (
-              <TableRow
-                key={row.id}
-                data-state={row.getIsSelected() && "selected"}
-                onClick={() => onRowClick?.(row.original)}
-                className={onRowClick ? "cursor-pointer hover:bg-muted" : ""}
-              >
-                {row.getVisibleCells().map((cell) => (
-                  <TableCell key={cell.id}>
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </TableCell>
-                ))}
-              </TableRow>
+              <React.Fragment key={row.id}>
+                <TableRow
+                  data-state={row.getIsSelected() && "selected"}
+                  onClick={() => onRowClick?.(row.original)}
+                  className={onRowClick ? "cursor-pointer hover:bg-muted" : ""}
+                >
+                  {row.getVisibleCells().map((cell) => (
+                    <TableCell key={cell.id}>
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </TableCell>
+                  ))}
+                </TableRow>
+                {row.getIsExpanded() && renderSubComponent && (
+                  <tr>
+                    <td colSpan={row.getVisibleCells().length}>
+                      {renderSubComponent({ row })}
+                    </td>
+                  </tr>
+                )}
+              </React.Fragment>
             ))
           ) : (
             <TableRow>
