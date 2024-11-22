@@ -111,7 +111,7 @@ export default function QueuePage() {
             <CardTitle>Queue Status</CardTitle>
             {//TODO: ADD STUFF HERE
             }
-            <QueueSettings />
+            <QueueSettings namespace={queue?.ns} queue={queue?.name} />
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-4 gap-4">
@@ -151,13 +151,13 @@ export default function QueuePage() {
                   <div>
                     <p className="text-gray-600">Daily Messages (avg)</p>
                     <p className="text-2xl font-medium">
-                      {queue.queue_operations_total?.[0]?.value || 0}
+                      {(queue.queue_operations_total ?? 0).toFixed(2)}
                     </p>
                   </div>
                   <div>
                     <p className="text-gray-600">Active Connections</p>
                     <p className="text-2xl font-medium">
-                      {queue.active_connections?.[0]?.value || 0}
+                      {(queue.active_connections ?? 0).toFixed(2)}
                     </p>
                   </div>
                   <div>

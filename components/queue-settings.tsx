@@ -17,9 +17,11 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useState, useEffect } from "react";
 import { useForm } from "@tanstack/react-form";
-import { queueSettingsSchema, type QueueSettingsType } from "@/schemas/queue-settings";
+import { yupValidator } from "@tanstack/yup-form-adapter";
+import { queueSettingsSchema } from "@/schemas/queue-settings";
 
-export function QueueSettings({ namespace, queue }: { namespace: string; queue: string }) {
+
+export function QueueSettings({ namespace, queue }: { namespace: string ; queue: string}) {
   const [open, setOpen] = useState(false);
   const queryClient = useQueryClient();
 
@@ -41,23 +43,20 @@ export function QueueSettings({ namespace, queue }: { namespace: string; queue: 
     },
   });
 
-  const form = useForm<QueueSettingsType>({
+  const form = useForm({
     defaultValues: {
       namespace,
       queue,
       maxRetries: 3,
       timeout: 30,
-      batchSize: 100,
     },
-    onSubmit: async (values) => {
-      try {
-        await queueSettingsSchema.validate(values, { abortEarly: false });
-        saveSettings(values);
-      } catch (error) {
-        if (error instanceof Error) {
-          form.setErrors(toFormErrors(error));
-        }
-      }
+    validatorAdapter: yupValidator(),
+    validators: {
+      onChange: queueSettingsSchema,
+      onMount: queueSettingsSchema,
+    },
+    onSubmit: async ({ value: data }) => {
+      saveSettings(data);
     },
   });
 
@@ -82,71 +81,76 @@ export function QueueSettings({ namespace, queue }: { namespace: string; queue: 
         {isLoading ? (
           <div>Loading...</div>
         ) : (
-          <form.Provider>
-            <form onSubmit={(e) => {
-              e.preventDefault();
-              form.handleSubmit();
-            }}>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                void form.handleSubmit();
+              }}
+            >
               <div className="grid gap-4 py-4">
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="retries" className="text-right">
-                    Max Retries
-                  </Label>
-                  <form.Field name="maxRetries">
-                    {(field) => (
+                <form.Field name="maxRetries">
+                  {(field) => (
+                    <div className="grid grid-cols-4 items-center gap-4">
+                      <Label htmlFor={field.name} className="text-right">
+                        Max Retries
+                      </Label>
                       <Input
-                        id="retries"
+                        id={field.name}
                         type="number"
                         className="col-span-3"
-                        value={field.value}
-                        onChange={(e) => field.setValue(parseInt(e.target.value))}
-                        error={field.error}
+                        value={field.state.value}
+                        onChange={(e) => field.handleChange(parseInt(e.target.value))}
+                        onBlur={field.handleBlur}
                       />
-                    )}
-                  </form.Field>
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="timeout" className="text-right">
-                    Timeout (s)
-                  </Label>
-                  <form.Field name="timeout">
-                    {(field) => (
+                      {field.state.meta.errors ? (
+                        <span className="col-start-2 col-span-3 text-sm text-destructive">
+                          {field.state.meta.errors.join(", ")}
+                        </span>
+                      ) : null}
+                    </div>
+                  )}
+                </form.Field>
+
+                <form.Field name="timeout">
+                  {(field) => (
+                    <div className="grid grid-cols-4 items-center gap-4">
+                      <Label htmlFor={field.name} className="text-right">
+                        Timeout (s)
+                      </Label>
                       <Input
-                        id="timeout"
+                        id={field.name}
                         type="number"
                         className="col-span-3"
-                        value={field.value}
-                        onChange={(e) => field.setValue(parseInt(e.target.value))}
-                        error={field.error}
+                        value={field.state.value}
+                        onChange={(e) => field.handleChange(parseInt(e.target.value))}
+                        onBlur={field.handleBlur}
                       />
-                    )}
-                  </form.Field>
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="batch-size" className="text-right">
-                    Batch Size
-                  </Label>
-                  <form.Field name="batchSize">
-                    {(field) => (
-                      <Input
-                        id="batch-size"
-                        type="number"
-                        className="col-span-3"
-                        value={field.value}
-                        onChange={(e) => field.setValue(parseInt(e.target.value))}
-                        error={field.error}
-                      />
-                    )}
-                  </form.Field>
-                </div>
+                      {field.state.meta.errors ? (
+                        <span className="col-start-2 col-span-3 text-sm text-destructive">
+                          {field.state.meta.errors.join(", ")}
+                        </span>
+                      ) : null}
+                    </div>
+                  )}
+                </form.Field>
               </div>
-              <DialogFooter>
-                <Button type="submit" disabled={isPending}>
-                  {isPending ? "Saving..." : "Save Changes"}
+
+              <DialogFooter className="gap-2">
+                <Button variant="outline" type="button" onClick={() => setOpen(false)}>
+                  Cancel
                 </Button>
+                <form.Subscribe
+                  selector={(state) => [state.canSubmit, state.isSubmitting]}
+                >
+                  {([canSubmit, isSubmitting]) => (
+                    <Button type="submit" disabled={!canSubmit || isPending}>
+                      {isPending ? "Saving..." : "Save Changes"}
+                    </Button>
+                  )}
+                </form.Subscribe>
               </DialogFooter>
             </form>
-          </form.Provider>
         )}
       </DialogContent>
     </Dialog>

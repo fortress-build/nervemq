@@ -32,6 +32,8 @@ export type Queue = {
 export type QueueStatistics = Queue & {
   messageCount: number;
   avgSizeBytes: number;
+  queue_operations_total: number;
+  active_connections: number;
 };
 
 export const columns: ColumnDef<QueueStatistics>[] = [

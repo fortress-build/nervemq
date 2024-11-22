@@ -126,11 +126,11 @@ const mockEvents: MessageObject[] = [
 function MessageDetails({ event }: { event: MessageObject }) {
   return (
     <div className="p-6 space-y-4 bg-gray-50">
-      <h3 className="font-semibold text-gray-700 mb-2">Event Details</h3>
+      <h3 className="font-semibold text-gray-700 mb-2">Message Details</h3>
       <div className="grid gap-3">
         {event.messages?.map((message, index) => (
           // biome-ignore lint/suspicious/noArrayIndexKey: <explanation>
-          <div key={index} className="bg-white p-4 rounded-lg shadow-sm">
+          <div key={index} className="bg-white p-4 rounded-lg border border-gray-200">
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <span className="text-xs uppercase text-gray-400">Key</span>
