@@ -113,7 +113,7 @@ export default function DashboardSidebar() {
       >
         <Axis3D />
       </SidebarHeader>
-      <SidebarContent aria-describedby="menu" className="flex">
+      <SidebarContent className="flex">
         {isMobile ? <DialogTitle className="hidden">Menu</DialogTitle> : null}
         <SidebarGroup>
           <SidebarGroupContent>
