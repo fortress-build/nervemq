@@ -10,12 +10,10 @@ use actix_web::{web::Data, App, HttpServer};
 use chrono::TimeDelta;
 use nervemq::api::auth::{self, Role};
 use nervemq::api::{admin, data, namespace, queue, tokens};
-use nervemq::auth::data::API_KEY_PREFIX;
 use nervemq::auth::middleware::protected_route::Protected;
 use nervemq::auth::session::SqliteSessionStore;
 use nervemq::config::Config;
 use nervemq::service::Service;
-use prefixed_api_key::PrefixedApiKeyController;
 use serde_email::Email;
 // use openssl::ssl::{SslAcceptor, SslFiletype, SslMethod};
 use tracing_actix_web::TracingLogger;
@@ -33,7 +31,7 @@ async fn main() -> eyre::Result<()> {
     match service
         .create_user(
             Email::from_str("admin@fortress.build").unwrap(),
-            "password".to_owned(),
+            "password".to_owned().into(),
             Some(Role::Admin),
             vec![],
         )
@@ -61,15 +59,6 @@ async fn main() -> eyre::Result<()> {
 
     let deadline = SESSION_EXPIRATION.to_std().expect("valid duration");
     let session_ttl = Duration::new(SESSION_EXPIRATION.num_seconds(), 0);
-
-    let api_key_gen = PrefixedApiKeyController::<_, prefixed_api_key::sha2::Sha256>::configure()
-        .prefix(API_KEY_PREFIX.to_owned())
-        .rng_osrng()
-        .short_token_length(8)
-        .long_token_length(24)
-        .finalize()?;
-
-    let data_keygen = Data::new(api_key_gen);
 
     HttpServer::new(move || {
         let session_middleware =
@@ -113,9 +102,8 @@ async fn main() -> eyre::Result<()> {
             .service(admin::service().wrap(Protected))
             .service(tokens::service().wrap(Protected))
             .service(auth::service())
-            .app_data(json_cfg)
             .app_data(data.clone())
-            .app_data(data_keygen.clone())
+            .app_data(json_cfg)
             .app_data(form_cfg)
     })
     // .bind_openssl(("127.0.0.1", 8080), ssl_acceptor)?

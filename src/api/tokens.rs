@@ -8,13 +8,12 @@ use actix_web::{
     web::{self, Json},
     FromRequest, HttpRequest, HttpResponse, Responder, Scope,
 };
-use base64::Engine;
+use secrecy::ExposeSecret;
 use serde::{Deserialize, Serialize};
-use sha2::Digest;
 use sqlx::FromRow;
 
 use crate::{
-    auth::data::{gen_api_key, ApiKeyGenerator, GeneratedKey},
+    auth::crypto::{generate_api_key, GeneratedKey},
     service::Service,
 };
 
@@ -26,7 +25,8 @@ pub struct CreateTokenRequest {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CreateTokenResponse {
     name: String,
-    token: String,
+    access_key: String,
+    secret_key: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -37,30 +37,32 @@ pub struct DeleteTokenRequest {
 #[post("")]
 pub async fn create_token(
     data: web::Json<CreateTokenRequest>,
-    generator: web::Data<ApiKeyGenerator>,
     service: web::Data<Service>,
     identity: Identity,
 ) -> actix_web::Result<Json<CreateTokenResponse>> {
     let data = data.into_inner();
 
     let GeneratedKey {
-        api_key,
         short_token,
+        long_token,
         long_token_hash,
-    } = gen_api_key(generator)
+        validation_key,
+    } = web::block(|| generate_api_key())
         .await
+        .map_err(ErrorInternalServerError)?
         .map_err(ErrorInternalServerError)?;
 
     sqlx::query(
         "
-        INSERT INTO api_keys (name, user, key_id, hashed_key)
+        INSERT INTO api_keys (name, user, key_id, hashed_key, validation_key)
         VALUES ($1, (SELECT id FROM users WHERE email = $2), $3, $4)
         ",
     )
     .bind(&data.name)
     .bind(identity.id().map_err(ErrorUnauthorized)?)
-    .bind(short_token)
+    .bind(&short_token)
     .bind(long_token_hash.to_string())
+    .bind(validation_key)
     .execute(service.db())
     .await
     .map_err(ErrorInternalServerError)?;
@@ -68,7 +70,8 @@ pub async fn create_token(
     // Return the plain API key (should be securely sent/stored by the user).
     Ok(web::Json(CreateTokenResponse {
         name: data.name,
-        token: api_key.to_string(),
+        access_key: short_token,
+        secret_key: long_token.expose_secret().to_owned(),
     }))
 }
 
@@ -145,31 +148,6 @@ pub async fn list_tokens(
     .map_err(ErrorInternalServerError)?;
 
     Ok(Json(tokens))
-}
-
-#[derive(Debug, Serialize)]
-pub struct ClientIdResponse {
-    client_id: String,
-}
-
-#[get("/client_id")]
-pub async fn client_id(identity: Identity) -> actix_web::Result<impl Responder> {
-    let email = identity.id().map_err(|e| ErrorUnauthorized(e))?;
-
-    // Hashing the email should yield a consistently unique ID since emails are required to be
-    // unique among users.
-
-    let mut hasher = sha2::Sha256::new();
-
-    hasher.update(email.as_bytes());
-
-    let hash = hasher.finalize();
-
-    let hash_str = base64::engine::general_purpose::STANDARD.encode(hash);
-
-    Ok(web::Json(ClientIdResponse {
-        client_id: hash_str,
-    }))
 }
 
 pub fn service() -> Scope {

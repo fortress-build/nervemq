@@ -7,7 +7,7 @@ use actix_web::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    db::queue::Queue,
+    queue::Queue,
     service::{Error, Service},
 };
 

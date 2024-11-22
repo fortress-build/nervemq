@@ -42,7 +42,7 @@ export default function Header({ className }: { className?: string }) {
     route = segments.map((s, i) => ({
       label: s
         .split("-")
-        .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
+        .map((s) => (i === 0 ? s.charAt(0).toUpperCase() + s.slice(1) : s))
         .join(" "),
       href: `/${segments.slice(0, i + 1).join("/")}`,
     }));
@@ -54,45 +54,50 @@ export default function Header({ className }: { className?: string }) {
     <header
       className={cn(className, "flex flex-row items-center justify-between")}
     >
-      <Button
-        onClick={() => setOpenMobile(!openMobile)}
-        size={"sm"}
-        variant={"ghost"}
-        className={cn(
-          "p-1.5 h-min",
-          // display: none on desktop
-          isMobile ? "" : "hidden",
-        )}
-      >
-        <Menu />
-      </Button>
-      <Breadcrumb>
-        <BreadcrumbList>
-          {route.flatMap((value, i) => [
-            <BreadcrumbSeparator
-              className={i > 0 ? "" : "hidden"}
-              key={`sep-${i.toString()}`}
-            >
-              <Slash />
-            </BreadcrumbSeparator>,
-            <BreadcrumbItem key={value.href}>
-              <BreadcrumbLink
-                className={cn(
-                  "text-primary text-lg",
-                  i === 0 ? "font-semibold" : "font-medium",
-                )}
-                asChild
+      <div className="flex flex-row items-center gap-2">
+        <Button
+          onClick={() => setOpenMobile(!openMobile)}
+          size={"sm"}
+          variant={"ghost"}
+          className={cn(
+            "p-1.5 h-min",
+            // display: none on desktop
+            isMobile ? "" : "hidden",
+          )}
+        >
+          <Menu />
+        </Button>
+        <Breadcrumb>
+          <BreadcrumbList>
+            {route.flatMap((value, i) => [
+              <BreadcrumbSeparator
+                className={i > 0 ? "" : "hidden"}
+                key={`sep-${i.toString()}`}
               >
-                <Link href={value.href}>{value.label}</Link>
-              </BreadcrumbLink>
-            </BreadcrumbItem>,
-          ])}
-        </BreadcrumbList>
-      </Breadcrumb>
+                <Slash />
+              </BreadcrumbSeparator>,
+              <BreadcrumbItem key={value.href}>
+                <BreadcrumbLink
+                  className={cn(
+                    "text-primary text-lg",
+                    i === 0 ? "font-semibold" : "font-medium",
+                  )}
+                  asChild
+                >
+                  <Link href={value.href}>{value.label}</Link>
+                </BreadcrumbLink>
+              </BreadcrumbItem>,
+            ])}
+          </BreadcrumbList>
+        </Breadcrumb>
+      </div>
+
       <DropdownMenu>
-        <DropdownMenuTrigger className="flex flex-row gap-2 text-sm items-center">
+        <DropdownMenuTrigger
+          className={cn("flex flex-row gap-2 text-sm items-center group")}
+        >
           {session?.email ?? "Anonymous"}
-          <User />
+          <User className="py-0.5 px-1.5 w-7 h-7 rounded-md transition-all group-hover:bg-accent" />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           <DropdownMenuLabel>NerveMQ</DropdownMenuLabel>

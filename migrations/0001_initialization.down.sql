@@ -17,6 +17,9 @@ drop table kv_pairs;
 drop index messages_queue_idx;
 drop table messages;
 
+drop index queue_configs_queue_idx;
+drop table queue_configurations;
+
 drop index queues_ns_name_idx;
 drop table queues;
 

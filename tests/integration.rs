@@ -2,12 +2,9 @@ use std::ops::Deref;
 use std::{collections::HashMap, rc::Rc};
 
 use actix_identity::Identity;
-use nervemq::{
-    api::auth::Role,
-    config::Config,
-    db::{namespace::Namespace, queue::Queue},
-    service::Service,
-};
+use nervemq::namespace::Namespace;
+use nervemq::queue::Queue;
+use nervemq::{api::auth::Role, config::Config, service::Service};
 use tempfile::TempDir;
 
 #[derive(Clone)]
@@ -31,6 +28,9 @@ async fn setup() -> TmpService {
 
     let svc = Service::connect_with(Config {
         db_path: Some(path.path().join("nervemq.db").to_string_lossy().to_string()),
+        default_max_retries: None,
+        root_email: None,
+        root_password: None,
     })
     .await
     .unwrap();
@@ -211,14 +211,15 @@ async fn test_send_message() {
     // Send a message with empty HashMap
     let message = "Hello, World!".as_bytes().to_vec();
     let kv = HashMap::new();
-    service
-        .send_message(
-            service.get_queue_id("testing", "test-queue").await.unwrap(),
-            &message,
-            kv,
+    let queue_id = service
+        .get_queue_id(
+            "testing",
+            "test-queue",
+            &mut service.db().acquire().await.unwrap(),
         )
         .await
         .unwrap();
+    service.send_message(queue_id, &message, kv).await.unwrap();
 
     // Verify message exists
     let messages = service
@@ -248,7 +249,14 @@ async fn test_list_messages() {
     let kv = HashMap::new();
     service
         .send_message(
-            service.get_queue_id("testing", "test-queue").await.unwrap(),
+            service
+                .get_queue_id(
+                    "testing",
+                    "test-queue",
+                    &mut service.db().acquire().await.unwrap(),
+                )
+                .await
+                .unwrap(),
             &message,
             kv,
         )

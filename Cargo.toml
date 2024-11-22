@@ -45,13 +45,16 @@ actix-web = { version = "4.9.0", features = [
 anyhow = "1.0.93"
 argon2 = { version = "0.5.3", features = ["simple", "std", "zeroize"] }
 base64 = "0.22.1"
+bs58 = { version = "0.5.1", features = ["sha2"] }
 chrono = "0.4.38"
 envy = "0.4.2"
 eyre = "0.6.12"
+hex = { version = "0.4.3", features = ["serde"] }
+hmac = { version = "0.12.1", features = ["std"] }
 # openssl = "0.10.9"
 pom = "3.4.0"
-prefixed-api-key = { version = "0.3.0", features = ["sha2"] }
 rand = "0.8.5"
+secrecy = { version = "0.10.3", features = ["serde"] }
 serde = { version = "1.0.215", features = ["derive"] }
 serde-email = "3.1.0"
 serde_json = "1.0.133"

@@ -30,12 +30,25 @@ create table if not exists queues (
 );
 create unique index if not exists queues_ns_name_idx on queues(ns, name);
 
+create table if not exists queue_configurations (
+  id integer not null,
+  queue integer not null,
+  max_retries integer not null,
+  dead_letter_queue integer,
+
+  primary key (id),
+  foreign key (queue) references queues(id) on delete cascade,
+  foreign key (dead_letter_queue) references queues(id) on delete set null
+);
+create unique index if not exists queue_configs_queue_idx on queue_configurations(queue);
+
 create table if not exists messages (
   id    integer not null,
   queue integer not null,
   body  blob    not null,
   delivered_at  integer,
   sent_by       integer,
+  tries integer not null default 0,
 
   primary key (id),
   foreign key (queue) references queues(id) on delete cascade,
@@ -100,6 +113,7 @@ create table if not exists api_keys (
   name string not null,
   key_id text not null,
   hashed_key text not null,
+  validation_key blob not null,
 
   primary key (id),
   foreign key (user) references users(id) on delete cascade

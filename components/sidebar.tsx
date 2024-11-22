@@ -51,6 +51,8 @@ function SidebarItem({
   onClick?: MouseEventHandler<HTMLButtonElement>;
   icon: JSX.ElementType;
 }) {
+  const { setOpenMobile, isMobile } = useSidebar();
+
   return (
     <SidebarMenuItem key={title}>
       <SidebarMenuButton
@@ -59,7 +61,14 @@ function SidebarItem({
         tooltip={title}
         asChild
       >
-        <Link href={url}>
+        <Link
+          onClick={() => {
+            if (isMobile) {
+              setOpenMobile(false);
+            }
+          }}
+          href={url}
+        >
           <Icon />
           {title}
         </Link>
@@ -90,7 +99,7 @@ export default function DashboardSidebar() {
   const [mode, setMode] = useState<Mode>("normal");
 
   return (
-    <Sidebar collapsible="icon">
+    <Sidebar collapsible="icon" className="max-sm:w-full">
       <CreateQueue
         open={mode === "create-queue"}
         close={() => setMode("normal")}
@@ -156,7 +165,9 @@ export default function DashboardSidebar() {
         <ThemeSelector />
         <SidebarTrigger
           size={"sm"}
-          className="hover:bg-sidebar-accent cursor-pointer"
+          className={
+            isMobile ? "hidden" : "hover:bg-sidebar-accent cursor-pointer"
+          }
         >
           {open ? <PanelLeftClose /> : <PanelLeftOpen />}
         </SidebarTrigger>
