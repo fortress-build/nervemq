@@ -16,9 +16,10 @@ import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Spinner } from "@nextui-org/spinner";
-import { QueueStatistics } from "@/components/queues/table";
+import type { QueueStatistics } from "@/components/queues/table";
 import { listQueues } from "@/actions/api";
 import { useParams } from "next/navigation";
+import { QueueSettings } from "@/components/queue-settings";
 
 // Register ChartJS components
 ChartJS.register(
@@ -107,8 +108,9 @@ export default function QueuePage() {
       <div className="grid gap-4">
         {/* Queue Status Section */}
         <Card>
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle>Queue Status</CardTitle>
+            <QueueSettings />
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-4 gap-4">
