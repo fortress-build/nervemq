@@ -46,8 +46,8 @@ export default function Queues() {
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [searchQuery, setSearchQuery] = useState("");
 
-  const filteredData = data.filter((queue) =>
-    queue.name.toLowerCase().includes(searchQuery.toLowerCase()),
+  const filteredData = Array.from(data.values()).filter((queue: QueueStatistics) =>
+    queue.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const handleDeleteQueue = async (

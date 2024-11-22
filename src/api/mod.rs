@@ -4,3 +4,4 @@ pub mod data;
 pub mod namespace;
 pub mod queue;
 pub mod tokens;
+pub mod sqs;

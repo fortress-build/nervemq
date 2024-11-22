@@ -3,6 +3,7 @@ import type { NamespaceStatistics } from "@/components/namespaces/table";
 import type { QueueStatistics } from "@/components/queues/table";
 import type { CreateNamespaceRequest } from "@/schemas/create-namespace";
 import type { CreateQueueRequest } from "@/schemas/create-queue";
+import type { QueueSettingsType } from "@/schemas/queue-settings";
 import type { APIKey } from "@/components/create-api-key";
 import type { UserStatistics } from "@/components/create-user";
 import { SERVER_ENDPOINT } from "@/app/globals";
@@ -66,7 +67,7 @@ export async function deleteQueue(data: CreateQueueRequest) {
   }).catch(() => toast.error("Something went wrong"));
 }
 
-export async function listQueues(): Promise<QueueStatistics[]> {
+export async function listQueues(): Promise<Map<string, QueueStatistics>> {
   return await fetch(`${SERVER_ENDPOINT}/stats/queue`, {
     method: "GET",
     credentials: "include",
@@ -75,9 +76,12 @@ export async function listQueues(): Promise<QueueStatistics[]> {
     },
   })
     .then((res) => res.json())
+    .then(
+      (json: Record<string, QueueStatistics>) => new Map(Object.entries(json)),
+    )
     .catch(() => {
       toast.error("Something went wrong");
-      return [];
+      return new Map();
     });
 }
 
@@ -186,4 +190,59 @@ export async function updateUser(data: CreateUserRequest): Promise<void> {
       tags: ["users"],
     },
   }).catch(() => toast.error("Something went wrong"));
+}
+
+export async function updateQueueSettings(data: QueueSettingsType) {
+  return await fetch(
+    `${SERVER_ENDPOINT}/queue/${data.namespace}/${data.queue}/settings`,
+    {
+      method: "PUT",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        max_retries: data.maxRetries,
+        timeout: data.timeout,
+      }),
+      next: {
+        tags: ["queues"],
+      },
+    },
+  )
+    .then((res) => res.json())
+    .catch(() => {
+      toast.error("Something went wrong");
+      throw new Error("Failed to update settings");
+    });
+}
+
+export async function getQueueSettings(
+  namespace?: string,
+  queue?: string,
+): Promise<QueueSettingsType | undefined> {
+  if (namespace === undefined || queue === undefined) {
+    return undefined;
+  }
+  return await fetch(
+    `${SERVER_ENDPOINT}/queue/${namespace}/${queue}/settings`,
+    {
+      method: "GET",
+      credentials: "include",
+      next: {
+        tags: ["queues"],
+      },
+    },
+  )
+    .then((res) => res.json())
+    .then((data) => ({
+      namespace,
+      queue,
+      maxRetries: data.max_retries,
+      timeout: data.timeout,
+    }))
+    .catch(() => {
+      toast.error("Something went wrong");
+      throw new Error("Failed to fetch settings");
+    });
 }
