@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { cookies } from "next/headers";
 import Providers from "./providers";
-import { AuthVerifier } from '@/components/auth-verifier';
+import { AuthVerifier } from "@/components/auth-verifier";
 
 export const metadata: Metadata = {
   title: "NerveMQ UI",

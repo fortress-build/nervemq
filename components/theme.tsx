@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import { AnimatePresence, MotionConfig, motion } from "framer-motion";
 import { Computer, Moon, Sun } from "lucide-react";
 import { useRef, useState, useEffect, useId } from "react";
-import { SidebarMenuButton } from "./ui/sidebar";
+import { sidebarMenuButtonVariants } from "./ui/sidebar";
 
 import React from "react";
 import { Button } from "./ui/button";
@@ -34,18 +34,18 @@ export default function ThemeSelector() {
   const uniqueId = useId();
   const formContainerRef = useRef<HTMLDivElement>(null);
   const [isOpen, setIsOpen] = useState(false);
-  const { theme, setTheme } = useTheme() as UseThemeProps & {
+  const { theme = "light", setTheme } = useTheme() as UseThemeProps & {
     theme: Theme;
-  };
-
-  const onValueChange = (value: string) => {
-    setTheme(value);
-    setIsOpen(false);
   };
 
   useClickOutside(formContainerRef, () => {
     setIsOpen(false);
   });
+
+  const onValueChange = (value: string) => {
+    setTheme(value);
+    setIsOpen(false);
+  };
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -61,24 +61,29 @@ export default function ThemeSelector() {
     };
   }, []);
 
-  const currentTheme = themes[theme ?? "system"];
-
   return (
     <MotionConfig transition={TRANSITION}>
       <div className="relative">
         <motion.button
           key="button"
           layoutId={`popover-${uniqueId}`}
-          className={cn("flex h-8 w-8 justify-start")}
+          className={cn(
+            sidebarMenuButtonVariants({ variant: "default", size: "default" }),
+            "flex h-8 w-8 justify-start !rounded-md",
+          )}
           onClick={() => setIsOpen(true)}
         >
           <motion.span
             className="flex items-center justify-center"
             layoutId={`popover-label-${uniqueId}`}
           >
-            <SidebarMenuButton asChild className="text-current w-8 h-8">
-              {<currentTheme.icon />}
-            </SidebarMenuButton>
+            {theme === "system" ? (
+              <Computer />
+            ) : theme === "light" ? (
+              <Sun />
+            ) : (
+              <Moon />
+            )}
           </motion.span>
         </motion.button>
 
