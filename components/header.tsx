@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/breadcrumb";
 import { useSession } from "@/lib/state/global";
 import { cn } from "@/lib/utils";
-import { Slash, User } from "lucide-react";
+import { Menu, Slash, User } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -21,6 +21,8 @@ import {
   DropdownMenuContent,
 } from "./ui/dropdown-menu";
 import { SERVER_ENDPOINT } from "@/app/globals";
+import { Button } from "./ui/button";
+import { useSidebar } from "./ui/sidebar";
 
 export default function Header({ className }: { className?: string }) {
   const pathName = usePathname();
@@ -46,10 +48,24 @@ export default function Header({ className }: { className?: string }) {
     }));
   }
 
+  const { isMobile, setOpenMobile, openMobile } = useSidebar();
+
   return (
     <header
       className={cn(className, "flex flex-row items-center justify-between")}
     >
+      <Button
+        onClick={() => setOpenMobile(!openMobile)}
+        size={"sm"}
+        variant={"ghost"}
+        className={cn(
+          "p-1.5 h-min",
+          // display: none on desktop
+          isMobile ? "" : "hidden",
+        )}
+      >
+        <Menu />
+      </Button>
       <Breadcrumb>
         <BreadcrumbList>
           {route.flatMap((value, i) => [
