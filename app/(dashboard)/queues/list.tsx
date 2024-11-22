@@ -5,13 +5,11 @@ import type { ColumnDef } from "@tanstack/react-table";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-// Rename Message type to KVPair
 type KVPair = {
   key: string;
   value: string;
 };
 
-// Rename EventObject to MessageObject
 type MessageObject = {
   id: string;
   content: string;
@@ -23,7 +21,7 @@ type MessageObject = {
 };
 
 // Mock data for development
-const mockEvents: MessageObject[] = [
+const mockMessages: MessageObject[] = [
   {
     id: "msg-1234-abcd",
     content: "Process user registration for john@example.com",
@@ -122,13 +120,13 @@ const mockEvents: MessageObject[] = [
   },
 ];
 
-// Add this component for the expanded details
-function MessageDetails({ event }: { event: MessageObject }) {
+// Updated component name and prop type
+function MessageDetails({ message }: { message: MessageObject }) {
   return (
     <div className="p-6 space-y-4 bg-gray-50">
       <h3 className="font-semibold text-gray-700 mb-2">Message Details</h3>
       <div className="grid gap-3">
-        {event.messages?.map((message, index) => (
+        {message.messages?.map((message, index) => (
           // biome-ignore lint/suspicious/noArrayIndexKey: <explanation>
           <div key={index} className="bg-white p-4 rounded-lg border border-gray-200">
             <div className="grid grid-cols-2 gap-4">
@@ -217,17 +215,17 @@ const columns: ColumnDef<MessageObject>[] = [
 ];
 
 export default function ClientList() {
-  /*
+  const data = mockMessages;
+    /*
 const { queueId }: { queueId: string } = useParams();
 
-  const { data = mockEvents } = useQuery({
+  const { data = mockMessages } = useQuery({
     queryKey: ["queue-messages", queueId],
     queryFn: () => [] as MessageObject[],
   });
   */
-  const data = mockEvents;
 
   return <DataTable columns={columns} data={data} renderSubComponent={({ row }) => (
-    <MessageDetails event={row.original} />
+    <MessageDetails message={row.original} />
   )} />;
 }

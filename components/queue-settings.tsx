@@ -143,7 +143,7 @@ export function QueueSettings({ namespace, queue }: { namespace: string ; queue:
                 <form.Subscribe
                   selector={(state) => [state.canSubmit, state.isSubmitting]}
                 >
-                  {([canSubmit, isSubmitting]) => (
+                  {([canSubmit]) => (
                     <Button type="submit" disabled={!canSubmit || isPending}>
                       {isPending ? "Saving..." : "Save Changes"}
                     </Button>

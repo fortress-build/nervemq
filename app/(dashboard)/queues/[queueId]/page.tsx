@@ -109,9 +109,7 @@ export default function QueuePage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle>Queue Status</CardTitle>
-            {//TODO: ADD STUFF HERE
-            }
-            <QueueSettings namespace={queue?.ns} queue={queue?.name} />
+            {queue && <QueueSettings namespace={queue.ns} queue={queue.name} />}
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-4 gap-4">
