@@ -36,6 +36,7 @@ import CreateNamespace from "./create-namespace";
 import CreateApiKey from "./create-api-key";
 import CreateUser from "./create-user";
 import { useIsAdmin } from "@/lib/state/global";
+import { DialogTitle } from "./ui/dialog";
 
 function SidebarItem({
   title,
@@ -77,7 +78,7 @@ function SidebarItem({
 
 export default function DashboardSidebar() {
   const pathName = usePathname();
-  const { open } = useSidebar();
+  const { open, isMobile } = useSidebar();
 
   type Mode =
     | "normal"
@@ -106,12 +107,14 @@ export default function DashboardSidebar() {
         open={mode === "create-user"}
         close={() => setMode("normal")}
       />
+
       <SidebarHeader
         className={cn("flex gap-1 font-semibold justify-center p-3")}
       >
         <Axis3D />
       </SidebarHeader>
-      <SidebarContent className="flex">
+      <SidebarContent aria-describedby="menu" className="flex">
+        {isMobile ? <DialogTitle className="hidden">Menu</DialogTitle> : null}
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
