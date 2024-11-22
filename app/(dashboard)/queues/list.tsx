@@ -124,24 +124,25 @@ const mockEvents: EventObject[] = [
 // Add this component for the expanded details
 function EventDetails({ event }: { event: EventObject }) {
   return (
-    <div className="p-4 bg-gray-50 rounded-md">
-      <table className="w-full">
-        <thead>
-          <tr className="border-b">
-            <th className="py-2 text-left text-gray-600">Key</th>
-            <th className="py-2 text-left text-gray-600">Value</th>
-          </tr>
-        </thead>
-        <tbody>
-          {event.messages?.map((message, index) => (
-            // biome-ignore lint/suspicious/noArrayIndexKey: <explanation>
-<tr key={index} className="border-b">
-              <td className="py-2 font-medium text-gray-600">{message.key}</td>
-              <td className="py-2">{message.value}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div className="p-6 space-y-4 bg-gray-50">
+      <h3 className="font-semibold text-gray-700 mb-2">Event Details</h3>
+      <div className="grid gap-3">
+        {event.messages?.map((message, index) => (
+          // biome-ignore lint/suspicious/noArrayIndexKey: <explanation>
+          <div key={index} className="bg-white p-4 rounded-lg shadow-sm">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <span className="text-xs uppercase text-gray-400">Key</span>
+                <div className="mt-1 text-sm font-medium text-gray-700">{message.key}</div>
+              </div>
+              <div>
+                <span className="text-xs uppercase text-gray-400">Value</span>
+                <div className="mt-1 text-sm text-gray-700">{message.value}</div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
