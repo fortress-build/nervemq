@@ -5,24 +5,25 @@ import type { ColumnDef } from "@tanstack/react-table";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-// Add these type definitions
-type Message = {
+// Rename Message type to KVPair
+type KVPair = {
   key: string;
   value: string;
 };
 
-type EventObject = {
+// Rename EventObject to MessageObject
+type MessageObject = {
   id: string;
   content: string;
   timestamp: string;
   status: "pending" | "completed" | "failed";
   error?: string;
   attempts?: number;
-  messages?: Message[];
+  messages?: KVPair[];
 };
 
 // Mock data for development
-const mockEvents: EventObject[] = [
+const mockEvents: MessageObject[] = [
   {
     id: "msg-1234-abcd",
     content: "Process user registration for john@example.com",
@@ -122,7 +123,7 @@ const mockEvents: EventObject[] = [
 ];
 
 // Add this component for the expanded details
-function EventDetails({ event }: { event: EventObject }) {
+function MessageDetails({ event }: { event: MessageObject }) {
   return (
     <div className="p-6 space-y-4 bg-gray-50">
       <h3 className="font-semibold text-gray-700 mb-2">Event Details</h3>
@@ -148,7 +149,7 @@ function EventDetails({ event }: { event: EventObject }) {
 }
 
 // Define columns for the messages table
-const columns: ColumnDef<EventObject>[] = [
+const columns: ColumnDef<MessageObject>[] = [
   {
     id: "expand",
     header: "",
@@ -221,12 +222,12 @@ const { queueId }: { queueId: string } = useParams();
 
   const { data = mockEvents } = useQuery({
     queryKey: ["queue-messages", queueId],
-    queryFn: () => [] as EventObject[],
+    queryFn: () => [] as MessageObject[],
   });
   */
   const data = mockEvents;
 
   return <DataTable columns={columns} data={data} renderSubComponent={({ row }) => (
-    <EventDetails event={row.original} />
+    <MessageDetails event={row.original} />
   )} />;
 }

@@ -65,6 +65,7 @@ const chartData = {
 
 export default function QueuePage() {
   const { queueId }: { queueId: string } = useParams();
+  
 
   const { data: queue, isLoading } = useQuery({
     queryKey: ["queues"],
@@ -72,8 +73,6 @@ export default function QueuePage() {
     refetchInterval: 30000, // Refetch every 30 seconds
     select: (data: Map<string, QueueStatistics>) => data.get(queueId),
   });
-
-  console.log(queue);
 
   // Add state for visibility toggles
   const [visibleDatasets, setVisibleDatasets] = useState({
@@ -110,6 +109,8 @@ export default function QueuePage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle>Queue Status</CardTitle>
+            {//TODO: ADD STUFF HERE
+            }
             <QueueSettings />
           </CardHeader>
           <CardContent>
