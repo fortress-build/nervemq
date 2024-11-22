@@ -480,15 +480,43 @@ impl Service {
         Message::list(db.acquire().await?, namespace, queue).await
     }
 
-    pub async fn queue_statistics(
+    pub async fn list_queue_statistics(
         &self,
         identity: Identity,
-    ) -> Result<Vec<QueueStatistics>, Error> {
+    ) -> Result<HashMap<String, QueueStatistics>, Error> {
         let mut db = self.db.acquire().await?;
-        Queue::statistics(db.acquire().await?, identity).await
+        let email = identity.id()?;
+
+        let res = sqlx::query_as(
+            "
+            SELECT
+                q.id,
+                q.name,
+                qu.email as created_by,
+                n.name as ns,
+                COUNT(m.id) AS message_count,
+                SUM(LENGTH(m.body)) / CAST(COUNT(m.id) AS FLOAT) as avg_size_bytes
+            FROM queues q
+            LEFT JOIN messages m ON q.id = m.queue
+            JOIN user_permissions p ON p.namespace = q.ns
+            JOIN namespaces n ON n.id = q.ns
+            JOIN users u ON u.id = p.user
+            JOIN users qu ON q.created_by = qu.id
+            WHERE u.email = $1
+            GROUP BY q.id, q.name
+        ",
+        )
+        .bind(email)
+        .fetch_all(&mut *db)
+        .await?
+        .into_iter()
+        .map(|row: QueueStatistics| (row.name.clone(), row))
+        .collect::<HashMap<_, _>>();
+
+        Ok(res)
     }
 
-    pub async fn namespace_statistics(
+    pub async fn list_namespace_statistics(
         &self,
         identity: Identity,
     ) -> Result<Vec<NamespaceStatistics>, Error> {

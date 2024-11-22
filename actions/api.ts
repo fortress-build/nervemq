@@ -66,7 +66,7 @@ export async function deleteQueue(data: CreateQueueRequest) {
   }).catch(() => toast.error("Something went wrong"));
 }
 
-export async function listQueues(): Promise<QueueStatistics[]> {
+export async function listQueues(): Promise<Map<string, QueueStatistics>> {
   return await fetch(`${SERVER_ENDPOINT}/stats/queue`, {
     method: "GET",
     credentials: "include",
@@ -75,9 +75,12 @@ export async function listQueues(): Promise<QueueStatistics[]> {
     },
   })
     .then((res) => res.json())
+    .then(
+      (json: Record<string, QueueStatistics>) => new Map(Object.entries(json)),
+    )
     .catch(() => {
       toast.error("Something went wrong");
-      return [];
+      return new Map();
     });
 }
 

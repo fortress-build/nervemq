@@ -22,12 +22,14 @@ impl PartialEq for Queue {
 }
 
 #[derive(Serialize, Deserialize, FromRow, Debug)]
+#[serde(rename_all = "camelCase")]
 pub struct QueueStatistics {
-    id: u64,
-    ns: String,
-    name: String,
-    created_by: String,
-    message_count: u64,
+    pub id: u64,
+    pub ns: String,
+    pub name: String,
+    pub created_by: String,
+    pub message_count: u64,
+    pub avg_size_bytes: f64,
 }
 
 impl Queue {
@@ -105,37 +107,6 @@ impl Queue {
         }
 
         Ok(queues)
-    }
-
-    pub async fn statistics(
-        db: &mut SqliteConnection,
-        identity: Identity,
-    ) -> Result<Vec<QueueStatistics>, Error> {
-        let email = identity.id()?;
-
-        let res = sqlx::query_as(
-            "
-            SELECT
-                q.id,
-                q.name,
-                qu.email as created_by,
-                n.name as ns,
-                COUNT(m.id) AS message_count
-            FROM queues q
-            LEFT JOIN messages m ON q.id = m.queue
-            JOIN user_permissions p ON p.namespace = q.ns
-            JOIN namespaces n ON n.id = q.ns
-            JOIN users u ON u.id = p.user
-            JOIN users qu ON q.created_by = qu.id
-            WHERE u.email = $1
-            GROUP BY q.id, q.name
-        ",
-        )
-        .bind(email)
-        .fetch_all(db)
-        .await?;
-
-        Ok(res)
     }
 
     pub async fn list(

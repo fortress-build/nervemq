@@ -9,11 +9,7 @@ import {
   Filter,
   Check,
 } from "lucide-react";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "../ui/popover";
+import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { Button } from "../ui/button";
 import React from "react";
 import {
@@ -35,6 +31,7 @@ export type Queue = {
 
 export type QueueStatistics = Queue & {
   messageCount: number;
+  avgSizeBytes: number;
 };
 
 export const columns: ColumnDef<QueueStatistics>[] = [
@@ -94,16 +91,21 @@ export const columns: ColumnDef<QueueStatistics>[] = [
                         key={namespace.name}
                         value={namespace.name}
                         onSelect={(value) => {
-                          const currentFilters = column.getFilterValue() as string[] || [];
+                          const currentFilters =
+                            (column.getFilterValue() as string[]) || [];
                           const newFilters = currentFilters.includes(value)
                             ? currentFilters.filter((f) => f !== value)
                             : [...currentFilters, value];
-                          column.setFilterValue(newFilters.length ? newFilters : undefined);
+                          column.setFilterValue(
+                            newFilters.length ? newFilters : undefined,
+                          );
                         }}
                       >
                         <Check
                           className={`mr-2 h-4 w-4 ${
-                            selectedNamespaces.includes(namespace.name) ? "opacity-100" : "opacity-0"
+                            selectedNamespaces.includes(namespace.name)
+                              ? "opacity-100"
+                              : "opacity-0"
                           }`}
                         />
                         {namespace.name}

@@ -12,8 +12,13 @@ import {
   Legend,
 } from "chart.js";
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Spinner } from "@nextui-org/spinner";
+import { QueueStatistics } from "@/components/queues/table";
+import { listQueues } from "@/actions/api";
+import { useParams } from "next/navigation";
 
 // Register ChartJS components
 ChartJS.register(
@@ -32,7 +37,7 @@ const chartData = {
   datasets: [
     {
       label: "Pending",
-      data: [4, 3, 5, 6, 5],
+      data: [4, 3, 8, 6, 5],
       borderColor: "rgb(75, 192, 192)",
       tension: 0.1,
     },
@@ -58,6 +63,17 @@ const chartData = {
 };
 
 export default function QueuePage() {
+  const { queueId }: { queueId: string } = useParams();
+
+  const { data: queue, isLoading } = useQuery({
+    queryKey: ["queues"],
+    queryFn: () => listQueues(),
+    refetchInterval: 30000, // Refetch every 30 seconds
+    select: (data: Map<string, QueueStatistics>) => data.get(queueId),
+  });
+
+  console.log(queue);
+
   // Add state for visibility toggles
   const [visibleDatasets, setVisibleDatasets] = useState({
     pending: true,
@@ -112,6 +128,49 @@ export default function QueuePage() {
                 <p className="text-gray-600">Failed</p>
                 <p className="text-2xl font-medium">5</p>
               </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Prometheus Metrics Section */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Metrics</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {isLoading ? (
+                <div className="col-span-2 md:col-span-4 flex items-center justify-center">
+                  <Spinner />
+                </div>
+              ) : queue ? (
+                <>
+                  <div>
+                    <p className="text-gray-600">Daily Messages (avg)</p>
+                    <p className="text-2xl font-medium">
+                      {queue.queue_operations_total?.[0]?.value || 0}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-gray-600">Active Connections</p>
+                    <p className="text-2xl font-medium">
+                      {queue.active_connections?.[0]?.value || 0}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-gray-600">Message Size (avg)</p>
+                    <p className="text-2xl font-medium">
+                      {(queue.avgSizeBytes ?? 0).toFixed(2)} bytes
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-gray-600">Error Rate</p>
+                    <p className="text-2xl font-medium">{(0).toFixed(2)}%</p>
+                  </div>
+                </>
+              ) : (
+                <div>Failed to load metrics</div>
+              )}
             </div>
           </CardContent>
         </Card>
