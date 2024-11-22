@@ -38,7 +38,7 @@ create table if not exists queue_configurations (
 
   primary key (id),
   foreign key (queue) references queues(id) on delete cascade,
-  foreign key (dead_letter_queue) references queues(id) on delete cascade,
+  foreign key (dead_letter_queue) references queues(id) on delete cascade
 );
 create unique index if not exists queue_configs_queue_idx on queue_configurations(queue);
 

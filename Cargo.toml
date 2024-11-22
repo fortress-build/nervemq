@@ -52,6 +52,7 @@ eyre = "0.6.12"
 pom = "3.4.0"
 prefixed-api-key = { version = "0.3.0", features = ["sha2"] }
 rand = "0.8.5"
+secrecy = { version = "0.10.3", features = ["serde"] }
 serde = { version = "1.0.215", features = ["derive"] }
 serde-email = "3.1.0"
 serde_json = "1.0.133"

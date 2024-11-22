@@ -3,31 +3,14 @@ use std::collections::HashMap;
 use actix_identity::Identity;
 use actix_web::{get, web, Scope};
 
-use crate::{
-    db::{namespace::NamespaceStatistics, queue::QueueStatistics},
-    service::Service,
-};
-
-// #[get("/queue/{queue_id}")]
-// async fn queue_stats(
-//     service: web::Data<Service>,
-//     identity: Identity,
-//     path: web::Path<String>,
-// ) -> actix_web::Result<web::Json<Vec<QueueStatistics>>> {
-//     let queue_name = path.into_inner();
-//
-//     match service.queue_statistics(identity, queue_name).await {
-//         Ok(val) => Ok(web::Json(val)),
-//         Err(e) => Err(actix_web::error::ErrorInternalServerError(e)),
-//     }
-// }
+use crate::{namespace::NamespaceStatistics, queue::QueueStatistics, service::Service};
 
 #[get("/queue")]
 async fn queue_stats(
     service: web::Data<Service>,
     identity: Identity,
 ) -> actix_web::Result<web::Json<HashMap<String, QueueStatistics>>> {
-    match service.list_queue_statistics(identity).await {
+    match service.global_queue_statistics(identity).await {
         Ok(val) => Ok(web::Json(val)),
         Err(e) => Err(actix_web::error::ErrorInternalServerError(e)),
     }

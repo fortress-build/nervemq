@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 use actix_identity::{error::GetIdentityError, Identity};
 use serde_email::Email;
@@ -8,8 +8,9 @@ use sqlx::{
         SqliteAutoVacuum, SqliteConnectOptions, SqliteJournalMode, SqliteLockingMode,
         SqlitePoolOptions,
     },
-    Acquire, Executor, Pool, Sqlite, SqlitePool,
+    Acquire, Sqlite, SqlitePool,
 };
+use tokio_stream::StreamExt as _;
 
 use crate::{
     api::{
@@ -17,11 +18,9 @@ use crate::{
         auth::{Permission, Role, User},
     },
     config::Config,
-    db::{
-        message::Message,
-        namespace::{Namespace, NamespaceStatistics},
-        queue::{Queue, QueueStatistics},
-    },
+    message::Message,
+    namespace::{Namespace, NamespaceStatistics},
+    queue::{Queue, QueueStatistics},
 };
 
 #[derive(Debug, Snafu)]
@@ -65,11 +64,11 @@ impl From<GetIdentityError> for Error {
 pub struct Service {
     db: SqlitePool,
     #[allow(unused)]
-    config: crate::config::Config,
+    config: Arc<crate::config::Config>,
 }
 
 impl Service {
-    pub fn db(&self) -> &Pool<Sqlite> {
+    pub fn db(&self) -> &SqlitePool {
         &self.db
     }
 
@@ -91,7 +90,45 @@ impl Service {
 
         sqlx::migrate!("./migrations").run(&pool).await?;
 
-        Ok(Self { db: pool, config })
+        Ok(Self {
+            db: pool,
+            config: Arc::new(config),
+        })
+    }
+
+    pub async fn get_queue_id(
+        &self,
+        namespace: &str,
+        name: &str,
+        exec: impl Acquire<'_, Database = Sqlite>,
+    ) -> Result<u64, Error> {
+        Ok(sqlx::query_scalar(
+            "
+            SELECT q.id FROM queues q
+            JOIN namespaces n ON q.ns = n.id
+            WHERE n.name = $1 AND q.name = $2
+            ",
+        )
+        .bind(namespace)
+        .bind(name)
+        .fetch_one(&mut *exec.acquire().await?)
+        .await?)
+    }
+
+    pub async fn get_namespace_id<'a>(
+        &self,
+        name: &str,
+        ex: impl Acquire<'a, Database = Sqlite>,
+    ) -> eyre::Result<Option<u64>> {
+        sqlx::query_scalar(
+            "
+                    SELECT id FROM namespaces WHERE name = $1
+                ",
+        )
+        .bind(name)
+        .fetch_optional(&mut *ex.acquire().await?)
+        .await
+        .map_err(|e| eyre::eyre!(e))
     }
 
     pub async fn list_namespaces(&self, identity: Identity) -> Result<Vec<Namespace>, Error> {
@@ -107,17 +144,18 @@ impl Service {
         ",
         )
         .bind(email)
-        .fetch_all(&self.db)
+        .fetch_all(&mut *self.db.acquire().await?)
         .await?)
     }
 
     pub async fn create_namespace(&self, name: &str, identity: Identity) -> Result<u64, Error> {
-        let mut tx = self.db.begin().await?;
+        let mut tx = self.db().begin().await?;
 
         let user_email = identity.id()?;
+
         let user: User = sqlx::query_as("SELECT * FROM users WHERE email = $1")
             .bind(&user_email)
-            .fetch_optional(&mut *tx)
+            .fetch_optional(&mut *tx.acquire().await?)
             .await?
             .ok_or_else(|| Error::Unauthorized)?;
 
@@ -130,7 +168,7 @@ impl Service {
         )
         .bind(name)
         .bind(user.id as i64)
-        .fetch_one(&mut *tx)
+        .fetch_one(&mut *tx.as_mut().acquire().await?)
         .await?;
 
         sqlx::query(
@@ -141,7 +179,7 @@ impl Service {
         )
         .bind(user.id as i64)
         .bind(ns_id as i64)
-        .execute(&mut *tx)
+        .execute(&mut *tx.as_mut().acquire().await?)
         .await?;
 
         tx.commit().await?;
@@ -150,34 +188,44 @@ impl Service {
     }
 
     pub async fn delete_namespace(&self, name: &str, identity: Identity) -> Result<(), Error> {
-        let mut tx = self.db.begin().await?;
+        let mut tx = self.db().begin().await?;
 
-        let namespace = Namespace::get_id(tx.acquire().await?, name)
+        let namespace = self
+            .get_namespace_id(name, &mut tx)
             .await?
             .ok_or_else(|| eyre::eyre!("Namespace {name} does not exist"))?;
 
         let (_user_id, can_delete) = self
-            .check_user_access(&identity, namespace, tx.acquire().await?)
+            .check_user_access(&identity, namespace, &mut tx)
             .await?;
 
         if !can_delete {
             return Err(Error::Unauthorized);
         }
 
-        Namespace::delete(tx.acquire().await?, name).await?;
+        sqlx::query(
+            "
+            DELETE FROM namespaces WHERE name = $1
+        ",
+        )
+        .bind(name)
+        .execute(&mut *tx)
+        .await
+        .map(|_| ())?;
 
         tx.commit().await?;
 
         Ok(())
     }
 
-    pub async fn check_user_access<'a>(
+    async fn check_user_access<'a>(
         &self,
         identity: &Identity,
         ns: u64,
-        executor: impl Executor<'a, Database = Sqlite>,
+        exec: impl Acquire<'_, Database = Sqlite>,
     ) -> Result<(u64, bool), Error> {
         let email = identity.id()?;
+        let mut db = exec.acquire().await?;
 
         let res: Option<Permission> = sqlx::query_as(
             "
@@ -188,7 +236,7 @@ impl Service {
         )
         .bind(email)
         .bind(ns as i64)
-        .fetch_optional(executor)
+        .fetch_optional(&mut *db)
         .await?;
 
         match res {
@@ -197,34 +245,21 @@ impl Service {
         }
     }
 
-    pub async fn get_queue_id<'a>(&self, namespace: &str, name: &str) -> Result<u64, Error> {
-        Ok(sqlx::query_scalar(
-            "
-            SELECT q.id FROM queues q
-            JOIN namespaces n ON q.ns = n.id
-            WHERE n.name = $1 AND q.name = $2
-            ",
-        )
-        .bind(namespace)
-        .bind(name)
-        .fetch_one(&self.db)
-        .await?)
-    }
-
     pub async fn create_queue(
         &self,
         namespace: &str,
         name: &str,
         identity: Identity,
     ) -> Result<(), Error> {
-        let mut tx = self.db.begin().await?;
+        let mut tx = self.db().begin().await?;
 
-        let namespace = Namespace::get_id(tx.acquire().await?, namespace)
+        let namespace = self
+            .get_namespace_id(namespace, &mut tx)
             .await?
             .ok_or_else(|| eyre::eyre!("Namespace {namespace} does not exist"))?;
 
         let (user_id, _) = self
-            .check_user_access(&identity, namespace, &mut *tx)
+            .check_user_access(&identity, namespace, &mut tx)
             .await?;
 
         sqlx::query("INSERT INTO queues (ns, name, created_by) VALUES ($1, $2, $3)")
@@ -245,16 +280,22 @@ impl Service {
         name: &str,
         identity: Identity,
     ) -> eyre::Result<()> {
-        let mut tx = self.db.begin().await?;
+        let mut tx = self.db().begin().await?;
 
-        let namespace_id = Namespace::get_id(tx.acquire().await?, namespace)
+        let namespace_id = self
+            .get_namespace_id(namespace, &mut tx)
             .await?
             .ok_or_else(|| eyre::eyre!("Namespace {namespace} does not exist"))?;
 
-        self.check_user_access(&identity, namespace_id, &mut *tx)
+        self.check_user_access(&identity, namespace_id, &mut tx)
             .await?;
 
-        Queue::delete(tx.acquire().await?, namespace, name).await?;
+        let id = self.get_queue_id(namespace, name, &mut tx).await?;
+
+        sqlx::query("DELETE FROM queues WHERE id = $1")
+            .bind(id as i64)
+            .execute(&mut *tx)
+            .await?;
 
         tx.commit().await?;
 
@@ -266,10 +307,11 @@ impl Service {
         namespace: Option<&str>,
         identity: Identity,
     ) -> Result<Vec<Queue>, Error> {
-        let mut conn = self.db.acquire().await?;
+        let mut conn = self.db().acquire().await?;
 
         if let Some(namespace) = namespace {
-            let namespace_id = Namespace::get_id(conn.acquire().await?, namespace)
+            let namespace_id = self
+                .get_namespace_id(namespace, &mut *conn)
                 .await?
                 .ok_or_else(|| eyre::eyre!("Namespace {namespace} does not exist"))?;
 
@@ -277,7 +319,53 @@ impl Service {
                 .await?;
         }
 
-        Queue::list(conn.acquire().await?, namespace, identity).await
+        // Queue::list(conn.acquire().await?, namespace, identity).await
+
+        match namespace {
+            Some(ns) => self.list_queues_for_namespace(ns).await,
+            None => self.list_all_queues(identity).await,
+        }
+    }
+
+    pub async fn list_queues_for_namespace(&self, namespace: &str) -> Result<Vec<Queue>, Error> {
+        let mut db = self.db().acquire().await?;
+        let mut stream = sqlx::query_as(
+            "
+            SELECT q.id, q.name, n.name as ns, u.email as created_by FROM queues q
+            JOIN namespaces n ON q.ns = n.id
+            JOIN users u on q.created_by = u.id
+            WHERE n.name = $1",
+        )
+        .bind(namespace)
+        .fetch(&mut *db);
+
+        let mut queues = Vec::new();
+
+        while let Some(res) = stream.next().await.transpose()? {
+            queues.push(res);
+        }
+
+        Ok(queues)
+    }
+
+    pub async fn list_all_queues(&self, identity: Identity) -> Result<Vec<Queue>, Error> {
+        let email = identity.id()?;
+
+        let queues = sqlx::query_as(
+            "
+            SELECT q.id, q.name, qu.email as created_by, n.name as ns FROM queues q
+            JOIN user_permissions p ON p.namespace = q.ns
+            JOIN namespaces n ON n.id = q.ns
+            JOIN users u ON u.id = p.user
+            JOIN users qu ON q.id = q.created_by
+            WHERE u.email = $1
+            ",
+        )
+        .bind(email)
+        .fetch_all(&mut *self.db().acquire().await?)
+        .await?;
+
+        Ok(queues)
     }
 
     pub async fn create_user(
@@ -289,7 +377,7 @@ impl Service {
     ) -> eyre::Result<()> {
         let hashed_password = hash_password(password).await?;
 
-        let mut tx = self.db.begin().await?;
+        let mut tx = self.db().begin().await?;
 
         let user_id: u64 = sqlx::query_scalar(
             "
@@ -301,7 +389,7 @@ impl Service {
         .bind(email.as_str())
         .bind(hashed_password.to_string())
         .bind(role.unwrap_or(Role::User))
-        .fetch_one(tx.acquire().await?)
+        .fetch_one(&mut *tx.acquire().await?)
         .await?;
 
         for namespace in namespaces {
@@ -328,9 +416,23 @@ impl Service {
         message: &[u8],
         kv: HashMap<String, String>,
     ) -> eyre::Result<u64> {
-        let mut tx = self.db.begin().await?;
+        let mut tx = self.db().begin().await?;
 
-        let msg_id = Message::insert(tx.acquire().await?, queue, message, kv).await?;
+        let msg_id: u64 =
+            sqlx::query_scalar("INSERT INTO messages (queue, body) VALUES ($1, $2) RETURNING id")
+                .bind(queue as i64)
+                .bind(message)
+                .fetch_one(&mut *tx)
+                .await?;
+
+        for (k, v) in kv.into_iter() {
+            sqlx::query("INSERT INTO kv_pairs (message, k, v) VALUES ($1, $2, $3)")
+                .bind(msg_id as i64)
+                .bind(k)
+                .bind(v)
+                .execute(&mut *tx)
+                .await?;
+        }
 
         tx.commit().await?;
 
@@ -343,7 +445,7 @@ impl Service {
         queue: &str,
         messages: Vec<(Vec<u8>, HashMap<String, String>)>,
     ) -> eyre::Result<Vec<u64>> {
-        let mut tx = self.db.begin().await?;
+        let mut tx = self.db().begin().await?;
 
         // Get queue ID once for all messages
         let queue_id: u64 = sqlx::query_scalar(
@@ -362,7 +464,24 @@ impl Service {
 
         // Insert all messages in the batch
         for (message, kv) in messages {
-            message_ids.push(Message::insert(tx.acquire().await?, queue_id, &message, kv).await?);
+            let msg_id: u64 = sqlx::query_scalar(
+                "INSERT INTO messages (queue, body) VALUES ($1, $2) RETURNING id",
+            )
+            .bind(queue_id as i64)
+            .bind(&message)
+            .fetch_one(&mut *tx)
+            .await?;
+
+            for (k, v) in kv.into_iter() {
+                sqlx::query("INSERT INTO kv_pairs (message, k, v) VALUES ($1, $2, $3)")
+                    .bind(msg_id as i64)
+                    .bind(k)
+                    .bind(v)
+                    .execute(&mut *tx)
+                    .await?;
+            }
+
+            message_ids.push(msg_id);
         }
 
         tx.commit().await?;
@@ -375,7 +494,7 @@ impl Service {
         namespace: impl AsRef<str>,
         queue: impl AsRef<str>,
     ) -> eyre::Result<Option<Message>> {
-        let mut tx = self.db.begin().await?;
+        let mut tx = self.db().begin().await?;
 
         // Get the first undelivered message and mark it as delivered in one atomic operation
         let message: Option<Message> = sqlx::query_as(
@@ -418,7 +537,7 @@ impl Service {
         queue: &str,
         max_messages: usize,
     ) -> eyre::Result<Vec<Message>> {
-        let mut tx = self.db.begin().await?;
+        let mut tx = self.db().begin().await?;
 
         // Get multiple undelivered messages and mark them as delivered in one atomic operation
         let messages: Vec<Message> = sqlx::query_as(
@@ -457,7 +576,7 @@ impl Service {
     }
 
     pub async fn peek(&self, namespace: &str, queue: &str, message_id: u64) -> Option<Message> {
-        let mut db = self.db.acquire().await.ok()?;
+        let mut db = self.db().acquire().await.ok()?;
 
         sqlx::query_as(
             r#"
@@ -476,15 +595,25 @@ impl Service {
     }
 
     pub async fn list_messages(&self, namespace: &str, queue: &str) -> eyre::Result<Vec<Message>> {
-        let mut db = self.db.acquire().await?;
-        Message::list(db.acquire().await?, namespace, queue).await
+        let mut db = self.db().acquire().await?;
+
+        Ok(sqlx::query_as::<_, Message>(
+            "
+            SELECT m.*, q.name as queue FROM messages m
+            JOIN queues q ON m.queue = q.id
+        ",
+        )
+        .bind(namespace)
+        .bind(queue)
+        .fetch_all(&mut *db)
+        .await?)
     }
 
-    pub async fn list_queue_statistics(
+    pub async fn global_queue_statistics(
         &self,
         identity: Identity,
     ) -> Result<HashMap<String, QueueStatistics>, Error> {
-        let mut db = self.db.acquire().await?;
+        let mut db = self.db().acquire().await?;
         let email = identity.id()?;
 
         let res = sqlx::query_as(
@@ -510,7 +639,7 @@ impl Service {
         .fetch_all(&mut *db)
         .await?
         .into_iter()
-        .map(|row: QueueStatistics| (row.name.clone(), row))
+        .map(|row: QueueStatistics| (row.queue.name.clone(), row))
         .collect::<HashMap<_, _>>();
 
         Ok(res)
@@ -538,7 +667,7 @@ impl Service {
         ",
         )
         .bind(email)
-        .fetch_all(&self.db)
+        .fetch_all(&mut *self.db().acquire().await?)
         .await?)
     }
 }
