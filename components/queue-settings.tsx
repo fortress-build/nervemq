@@ -19,15 +19,21 @@ import { useState, useEffect } from "react";
 import { useForm } from "@tanstack/react-form";
 import { yupValidator } from "@tanstack/yup-form-adapter";
 import { queueSettingsSchema } from "@/schemas/queue-settings";
+import type { QueueStatistics } from "./queues/table";
 
-
-export function QueueSettings({ namespace, queue }: { namespace: string ; queue: string}) {
+export function QueueSettings({ queue }: { queue?: QueueStatistics }) {
   const [open, setOpen] = useState(false);
   const queryClient = useQueryClient();
 
   const { data: settings, isLoading } = useQuery({
-    queryKey: ["queueSettings", namespace, queue],
-    queryFn: () => getQueueSettings(namespace, queue),
+    queryKey: [
+      "queueSettings",
+      {
+        ns: queue?.ns,
+        name: queue?.name,
+      },
+    ],
+    queryFn: () => getQueueSettings(queue?.ns, queue?.name),
     enabled: open,
   });
 
@@ -35,7 +41,15 @@ export function QueueSettings({ namespace, queue }: { namespace: string ; queue:
     mutationFn: updateQueueSettings,
     onSuccess: () => {
       toast.success("Settings updated successfully");
-      queryClient.invalidateQueries({ queryKey: ["queueSettings", namespace, queue] });
+      queryClient.invalidateQueries({
+        queryKey: [
+          "queueSettings",
+          {
+            ns: queue?.ns,
+            queue: queue?.name,
+          },
+        ],
+      });
       setOpen(false);
     },
     onError: (error: Error) => {
@@ -45,8 +59,8 @@ export function QueueSettings({ namespace, queue }: { namespace: string ; queue:
 
   const form = useForm({
     defaultValues: {
-      namespace,
-      queue,
+      namespace: queue?.ns ?? "",
+      queue: queue?.name ?? "",
       maxRetries: 3,
       timeout: 30,
     },
@@ -55,9 +69,7 @@ export function QueueSettings({ namespace, queue }: { namespace: string ; queue:
       onChange: queueSettingsSchema,
       onMount: queueSettingsSchema,
     },
-    onSubmit: async ({ value: data }) => {
-      saveSettings(data);
-    },
+    onSubmit: ({ value }) => saveSettings(value),
   });
 
   // Update form values when settings are loaded
@@ -81,76 +93,84 @@ export function QueueSettings({ namespace, queue }: { namespace: string ; queue:
         {isLoading ? (
           <div>Loading...</div>
         ) : (
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                void form.handleSubmit();
-              }}
-            >
-              <div className="grid gap-4 py-4">
-                <form.Field name="maxRetries">
-                  {(field) => (
-                    <div className="grid grid-cols-4 items-center gap-4">
-                      <Label htmlFor={field.name} className="text-right">
-                        Max Retries
-                      </Label>
-                      <Input
-                        id={field.name}
-                        type="number"
-                        className="col-span-3"
-                        value={field.state.value}
-                        onChange={(e) => field.handleChange(parseInt(e.target.value))}
-                        onBlur={field.handleBlur}
-                      />
-                      {field.state.meta.errors ? (
-                        <span className="col-start-2 col-span-3 text-sm text-destructive">
-                          {field.state.meta.errors.join(", ")}
-                        </span>
-                      ) : null}
-                    </div>
-                  )}
-                </form.Field>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              void form.handleSubmit();
+            }}
+          >
+            <div className="grid gap-4 py-4">
+              <form.Field name="maxRetries">
+                {(field) => (
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor={field.name} className="text-right">
+                      Max Retries
+                    </Label>
+                    <Input
+                      id={field.name}
+                      type="number"
+                      className="col-span-3"
+                      value={field.state.value}
+                      onChange={(e) =>
+                        field.handleChange(Number.parseInt(e.target.value))
+                      }
+                      onBlur={field.handleBlur}
+                    />
+                    {field.state.meta.errors ? (
+                      <span className="col-start-2 col-span-3 text-sm text-destructive">
+                        {field.state.meta.errors.join(", ")}
+                      </span>
+                    ) : null}
+                  </div>
+                )}
+              </form.Field>
 
-                <form.Field name="timeout">
-                  {(field) => (
-                    <div className="grid grid-cols-4 items-center gap-4">
-                      <Label htmlFor={field.name} className="text-right">
-                        Timeout (s)
-                      </Label>
-                      <Input
-                        id={field.name}
-                        type="number"
-                        className="col-span-3"
-                        value={field.state.value}
-                        onChange={(e) => field.handleChange(parseInt(e.target.value))}
-                        onBlur={field.handleBlur}
-                      />
-                      {field.state.meta.errors ? (
-                        <span className="col-start-2 col-span-3 text-sm text-destructive">
-                          {field.state.meta.errors.join(", ")}
-                        </span>
-                      ) : null}
-                    </div>
-                  )}
-                </form.Field>
-              </div>
+              <form.Field name="timeout">
+                {(field) => (
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor={field.name} className="text-right">
+                      Timeout (s)
+                    </Label>
+                    <Input
+                      id={field.name}
+                      type="number"
+                      className="col-span-3"
+                      value={field.state.value}
+                      onChange={(e) =>
+                        field.handleChange(Number.parseInt(e.target.value))
+                      }
+                      onBlur={field.handleBlur}
+                    />
+                    {field.state.meta.errors ? (
+                      <span className="col-start-2 col-span-3 text-sm text-destructive">
+                        {field.state.meta.errors.join(", ")}
+                      </span>
+                    ) : null}
+                  </div>
+                )}
+              </form.Field>
+            </div>
 
-              <DialogFooter className="gap-2">
-                <Button variant="outline" type="button" onClick={() => setOpen(false)}>
-                  Cancel
-                </Button>
-                <form.Subscribe
-                  selector={(state) => [state.canSubmit, state.isSubmitting]}
-                >
-                  {([canSubmit]) => (
-                    <Button type="submit" disabled={!canSubmit || isPending}>
-                      {isPending ? "Saving..." : "Save Changes"}
-                    </Button>
-                  )}
-                </form.Subscribe>
-              </DialogFooter>
-            </form>
+            <DialogFooter className="gap-2">
+              <Button
+                variant="outline"
+                type="button"
+                onClick={() => setOpen(false)}
+              >
+                Cancel
+              </Button>
+              <form.Subscribe
+                selector={(state) => [state.canSubmit, state.isSubmitting]}
+              >
+                {([canSubmit]) => (
+                  <Button type="submit" disabled={!canSubmit || isPending}>
+                    {isPending ? "Saving..." : "Save Changes"}
+                  </Button>
+                )}
+              </form.Subscribe>
+            </DialogFooter>
+          </form>
         )}
       </DialogContent>
     </Dialog>

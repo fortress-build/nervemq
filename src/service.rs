@@ -262,12 +262,29 @@ impl Service {
             .check_user_access(&identity, namespace, &mut tx)
             .await?;
 
-        sqlx::query("INSERT INTO queues (ns, name, created_by) VALUES ($1, $2, $3)")
-            .bind(namespace as i64)
-            .bind(name)
-            .bind(user_id as i64)
-            .execute(tx.acquire().await?)
-            .await?;
+        let queue_id: u64 = sqlx::query_scalar(
+            "
+            INSERT INTO queues (ns, name, created_by)
+            VALUES ($1, $2, $3)
+            RETURNING id
+        ",
+        )
+        .bind(namespace as i64)
+        .bind(name)
+        .bind(user_id as i64)
+        .fetch_one(&mut *tx)
+        .await?;
+
+        sqlx::query(
+            "
+            INSERT INTO queue_configurations (queue, max_retries)
+            VALUES ($1, $2)
+        ",
+        )
+        .bind(queue_id as i64)
+        .bind(self.config.default_max_retries() as i64)
+        .execute(&mut *tx)
+        .await?;
 
         tx.commit().await?;
 
@@ -449,11 +466,11 @@ impl Service {
 
         // Get queue ID once for all messages
         let queue_id: u64 = sqlx::query_scalar(
-            r#"
+            "
             SELECT q.id FROM queues q
             JOIN namespaces n ON q.ns = n.id
             WHERE n.name = $1 AND q.name = $2
-            "#,
+            ",
         )
         .bind(namespace)
         .bind(queue)
@@ -498,7 +515,7 @@ impl Service {
 
         // Get the first undelivered message and mark it as delivered in one atomic operation
         let message: Option<Message> = sqlx::query_as(
-            r#"
+            "
             WITH next_message AS (
                 SELECT
                     m.id,
@@ -519,7 +536,7 @@ impl Service {
             SET delivered_at = unixepoch('now')
             WHERE id IN (SELECT id FROM next_message)
             RETURNING *
-            "#,
+            ",
         )
         .bind(namespace.as_ref())
         .bind(queue.as_ref())
@@ -541,7 +558,7 @@ impl Service {
 
         // Get multiple undelivered messages and mark them as delivered in one atomic operation
         let messages: Vec<Message> = sqlx::query_as(
-            r#"
+            "
             WITH next_messages AS (
                 SELECT
                     m.id,
@@ -562,7 +579,7 @@ impl Service {
             SET delivered_at = unixepoch('now')
             WHERE id IN (SELECT id FROM next_messages)
             RETURNING *, (SELECT queue_name FROM next_messages WHERE next_messages.id = messages.id) as queue
-            "#,
+            ",
         )
         .bind(namespace)
         .bind(queue)
@@ -579,12 +596,12 @@ impl Service {
         let mut db = self.db().acquire().await.ok()?;
 
         sqlx::query_as(
-            r#"
+            "
             SELECT m.* FROM messages m
             JOIN queues q ON m.queue = q.id
             JOIN namespaces n ON q.ns = n.id
             WHERE n.name = $1 AND q.name = $2 AND m.id = $3
-            "#,
+            ",
         )
         .bind(namespace)
         .bind(queue)
