@@ -16,9 +16,10 @@ import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Spinner } from "@nextui-org/spinner";
-import { QueueStatistics } from "@/components/queues/table";
+import type { QueueStatistics } from "@/components/queues/table";
 import { listQueues } from "@/actions/api";
 import { useParams } from "next/navigation";
+import { QueueSettings } from "@/components/queue-settings";
 
 // Register ChartJS components
 ChartJS.register(
@@ -64,6 +65,7 @@ const chartData = {
 
 export default function QueuePage() {
   const { queueId }: { queueId: string } = useParams();
+  
 
   const { data: queue, isLoading } = useQuery({
     queryKey: ["queues"],
@@ -71,8 +73,6 @@ export default function QueuePage() {
     refetchInterval: 30000, // Refetch every 30 seconds
     select: (data: Map<string, QueueStatistics>) => data.get(queueId),
   });
-
-  console.log(queue);
 
   // Add state for visibility toggles
   const [visibleDatasets, setVisibleDatasets] = useState({
@@ -107,8 +107,9 @@ export default function QueuePage() {
       <div className="grid gap-4">
         {/* Queue Status Section */}
         <Card>
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle>Queue Status</CardTitle>
+            {queue && <QueueSettings namespace={queue.ns} queue={queue.name} />}
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-4 gap-4">
@@ -148,13 +149,13 @@ export default function QueuePage() {
                   <div>
                     <p className="text-gray-600">Daily Messages (avg)</p>
                     <p className="text-2xl font-medium">
-                      {queue.queue_operations_total?.[0]?.value || 0}
+                      {(queue.queue_operations_total ?? 0).toFixed(2)}
                     </p>
                   </div>
                   <div>
                     <p className="text-gray-600">Active Connections</p>
                     <p className="text-2xl font-medium">
-                      {queue.active_connections?.[0]?.value || 0}
+                      {(queue.active_connections ?? 0).toFixed(2)}
                     </p>
                   </div>
                   <div>
