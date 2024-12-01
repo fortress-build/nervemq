@@ -310,17 +310,15 @@ export default function CreateUser({
                 selector={(state) => [state.canSubmit, state.isSubmitting]}
               >
                 {([canSubmit, isSubmitting]) => (
-                  <>
+                  <div className="flex flex-col sm:flex-row gap-2">
                     <Button type="submit" disabled={!canSubmit}>
                       {isSubmitting ? (
                         <>
-                          {
-                            <Spinner
-                              className="absolute self-center"
-                              size="sm"
-                              color="current"
-                            />
-                          }
+                          <Spinner
+                            className="absolute self-center"
+                            size="sm"
+                            color="current"
+                          />
                           <p className="text-transparent">Create</p>
                         </>
                       ) : (
@@ -329,11 +327,11 @@ export default function CreateUser({
                     </Button>
 
                     <DialogClose asChild>
-                      <Button variant={"secondary"} disabled={isSubmitting}>
+                      <Button variant="secondary" disabled={isSubmitting}>
                         Cancel
                       </Button>
                     </DialogClose>
-                  </>
+                  </div>
                 )}
               </form.Subscribe>
             </DialogFooter>
