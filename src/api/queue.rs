@@ -21,7 +21,7 @@ async fn list_all_queues(
     service: web::Data<Service>,
     identity: Identity,
 ) -> actix_web::Result<impl Responder> {
-    let queues = match service.list_queues(None, identity).await {
+    let queues = match service.list_all_queues(identity).await {
         Ok(q) => q,
         Err(e) => return Err(actix_web::error::ErrorInternalServerError(e)),
     };
@@ -33,9 +33,8 @@ async fn list_all_queues(
 async fn list_ns_queues(
     service: web::Data<Service>,
     path: web::Path<String>,
-    identity: Identity,
 ) -> actix_web::Result<impl Responder> {
-    let queues = match service.list_queues(Some(&*path), identity).await {
+    let queues = match service.list_queues_for_namespace(&*path).await {
         Ok(q) => q,
         Err(e) => return Err(actix_web::error::ErrorInternalServerError(e)),
     };
