@@ -74,10 +74,26 @@ async fn create_queue(
     Ok("OK")
 }
 
+#[get("/{ns_name}/{queue_name}")]
+async fn queue_info(
+    service: web::Data<Service>,
+    path: web::Path<(String, String)>,
+    identity: Identity,
+) -> actix_web::Result<impl Responder> {
+    let (namespace, name) = &*path;
+
+    match service.queue_statistics(identity, namespace, name).await {
+        Ok(stats) => Ok(web::Json(stats)),
+        Err(Error::Unauthorized) => Err(ErrorUnauthorized("Unauthorized")),
+        Err(e) => Err(ErrorInternalServerError(e)),
+    }
+}
+
 pub fn service() -> Scope {
     web::scope("/queue")
         .service(list_all_queues)
         .service(list_ns_queues)
         .service(create_queue)
         .service(delete_queue)
+        .service(queue_info)
 }
