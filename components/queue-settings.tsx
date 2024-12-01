@@ -86,7 +86,7 @@ export function QueueSettings({ queue }: { queue?: QueueStatistics }) {
           <Settings2 className="h-4 w-4" />
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="rounded-lg sm:rounded-lg">
         <DialogHeader>
           <DialogTitle>Queue Settings</DialogTitle>
         </DialogHeader>
