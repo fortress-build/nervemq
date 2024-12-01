@@ -4,19 +4,49 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Spinner } from "@nextui-org/spinner";
 import type { QueueStatistics } from "@/components/queues/table";
-import { listQueues } from "@/actions/api";
-import { useParams } from "next/navigation";
+import { fetchQueue } from "@/actions/api";
+import { useParams, useRouter } from "next/navigation";
 import { QueueSettings } from "@/components/queue-settings";
+import { Button } from "@/components/ui/button";
 
 export default function QueuePage() {
+  const router = useRouter();
   const { queueId }: { queueId: string } = useParams();
 
-  const { data: queue, isLoading } = useQuery({
-    queryKey: ["queues"],
-    queryFn: () => listQueues(),
-    refetchInterval: 30000, // Refetch every 30 seconds
-    select: (data: Map<string, QueueStatistics>) => data.get(queueId),
+  const [name, namespace] = queueId?.split('-') || [];
+
+  const { data: queue, isLoading, error } = useQuery<QueueStatistics, Error>({
+    queryKey: ["queues", name, namespace],
+    queryFn: async () => {
+      if (!name || !namespace) {
+        throw new Error("Invalid queue ID");
+      }
+      const result = await fetchQueue(name, namespace);
+      if (!result) {
+        throw new Error("Queue not found");
+      }
+      return result as QueueStatistics;
+    },
+    refetchInterval: 30000,
   });
+
+  if (error instanceof Error && 'status' in error && error.status === 403) {
+    return (
+      <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center">
+        <Card className="w-[400px] border">
+          <CardHeader className="text-center">
+            <CardTitle>Access Denied</CardTitle>
+          </CardHeader>
+          <CardContent className="text-center">
+            <p className="mb-4">You don&apos;t have permission to view this queue.</p>
+            <Button onClick={() => router.push('/queues')}>
+              Return to Queues
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <>

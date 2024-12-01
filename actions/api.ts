@@ -85,6 +85,25 @@ export async function listQueues(): Promise<Map<string, QueueStatistics>> {
     });
 }
 
+// Mock function
+export async function fetchQueue(
+  namespace: string,
+  queueName: string
+): Promise<QueueStatistics | undefined> {
+  return await fetch(`${SERVER_ENDPOINT}/stats/queue/${namespace}/${queueName}`, {
+    method: "GET",
+    credentials: "include",
+    next: {
+      tags: ["queues"],
+    },
+  })
+    .then((res) => res.json())
+    .catch(() => {
+      toast.error("Something went wrong");
+      return undefined;
+    });
+}
+
 export async function listAPIKeys(): Promise<ApiKey[]> {
   "use client";
   return await fetch(`${SERVER_ENDPOINT}/tokens`, {

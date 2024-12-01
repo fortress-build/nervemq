@@ -38,12 +38,11 @@ export default function Header({ className }: { className?: string }) {
       },
     ];
   } else {
-    const segments = pathName.split("/").filter((s) => s.length > 0);
+    const cleanPath = pathName.split('?')[0];
+    const segments = cleanPath.split("/").filter((s) => s.length > 0);
     route = segments.map((s, i) => ({
-      label: s
-        .split("-")
-        .map((s) => (i === 0 ? s.charAt(0).toUpperCase() + s.slice(1) : s))
-        .join(" "),
+      label: s.split("-")[0]
+        .charAt(0) + s.split("-")[0].slice(1),
       href: `/${segments.slice(0, i + 1).join("/")}`,
     }));
   }
