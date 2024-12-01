@@ -1,7 +1,9 @@
-use actix_web::dev::ServiceRequest;
+use actix_web::{dev::ServiceRequest, web};
 use hmac::Mac;
 use secrecy::ExposeSecret;
+use serde::Deserialize;
 use sha2::Sha256;
+use sqlx::FromRow;
 
 use crate::auth::{
     crypto::{gen_signature_key, sha256_hex},
@@ -17,6 +19,13 @@ pub struct SigV4Header<'a> {
     pub signature: &'a str,
     pub region: &'a str,
     pub service: &'a str,
+}
+
+#[derive(Deserialize, FromRow)]
+struct VerificationData {
+    #[allow(unused)]
+    hashed_key: String,
+    validation_key: Vec<u8>,
 }
 
 pub async fn authenticate_sigv4(
@@ -81,9 +90,45 @@ pub async fn authenticate_sigv4(
         header.algorithm, header.date, credential_scope, canonical_request_hash
     );
 
+    let pool = req
+        .app_data::<web::Data<crate::service::Service>>()
+        .expect("SQLite pool not found. This is a bug.")
+        .db();
+
+    let Some(verify) = sqlx::query_as::<_, VerificationData>(
+        "SELECT hashed_key, validation_key FROM api_keys WHERE key_id = $1",
+    )
+    .bind(&header.key_id)
+    .fetch_optional(pool)
+    .await
+    .map_err(|e| {
+        tracing::error!("Failed to fetch identity: {}", e);
+        Error::InternalError
+    })?
+    else {
+        return Err(Error::IdentityNotFound {
+            key_id: header.key_id.to_string(),
+        }
+        .into());
+    };
+
+    // let Ok(hashed_key) = PasswordHashString::new(&verify.hashed_key) else {
+    //     return Err(Error::InternalError.into());
+    // };
+    //
+    // let hash = hashed_key.password_hash();
+    // let Some(salt) = hash.salt else {
+    //     tracing::error!("No salt found in hashed key - this is probably a bug");
+    //     return Err(Error::InternalError);
+    // };
+
     let generated_signature = {
-        let signing_key =
-            gen_signature_key("SIGNING KEY", &header.date, &header.region, &header.service);
+        let signing_key = gen_signature_key(
+            &verify.validation_key,
+            &header.date,
+            &header.region,
+            &header.service,
+        );
 
         let mut mac = hmac::Hmac::<Sha256>::new_from_slice(signing_key.expose_secret())
             .map_err(|_| Error::InternalError)?;

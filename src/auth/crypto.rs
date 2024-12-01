@@ -13,8 +13,10 @@ pub fn sha256_hex(data: &[u8]) -> String {
     hex::encode(hasher.finalize())
 }
 
-pub fn gen_signature_key(key: &str, date: &str, region: &str, service: &str) -> SecretSlice<u8> {
-    let key_secret = format!("AWS4{}", key);
+pub fn gen_signature_key(key: &[u8], date: &str, region: &str, service: &str) -> SecretSlice<u8> {
+    let mut key_secret = Vec::with_capacity(key.len() + 4);
+    key_secret.extend_from_slice(b"AWS4");
+    key_secret.extend_from_slice(key);
 
     let sign = |msg: &[u8], key: &[u8]| -> Vec<u8> {
         let mut mac =
@@ -23,7 +25,7 @@ pub fn gen_signature_key(key: &str, date: &str, region: &str, service: &str) -> 
         mac.finalize().into_bytes().to_vec()
     };
 
-    let date_key = sign(key_secret.as_bytes(), date.as_bytes());
+    let date_key = sign(&key_secret, date.as_bytes());
     let date_region_key = sign(&date_key, region.as_bytes());
     let date_region_service_key = sign(&date_region_key, service.as_bytes());
     sign(&date_region_service_key, b"aws4_request").into()
