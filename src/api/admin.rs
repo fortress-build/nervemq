@@ -1,7 +1,7 @@
 use actix_web::{
     delete,
     error::{ErrorBadRequest, ErrorInternalServerError},
-    get, post,
+    get, post, put,
     web::{self, Json},
     HttpResponse, Responder, Scope,
 };
@@ -74,9 +74,134 @@ pub async fn delete_user(
     Ok(HttpResponse::Ok())
 }
 
+#[get("/users/{email}/permissions")]
+pub async fn list_user_permissions(
+    service: web::Data<Service>,
+    email: String,
+) -> actix_web::Result<impl Responder> {
+    let permissions: Vec<String> = sqlx::query_scalar(
+        "
+            SELECT name FROM user_permissions p
+            JOIN namespaces ON p.namespace = ns.id
+            JOIN users u ON u.id = p.user
+            WHERE u.email = $1
+        ",
+    )
+    .bind(&email)
+    .fetch_all(service.db())
+    .await
+    .map_err(ErrorInternalServerError)?;
+    Ok(Json(permissions))
+}
+
+#[put("/users/{email}/permissions")]
+pub async fn grant_user_permissions(
+    service: web::Data<Service>,
+    email: String,
+    data: Json<Vec<String>>,
+) -> actix_web::Result<impl Responder> {
+    let mut tx = service
+        .db()
+        .begin()
+        .await
+        .map_err(ErrorInternalServerError)?;
+    for namespace in data.iter() {
+        sqlx::query(
+            "
+            INSERT INTO user_permissions (user, namespace)
+            VALUES ((SELECT id FROM users WHERE email = $1), (SELECT id FROM namespaces WHERE name = $2))
+            ON CONFLICT DO UPDATE
+            ",
+        )
+        .bind(&email)
+        .bind(namespace)
+        .execute(&mut *tx)
+        .await
+        .map_err(ErrorInternalServerError)?;
+    }
+    tx.commit().await.map_err(ErrorInternalServerError)?;
+    Ok(HttpResponse::Ok())
+}
+
+#[delete("/users/{email}/permissions")]
+pub async fn revoke_user_permissions(
+    service: web::Data<Service>,
+    email: String,
+    data: Json<Vec<String>>,
+) -> actix_web::Result<impl Responder> {
+    let mut tx = service
+        .db()
+        .begin()
+        .await
+        .map_err(ErrorInternalServerError)?;
+    for namespace in data.iter() {
+        sqlx::query(
+            "
+            DELETE FROM user_permissions
+            WHERE user = (SELECT id FROM users WHERE email = $1)
+            AND namespace = (SELECT id FROM namespaces WHERE name = $2)
+            ",
+        )
+        .bind(&email)
+        .bind(namespace)
+        .execute(&mut *tx)
+        .await
+        .map_err(ErrorInternalServerError)?;
+    }
+    tx.commit().await.map_err(ErrorInternalServerError)?;
+    Ok(HttpResponse::Ok())
+}
+
+#[put("/users/{email}/permissions")]
+pub async fn update_user_permissions(
+    service: web::Data<Service>,
+    email: String,
+    data: Json<Vec<String>>,
+) -> actix_web::Result<impl Responder> {
+    let mut tx = service
+        .db()
+        .begin()
+        .await
+        .map_err(ErrorInternalServerError)?;
+
+    // Revoke all existing permissions.
+    sqlx::query(
+        "
+        DELETE FROM user_permissions
+        WHERE user = (SELECT id FROM users WHERE email = $1)
+        ",
+    )
+    .bind(&email)
+    .execute(&mut *tx)
+    .await
+    .map_err(ErrorInternalServerError)?;
+
+    for namespace in data.iter() {
+        sqlx::query(
+            "
+            INSERT INTO user_permissions (user, namespace)
+            VALUES ((SELECT id FROM users WHERE email = $1), (SELECT id FROM namespaces WHERE name = $2))
+            ON CONFLICT DO NOTHING
+            ",
+        )
+        .bind(&email)
+        .bind(namespace)
+        .execute(&mut *tx)
+        .await
+        .map_err(ErrorInternalServerError)?;
+    }
+
+    tx.commit().await.map_err(ErrorInternalServerError)?;
+    Ok(HttpResponse::Ok())
+}
+
 pub fn service() -> Scope {
     web::scope("/admin")
         .service(create_user)
         .service(delete_user)
         .service(list_users)
+        .service(list_user_permissions)
+        .service(grant_user_permissions)
+        .service(revoke_user_permissions)
+        .service(update_user_permissions)
 }
