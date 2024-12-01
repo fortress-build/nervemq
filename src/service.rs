@@ -626,6 +626,40 @@ impl Service {
         .await?)
     }
 
+    pub async fn queue_statistics(
+        &self,
+        identity: Identity,
+        namespace: &str,
+        queue: &str,
+    ) -> Result<QueueStatistics, Error> {
+        let mut db = self.db().acquire().await?;
+        let email = identity.id()?;
+
+        Ok(sqlx::query_as(
+            "
+            SELECT
+                q.id,
+                q.name,
+                qu.email as created_by,
+                n.name as ns,
+                COUNT(m.id) AS message_count,
+                SUM(LENGTH(m.body)) / CAST(COUNT(m.id) AS FLOAT) as avg_size_bytes
+            FROM queues q
+            LEFT JOIN messages m ON q.id = m.queue
+            JOIN user_permissions p ON p.namespace = q.ns
+            JOIN namespaces n ON n.id = q.ns
+            JOIN users u ON u.id = p.user
+            JOIN users qu ON q.created_by = qu.id
+            WHERE u.email = $1 AND n.name = $2 AND q.name = $3
+        ",
+        )
+        .bind(email)
+        .bind(namespace)
+        .bind(queue)
+        .fetch_one(&mut *db)
+        .await?)
+    }
+
     pub async fn global_queue_statistics(
         &self,
         identity: Identity,
