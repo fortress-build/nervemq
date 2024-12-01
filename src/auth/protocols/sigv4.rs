@@ -1,9 +1,7 @@
 use actix_web::{dev::ServiceRequest, web};
 use hmac::Mac;
 use secrecy::ExposeSecret;
-use serde::Deserialize;
 use sha2::Sha256;
-use sqlx::FromRow;
 
 use crate::auth::{
     crypto::{gen_signature_key, sha256_hex},
@@ -19,13 +17,6 @@ pub struct SigV4Header<'a> {
     pub signature: &'a str,
     pub region: &'a str,
     pub service: &'a str,
-}
-
-#[derive(Deserialize, FromRow)]
-struct VerificationData {
-    #[allow(unused)]
-    hashed_key: String,
-    validation_key: Vec<u8>,
 }
 
 pub async fn authenticate_sigv4(
@@ -95,16 +86,15 @@ pub async fn authenticate_sigv4(
         .expect("SQLite pool not found. This is a bug.")
         .db();
 
-    let Some(verify) = sqlx::query_as::<_, VerificationData>(
-        "SELECT hashed_key, validation_key FROM api_keys WHERE key_id = $1",
-    )
-    .bind(&header.key_id)
-    .fetch_optional(pool)
-    .await
-    .map_err(|e| {
-        tracing::error!("Failed to fetch identity: {}", e);
-        Error::InternalError
-    })?
+    let Some(validation_key) =
+        sqlx::query_scalar::<_, Vec<u8>>("SELECT validation_key FROM api_keys WHERE key_id = $1")
+            .bind(&header.key_id)
+            .fetch_optional(pool)
+            .await
+            .map_err(|e| {
+                tracing::error!("Failed to fetch identity: {}", e);
+                Error::InternalError
+            })?
     else {
         return Err(Error::IdentityNotFound {
             key_id: header.key_id.to_string(),
@@ -124,7 +114,7 @@ pub async fn authenticate_sigv4(
 
     let generated_signature = {
         let signing_key = gen_signature_key(
-            &verify.validation_key,
+            &validation_key,
             &header.date,
             &header.region,
             &header.service,

@@ -8,10 +8,8 @@ use actix_web::{
     web::{self, Json},
     FromRequest, HttpRequest, HttpResponse, Responder, Scope,
 };
-use base64::Engine;
 use secrecy::ExposeSecret;
 use serde::{Deserialize, Serialize};
-use sha2::Digest;
 use sqlx::FromRow;
 
 use crate::{
@@ -150,31 +148,6 @@ pub async fn list_tokens(
     .map_err(ErrorInternalServerError)?;
 
     Ok(Json(tokens))
-}
-
-#[derive(Debug, Serialize)]
-pub struct ClientIdResponse {
-    client_id: String,
-}
-
-#[get("/client_id")]
-pub async fn client_id(identity: Identity) -> actix_web::Result<impl Responder> {
-    let email = identity.id().map_err(|e| ErrorUnauthorized(e))?;
-
-    // Hashing the email should yield a consistently unique ID since emails are required to be
-    // unique among users.
-
-    let mut hasher = sha2::Sha256::new();
-
-    hasher.update(email.as_bytes());
-
-    let hash = hasher.finalize();
-
-    let hash_str = base64::engine::general_purpose::STANDARD.encode(hash);
-
-    Ok(web::Json(ClientIdResponse {
-        client_id: hash_str,
-    }))
 }
 
 pub fn service() -> Scope {
