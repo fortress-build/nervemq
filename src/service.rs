@@ -1,6 +1,8 @@
 use std::{collections::HashMap, sync::Arc};
 
 use actix_identity::{error::GetIdentityError, Identity};
+use actix_web::web;
+use secrecy::SecretString;
 use serde_email::Email;
 use snafu::Snafu;
 use sqlx::{
@@ -13,10 +15,8 @@ use sqlx::{
 use tokio_stream::StreamExt as _;
 
 use crate::{
-    api::{
-        admin::hash_password,
-        auth::{Permission, Role, User},
-    },
+    api::auth::{Permission, Role, User},
+    auth::crypto::hash_secret,
     config::Config,
     message::Message,
     namespace::{Namespace, NamespaceStatistics},
@@ -388,11 +388,11 @@ impl Service {
     pub async fn create_user(
         &self,
         email: Email,
-        password: String,
+        password: SecretString,
         role: Option<Role>,
         namespaces: Vec<String>,
     ) -> eyre::Result<()> {
-        let hashed_password = hash_password(password).await?;
+        let hashed_password = web::block(move || hash_secret(password)).await??;
 
         let mut tx = self.db().begin().await?;
 

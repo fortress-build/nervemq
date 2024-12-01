@@ -113,6 +113,7 @@ create table if not exists api_keys (
   name string not null,
   key_id text not null,
   hashed_key text not null,
+  validation_key blob not null,
 
   primary key (id),
   foreign key (user) references users(id) on delete cascade

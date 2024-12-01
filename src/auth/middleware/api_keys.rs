@@ -7,12 +7,11 @@ use actix_web::dev::{Service, Transform};
 use actix_web::error::ErrorUnauthorized;
 use actix_web::http::header::{self};
 use actix_web::web::Data;
-use actix_web::{dev::ServiceRequest, dev::ServiceResponse, Error, HttpMessage};
+use actix_web::{dev::ServiceRequest, dev::ServiceResponse, Error};
 
-use actix_casbin_auth::CasbinVals;
-
-use crate::auth::data::authenticate_api_key;
 use crate::auth::header::AuthHeader;
+use crate::auth::protocols::nervemq::authenticate_api_key;
+use crate::auth::protocols::sigv4::authenticate_sigv4;
 
 pub struct ApiKeyAuth;
 
@@ -56,7 +55,7 @@ where
         self.service.poll_ready(cx)
     }
 
-    fn call(&self, req: ServiceRequest) -> <Self as Service<ServiceRequest>>::Future {
+    fn call(&self, mut req: ServiceRequest) -> <Self as Service<ServiceRequest>>::Future {
         let svc = Arc::clone(&self.service);
 
         Box::pin(async move {
@@ -65,36 +64,34 @@ where
                 .expect("SQLite pool not found. This is a bug.")
                 .clone();
 
-            let Some(auth_header) = req.headers().get(header::AUTHORIZATION) else {
-                return Err(ErrorUnauthorized("API Key not provided"));
+            let auth_req = {
+                let Some(auth_header) = req.headers().get(header::AUTHORIZATION) else {
+                    return Err(ErrorUnauthorized("API Key not provided"));
+                };
+
+                match auth_header.to_str() {
+                    Ok(str) => str.to_owned(),
+                    Err(_) => return Err(ErrorUnauthorized("Invalid authorization")),
+                }
             };
 
-            let auth_req = match auth_header.to_str() {
-                Ok(str) => str,
-                Err(_) => return Err(ErrorUnauthorized("Invalid authorization")),
-            };
+            let auth_header = crate::auth::header::auth_header()
+                .parse_str(&auth_req)
+                .map_err(|_| ErrorUnauthorized("Invalid authorization"))?;
 
-            match {
-                let parser = crate::auth::header::auth_header();
-
-                parser
-                    .parse_str(auth_req)
-                    .map_err(|_| ErrorUnauthorized("Invalid authorization"))?
-            } {
-                AuthHeader::NerveMqApiV1 { token } => {
+            match auth_header {
+                AuthHeader::NerveMqApiV1(token) => {
                     match authenticate_api_key(api.db(), token).await {
-                        Ok(_) => {
-                            let vals = CasbinVals {
-                                subject: String::from("alice"),
-                                domain: None,
-                            };
-                            req.extensions_mut().insert(vals);
-                            svc.call(req).await
-                        }
+                        Ok(_) => svc.call(req).await,
                         Err(e) => Err(ErrorUnauthorized(e)),
                     }
                 }
-                AuthHeader::Bearer { .. } => Err(ErrorUnauthorized("unimplemented")),
+                AuthHeader::AWSv4(header) => match authenticate_sigv4(&mut req, header).await {
+                    Ok(_) => svc.call(req).await,
+                    Err(e) => Err(ErrorUnauthorized(e)),
+                },
+                #[allow(unreachable_patterns)]
+                _ => Err(ErrorUnauthorized("unimplemented")),
             }
         })
     }

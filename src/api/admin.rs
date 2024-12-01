@@ -5,10 +5,7 @@ use actix_web::{
     web::{self, Json},
     HttpResponse, Responder, Scope,
 };
-use argon2::{
-    password_hash::{PasswordHashString, PasswordHasher, SaltString},
-    Argon2,
-};
+use secrecy::SecretString;
 use serde::{Deserialize, Serialize};
 use serde_email::Email;
 use sqlx::FromRow;
@@ -17,30 +14,12 @@ use crate::service::Service;
 
 use super::auth::Role;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct CreateUserRequest {
     email: String,
-    password: String,
+    password: SecretString,
     role: Role,
     namespaces: Vec<String>,
-}
-
-pub async fn hash_password(password: String) -> eyre::Result<PasswordHashString> {
-    match web::block(move || {
-        let argon2 = Argon2::default();
-
-        let salt = SaltString::generate(&mut rand::thread_rng());
-
-        Ok(argon2
-            .hash_password(password.as_bytes(), salt.as_salt())?
-            .serialize())
-    })
-    .await
-    {
-        Ok(Ok(res)) => Ok(res),
-        Ok(Err(e)) => Err(e),
-        Err(e) => Err(eyre::eyre!("Failed to join create API key task: {e}")),
-    }
 }
 
 #[post("/users")]
