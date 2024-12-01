@@ -76,7 +76,7 @@ export default function Queues() {
         data={filteredData}
         isLoading={isLoading}
         onRowClick={(row: QueueStatistics) =>
-          router.push(`/queues/${row.name}`)
+          router.push(`/queues/${row.name}-${row.ns}`)
         }
         meta={{ handleDeleteQueue }}
         sorting={sorting}
