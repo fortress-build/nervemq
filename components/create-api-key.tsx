@@ -114,8 +114,8 @@ export default function CreateApiKey({
         }
       }}
     >
-      <DialogContent>
-        {!showKey ? (
+      <DialogContent className="rounded-lg sm:rounded-lg">
+      {!showKey ? (
           <form
             onSubmit={(e) => {
               e.preventDefault();
