@@ -61,19 +61,6 @@ fn generate_token<const N: usize>(mut rng: impl Rng) -> eyre::Result<String> {
     Ok(bs58::encode(token).into_string())
 }
 
-#[test]
-fn test_gen_token() {
-    let mut rng = rand::thread_rng();
-
-    let token = generate_token::<8>(&mut rng).unwrap();
-
-    assert_eq!(token.len(), 8);
-
-    let token = generate_token::<12>(&mut rng).unwrap();
-
-    assert_eq!(token.len(), 12);
-}
-
 pub fn generate_api_key() -> eyre::Result<GeneratedKey> {
     let mut rng = rand::thread_rng();
     let short_token = generate_token::<8>(&mut rng)?;

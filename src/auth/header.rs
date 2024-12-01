@@ -85,15 +85,16 @@ fn nervemq_api_v1<'a>() -> Parser<'a, AuthHeader<'a>> {
 }
 
 fn sigv4<'a>() -> Parser<'a, AuthHeader<'a>> {
-    let tag =
-        ((seq("AWS4") - sym('-')) + (alphanumeric() | sym('-')).repeat(5..).collect()).collect();
+    let tag = seq("AWS4-HMAC-SHA256");
 
     let space = sym(' ');
 
+    // TODO: Switch to nom, chumsky or another parser library with an API not based on operator overloads. This is incomprehensible.
+
     let access_key_id = token();
     let yyyymmdd = numeric().repeat(8).collect();
-    let region = (alphanumeric() | sym('-')).repeat(4..).collect();
-    let service = (alphanumeric() | sym('-')).repeat(3..).collect();
+    let region = (alphanumeric() | sym('-')).repeat(1..).collect();
+    let service = (alphanumeric() | sym('-')).repeat(1..).collect();
 
     let credential_parser = (((access_key_id - sym('/'))
         + (yyyymmdd - sym('/'))
@@ -104,11 +105,12 @@ fn sigv4<'a>() -> Parser<'a, AuthHeader<'a>> {
         (access_key_id, yyyymmdd, region, service)
     });
 
-    let signed_headers_parser = list((alphanumeric() | sym('-')).repeat(2..).collect(), sym(';'));
+    let signed_headers_parser = list((alphanumeric() | sym('-')).repeat(1..).collect(), sym(';'));
 
     let kv = list(
-        token() - sym('=') + (!whitespace()).repeat(1..).collect(),
-        sym(','),
+        (((alphanumeric() | sym('-')).repeat(1..).collect()) - sym('='))
+            + none_of(",").repeat(1..).collect(),
+        (whitespace().repeat(0..) * sym(',')) - whitespace().repeat(0..),
     )
     .convert(move |items| {
         let (mut creds, mut signed_headers, mut signature) = (None, None, None);
@@ -121,14 +123,22 @@ fn sigv4<'a>() -> Parser<'a, AuthHeader<'a>> {
             }
         }
         let (Some(creds), Some(signed_headers), Some(signature)) =
-            (creds, signed_headers, signature)
+            (creds.clone(), signed_headers.clone(), signature)
         else {
-            return Err("missing required parameters");
+            return Err(format!(
+                "missing required parameters: {}",
+                vec![
+                    creds.map(|_| "creds ok").unwrap_or("creds"),
+                    signed_headers.map(|_| "headers ok").unwrap_or("headers"),
+                    signature.map(|_| "signature ok").unwrap_or("signature"),
+                ]
+                .join(", ")
+            ));
         };
         Ok((creds, signed_headers, signature))
     });
 
-    ((tag - space) + kv - end())
+    (((tag - space.repeat(1..)) + kv) - end())
         .convert(|(tag, (credential, signed_headers, signature))| {
             let (key_id, yyyymmdd, region, service) = credential?;
             let signed_headers = signed_headers?;
@@ -209,7 +219,7 @@ mod tests {
 
     #[test]
     fn test_aws_v4_valid() {
-        let input = "AWS4-HMAC-SHA256 Credential=AKIAIOSFODNN7EXAMPLE/20230815/us-east-1/sqs/aws4_request;SignedHeaders=content-type;host;x-amz-date;SignedHeaders=content-type;host;x-amz-date;Signature=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+        let input = "AWS4-HMAC-SHA256 Credential=AKIAIOSFODNN7EXAMPLE/20230815/us-east-1/sqs/aws4_request,SignedHeaders=content-type;host;x-amz-date,Signature=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
         let result = auth_header().parse(input.as_bytes());
 
         assert!(result.is_ok(), "{:?}", result.err());
