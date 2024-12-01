@@ -68,8 +68,8 @@ export default function CreateNamespace({
         }
       }}
     >
-      <DialogContent>
-        <form
+      <DialogContent className="rounded-lg sm:rounded-lg">
+      <form
           onSubmit={(e) => {
             e.preventDefault();
             e.stopPropagation();
