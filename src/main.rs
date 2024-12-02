@@ -4,7 +4,7 @@ use actix_session::config::{CookieContentSecurity, PersistentSession};
 use actix_session::SessionMiddleware;
 use actix_web::cookie::time::Duration;
 use actix_web::middleware::{NormalizePath, TrailingSlash};
-use actix_web::web::{FormConfig, Html, JsonConfig};
+use actix_web::web::{FormConfig, JsonConfig};
 use actix_web::{web::Data, App, HttpServer};
 
 use chrono::TimeDelta;
@@ -112,57 +112,4 @@ async fn main() -> eyre::Result<()> {
     .await?;
 
     Ok(())
-}
-
-#[actix_web::get("/")]
-async fn index(user: Option<actix_identity::Identity>) -> Html {
-    if let Some(user) = user {
-        let id = user.id().unwrap();
-
-        Html::new(format!(
-            r#"
-            <html>
-                <body>
-                    <h1>Welcome! {id}</h1>
-
-                    <form action="https://localhost:8081/logout" method="post" target="_blank">
-                         <input type="submit" value="Submit" />
-                    </form>
-                </body>
-            </html>
-            "#,
-        ))
-    } else {
-        Html::new(format!(
-            r#"
-            <html>
-                <body>
-                    <script>
-                        async function onSubmit() {{
-                            const data = {{
-                                email: document.getElementById("emailEntry").value,
-                                password: document.getElementById("passwordEntry").value
-                            }};
-                            const res = await fetch("http://localhost:8080/auth/login", {{
-                                method: "POST",
-                                body: JSON.stringify(data),
-                                headers: {{
-                                    "Content-Type": "application/json"
-                                }}
-                            }})
-                            console.log(res);
-                        }}
-                    </script>
-                    <h1>Welcome Anonymous!</h1>
-
-                    <form>
-                         <input type="text" id="emailEntry" name="email" value="e@e.e" /><br />
-                         <input type="text" id="passwordEntry" name="password" value="eeeeeeee" /><br />
-                         <input type="button" value="Submit" onclick="onSubmit()" />
-                    </form>
-                </body>
-            </html>
-            "#,
-        ))
-    }
 }
