@@ -59,17 +59,17 @@ export default function QueuePage() {
             <QueueSettings queue={queue} />
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               <div>
-                <p className="text-gray-600">Pending</p>
+                <p className="text-gray-600 break-words">Pending</p>
                 <p className="text-2xl font-medium">{queue?.pending ?? 0}</p>
               </div>
               <div>
-                <p className="text-gray-600">Delivered</p>
+                <p className="text-gray-600 break-words">Delivered</p>
                 <p className="text-2xl font-medium">{queue?.delivered ?? 0}</p>
               </div>
               <div>
-                <p className="text-gray-600">Failed</p>
+                <p className="text-gray-600 break-words">Failed</p>
                 <p className="text-2xl font-medium">{queue?.failed ?? 0}</p>
               </div>
             </div>
@@ -82,17 +82,17 @@ export default function QueuePage() {
             <CardTitle>Metrics</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {queue ? (
                 <>
                   <div>
-                    <p className="text-gray-600">Message Size (avg)</p>
-                    <p className="text-2xl font-medium">
+                    <p className="text-gray-600 break-words">Message Size (avg)</p>
+                    <p className="text-2xl font-medium overflow-hidden text-ellipsis">
                       {(queue.avgSizeBytes ?? 0).toFixed(2)} bytes
                     </p>
                   </div>
                   <div>
-                    <p className="text-gray-600">Error Rate</p>
+                    <p className="text-gray-600 break-words">Error Rate</p>
                     <p className="text-2xl font-medium">
                       {(queue.failed + queue.delivered === 0
                         ? 0
@@ -102,7 +102,7 @@ export default function QueuePage() {
                     </p>
                   </div>
                   <div>
-                    <p className="text-gray-600">Total Operations</p>
+                    <p className="text-gray-600 break-words">Total Operations</p>
                     <p className="text-2xl font-medium">
                       {(queue.queue_operations_total ?? 0).toFixed(2)}
                     </p>

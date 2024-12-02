@@ -177,13 +177,6 @@ const columns: ColumnDef<MessageObject>[] = [
     header: "Message",
   },
   {
-    accessorKey: "timestamp",
-    header: "Time",
-    cell: ({ row }) => {
-      return new Date(row.getValue("timestamp")).toLocaleString();
-    },
-  },
-  {
     accessorKey: "status",
     header: "Status",
     cell: ({ row }) => {
@@ -206,11 +199,6 @@ const columns: ColumnDef<MessageObject>[] = [
   {
     accessorKey: "attempts",
     header: "Attempts",
-  },
-  {
-    accessorKey: "error",
-    header: "Error",
-    cell: ({ row }) => row.getValue("error") || "-",
   },
 ];
 
