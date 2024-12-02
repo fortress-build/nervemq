@@ -12,7 +12,6 @@ export function middleware(request: NextRequest) {
       if (split.length !== 1 && split.length !== 3) {
         return NextResponse.redirect(new URL("/queues", request.url));
       }
-      return NextResponse.next();
     }
 
     return NextResponse.next();
