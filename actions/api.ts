@@ -3,7 +3,10 @@ import type { NamespaceStatistics } from "@/components/namespaces/table";
 import type { QueueStatistics } from "@/components/queues/table";
 import type { CreateNamespaceRequest } from "@/schemas/create-namespace";
 import type { CreateQueueRequest } from "@/schemas/create-queue";
-import type { QueueSettingsType } from "@/schemas/queue-settings";
+import type {
+  QueueConfig,
+  UpdateQueueConfigRequest,
+} from "@/schemas/queue-settings";
 import type { APIKey } from "@/components/create-api-key";
 import type { UserStatistics } from "@/components/create-user";
 import { SERVER_ENDPOINT } from "@/app/globals";
@@ -11,7 +14,7 @@ import type { CreateUserRequest } from "@/schemas/create-user";
 import { toast } from "sonner";
 import type { ApiKey } from "@/components/api-keys/table";
 import type { Role } from "@/lib/state/global";
-import { MessageObject } from "@/app/(dashboard)/queues/list";
+import type { MessageObject } from "@/app/(dashboard)/queues/list";
 
 export async function createNamespace(data: CreateNamespaceRequest) {
   await fetch(`${SERVER_ENDPOINT}/ns/${data.name}`, {
@@ -167,7 +170,14 @@ export async function fetchQueue(
     next: {
       tags: ["queues"],
     },
-  }).then((res) => res.json());
+  }).then((res) => {
+    if (res.status === 403) {
+      throw new Error("Access Denied", {
+        cause: 403,
+      });
+    }
+    return res.json();
+  });
 }
 
 export async function listMessages({
@@ -288,72 +298,48 @@ export async function listUsers(): Promise<UserStatistics[]> {
     .catch(() => toast.error("Something went wrong"));
 }
 
-// //SUBJECT TO CHANGE
-// export async function updateUser(data: CreateUserRequest): Promise<void> {
-//   await fetch(`${SERVER_ENDPOINT}/admin/users`, {
-//     method: "POST",
-//     credentials: "include",
-//     headers: {
-//       "Content-Type": "application/json",
-//     },
-//     body: JSON.stringify(data),
-//     next: {
-//       tags: ["users"],
-//     },
-//   }).catch(() => toast.error("Something went wrong"));
-// }
-
-export async function updateQueueSettings(data: QueueSettingsType) {
+export async function updateQueueSettings(data: UpdateQueueConfigRequest) {
   return await fetch(
-    `${SERVER_ENDPOINT}/queue/${data.namespace}/${data.queue}/settings`,
+    `${SERVER_ENDPOINT}/queue/${data.namespace}/${data.queue}/config`,
     {
-      method: "PUT",
+      method: "POST",
       credentials: "include",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
         max_retries: data.maxRetries,
-        timeout: data.timeout,
+        dead_letter_queue: data.deadLetterQueue,
       }),
       next: {
-        tags: ["queues"],
+        tags: ["queues", "queue-settings"],
       },
     },
-  )
-    .then((res) => res.json())
-    .catch(() => {
-      toast.error("Something went wrong");
-      throw new Error("Failed to update settings");
-    });
+  ).then((res) => {
+    if (!res.ok) {
+      throw new Error("Failed to update queue settings");
+    }
+  });
 }
 
 export async function getQueueSettings(
   namespace?: string,
   queue?: string,
-): Promise<QueueSettingsType | undefined> {
+): Promise<QueueConfig | undefined> {
   if (namespace === undefined || queue === undefined) {
-    return undefined;
+    throw new Error("Invalid queue ID");
   }
-  return await fetch(
-    `${SERVER_ENDPOINT}/queue/${namespace}/${queue}/settings`,
-    {
-      method: "GET",
-      credentials: "include",
-      next: {
-        tags: ["queues"],
-      },
+  return await fetch(`${SERVER_ENDPOINT}/queue/${namespace}/${queue}/config`, {
+    method: "GET",
+    credentials: "include",
+    cache: "no-store",
+    next: {
+      tags: ["queues", "queue-settings"],
     },
-  )
+  })
     .then((res) => res.json())
     .then((data) => ({
-      namespace,
-      queue,
       maxRetries: data.max_retries,
-      timeout: data.timeout,
-    }))
-    .catch(() => {
-      toast.error("Something went wrong");
-      throw new Error("Failed to fetch settings");
-    });
+      deadLetterQueue: data.dead_letter_queue,
+    }));
 }

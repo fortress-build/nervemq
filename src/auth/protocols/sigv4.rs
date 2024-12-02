@@ -5,10 +5,8 @@ use sha2::Sha256;
 
 use crate::{
     api::auth::User,
-    auth::{
-        crypto::{gen_signature_key, sha256_hex},
-        error::Error,
-    },
+    auth::crypto::{gen_signature_key, sha256_hex},
+    error::Error,
 };
 
 #[derive(Debug)]
@@ -30,13 +28,13 @@ pub async fn authenticate_sigv4(
         let payload: actix_web::web::Payload = req
             .extract::<actix_web::web::Payload>()
             .await
-            .map_err(|_| Error::InternalError)?;
+            .map_err(|e| Error::from(e))?;
 
         let bytes = payload
             .to_bytes_limited(8192)
             .await
             .map_err(|_| Error::PayloadTooLarge)?
-            .map_err(|_| Error::InternalError)?;
+            .map_err(|e| Error::from(e))?;
 
         sha256_hex(&bytes)
     };
@@ -93,11 +91,7 @@ pub async fn authenticate_sigv4(
         sqlx::query_scalar::<_, Vec<u8>>("SELECT validation_key FROM api_keys WHERE key_id = $1")
             .bind(&header.key_id)
             .fetch_optional(pool)
-            .await
-            .map_err(|e| {
-                tracing::error!("Failed to fetch identity: {}", e);
-                Error::InternalError
-            })?
+            .await?
     else {
         return Err(Error::IdentityNotFound {
             key_id: header.key_id.to_string(),
@@ -124,7 +118,7 @@ pub async fn authenticate_sigv4(
         );
 
         let mut mac = hmac::Hmac::<Sha256>::new_from_slice(signing_key.expose_secret())
-            .map_err(|_| Error::InternalError)?;
+            .map_err(|e| Error::internal(e))?;
 
         mac.update(string_to_sign.as_bytes());
 
@@ -144,8 +138,7 @@ pub async fn authenticate_sigv4(
     )
     .bind(&header.key_id)
     .fetch_one(pool)
-    .await
-    .map_err(|_| Error::InternalError)?;
+    .await?;
 
     Ok(user)
 }

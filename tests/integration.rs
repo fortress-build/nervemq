@@ -218,6 +218,7 @@ async fn test_send_message() {
             &mut service.db().acquire().await.unwrap(),
         )
         .await
+        .unwrap()
         .unwrap();
     service.send_message(queue_id, &message, kv).await.unwrap();
 
@@ -256,6 +257,7 @@ async fn test_list_messages() {
                     &mut service.db().acquire().await.unwrap(),
                 )
                 .await
+                .unwrap()
                 .unwrap(),
             &message,
             kv,
