@@ -100,7 +100,7 @@ export default function ModifyUser({
       await Promise.all([
         updateUserAllowedNamespaces({
           email: session?.email ?? "",
-          namespaces: data.namespaces.keys().toArray(),
+          namespaces: Array.from(data.namespaces.keys()),
         }),
         updateUserRole({
           email: session?.email ?? "",
@@ -241,9 +241,11 @@ export default function ModifyUser({
                                 }}
                               >
                                 <div className="flex items-center gap-2">
-                                  {field.state.value.has(namespace.name) ? (
-                                    <Check className="h-4 w-4" />
-                                  ) : null}
+                                <div className="w-4 h-4 flex items-center justify-center">
+                                    {field.state.value.has(namespace.name) && (
+                                      <Check className="h-4 w-4" />
+                                    )}
+                                  </div>
                                   {namespace.name}
                                 </div>
                               </CommandItem>
