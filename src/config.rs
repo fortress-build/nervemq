@@ -1,5 +1,6 @@
 use secrecy::SecretString;
 use serde::Deserialize;
+use url::Url;
 
 pub mod defaults {
     pub const DB_PATH: &str = "nervemq.db";
@@ -8,15 +9,29 @@ pub mod defaults {
     pub const ROOT_PASSWORD: &str = "password";
 }
 
-#[derive(Clone, Deserialize, Default)]
+#[derive(Clone, Deserialize)]
 pub struct Config {
     pub db_path: Option<String>,
     pub default_max_retries: Option<usize>,
+
+    pub host: Url,
 
     // TODO: Warn on launch if defaults are used for admin credentials
     pub root_email: Option<String>,
     #[allow(unused)]
     pub root_password: Option<SecretString>,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            db_path: None,
+            default_max_retries: None,
+            host: Url::parse("http://localhost:8080").expect("valid URL"),
+            root_email: None,
+            root_password: None,
+        }
+    }
 }
 
 impl Config {
