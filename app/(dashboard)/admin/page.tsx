@@ -76,7 +76,6 @@ export default function AdminPanel() {
       password: "",
       createdAt: user.createdAt,
       lastLogin: user.lastLogin,
-      namespaces: user.namespaces || [],
     };
     setUserToModify(fullUser);
   };

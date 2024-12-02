@@ -38,11 +38,10 @@ export default function Header({ className }: { className?: string }) {
       },
     ];
   } else {
-    const cleanPath = pathName.split('?')[0];
+    const cleanPath = pathName.split("?")[0];
     const segments = cleanPath.split("/").filter((s) => s.length > 0);
     route = segments.map((s, i) => ({
-      label: s.split("-")[0]
-        .charAt(0) + s.split("-")[0].slice(1),
+      label: s.split("-")[0].charAt(0) + s.split("-")[0].slice(1),
       href: `/${segments.slice(0, i + 1).join("/")}`,
     }));
   }
@@ -95,7 +94,7 @@ export default function Header({ className }: { className?: string }) {
         <DropdownMenuTrigger
           className={cn("flex flex-row gap-2 text-sm items-center group")}
         >
-          {session?.email ?? "Anonymous"}
+          {session?.email}
           <User className="py-0.5 px-1.5 w-7 h-7 rounded-md transition-all group-hover:bg-accent" />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">

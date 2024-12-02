@@ -39,13 +39,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "./ui/select";
+import type { Role } from "@/lib/state/global";
 
 export interface UserStatistics {
   email: string;
-  role: string;
+  role: Role;
   createdAt: string;
   lastLogin?: string;
-  namespaces: string[];
 }
 
 export default function CreateUser({
@@ -118,8 +118,8 @@ export default function CreateUser({
           }
         }}
       >
-      <DialogContent className="rounded-lg sm:rounded-lg">
-      <form
+        <DialogContent className="rounded-lg sm:rounded-lg">
+          <form
             onSubmit={(e) => {
               e.preventDefault();
               e.stopPropagation();

@@ -10,6 +10,7 @@ use actix_web::{web::Data, App, HttpServer};
 use chrono::TimeDelta;
 use nervemq::api::auth::{self, Role};
 use nervemq::api::{admin, data, namespace, queue, tokens};
+use nervemq::auth::middleware::api_keys::ApiKeyAuth;
 use nervemq::auth::middleware::protected_route::Protected;
 use nervemq::auth::session::SqliteSessionStore;
 use nervemq::config::Config;
@@ -90,17 +91,16 @@ async fn main() -> eyre::Result<()> {
 
         App::new()
             // .wrap(ApiKeyAuth)
-            // .wrap(actix_web::middleware::Logger::default())
             .wrap(identity_middleware)
             .wrap(session_middleware)
             .wrap(cors)
             .wrap(TracingLogger::default())
             .wrap(NormalizePath::new(TrailingSlash::Trim))
-            .service(namespace::service().wrap(Protected))
-            .service(queue::service().wrap(Protected))
-            .service(data::service().wrap(Protected))
-            .service(admin::service().wrap(Protected))
-            .service(tokens::service().wrap(Protected))
+            .service(queue::service().wrap(Protected::authenticated()))
+            .service(data::service().wrap(Protected::authenticated()))
+            .service(tokens::service().wrap(Protected::authenticated()))
+            .service(namespace::service().wrap(Protected::admin_only()))
+            .service(admin::service().wrap(Protected::admin_only()))
             .service(auth::service())
             .app_data(data.clone())
             .app_data(json_cfg)
