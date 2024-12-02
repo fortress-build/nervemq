@@ -3,6 +3,7 @@ use std::{collections::HashMap, sync::Arc};
 use actix_identity::{error::GetIdentityError, Identity};
 use actix_web::web;
 use secrecy::SecretString;
+use serde::{Deserialize, Serialize};
 use serde_email::Email;
 use snafu::Snafu;
 use sqlx::{
@@ -10,7 +11,7 @@ use sqlx::{
         SqliteAutoVacuum, SqliteConnectOptions, SqliteJournalMode, SqliteLockingMode,
         SqlitePoolOptions,
     },
-    Acquire, Sqlite, SqlitePool,
+    Acquire, FromRow, Sqlite, SqlitePool,
 };
 use tokio_stream::StreamExt as _;
 
@@ -58,6 +59,13 @@ impl From<GetIdentityError> for Error {
     fn from(_: GetIdentityError) -> Self {
         Self::Unauthorized
     }
+}
+
+#[derive(Debug, Serialize, Deserialize, FromRow)]
+pub struct QueueConfig {
+    pub queue: u64,
+    pub max_retries: u64,
+    pub dead_letter_queue: Option<u64>,
 }
 
 #[derive(Clone)]
@@ -155,7 +163,6 @@ impl Service {
             .fetch_one(&mut *self.db.acquire().await?)
             .await?;
         if user.role < role {
-            tracing::error!("User: {user:?}");
             return Err(Error::Unauthorized);
         }
 
@@ -640,6 +647,18 @@ impl Service {
         .await?)
     }
 
+    pub async fn queue_configuration(&self, queue: u64) -> eyre::Result<QueueConfig> {
+        let mut db = self.db().acquire().await?;
+        Ok(sqlx::query_as(
+            "
+            SELECT * FROM queue_configurations WHERE queue = $1
+            ",
+        )
+        .bind(queue as i64)
+        .fetch_one(&mut *db)
+        .await?)
+    }
+
     pub async fn queue_statistics(
         &self,
         identity: Identity,
@@ -657,8 +676,12 @@ impl Service {
                 qu.email as created_by,
                 n.name as ns,
                 COUNT(m.id) AS message_count,
-                SUM(LENGTH(m.body)) / CAST(COUNT(m.id) AS FLOAT) as avg_size_bytes
+                IFNULL(AVG(LENGTH(m.body)), 0.0) as avg_size_bytes,
+                COUNT(CASE WHEN m.delivered_at = 0 AND m.tries < conf.max_retries THEN 1 END) as pending,
+                COUNT(CASE WHEN m.delivered_at > 0  THEN 1 END) as delivered,
+                COUNT(CASE WHEN m.delivered_at = 0 AND m.tries >= conf.max_retries THEN 1 END) as failed
             FROM queues q
+            JOIN queue_configurations conf ON q.id = conf.queue
             LEFT JOIN messages m ON q.id = m.queue
             JOIN user_permissions p ON p.namespace = q.ns
             JOIN namespaces n ON n.id = q.ns
@@ -689,8 +712,12 @@ impl Service {
                 qu.email as created_by,
                 n.name as ns,
                 COUNT(m.id) AS message_count,
-                SUM(LENGTH(m.body)) / CAST(COUNT(m.id) AS FLOAT) as avg_size_bytes
+                IFNULL(AVG(LENGTH(m.body)), 0.0) as avg_size_bytes,
+                COUNT(CASE WHEN m.delivered_at = 0 AND m.tries < conf.max_retries THEN 1 END) as pending,
+                COUNT(CASE WHEN m.delivered_at > 0  THEN 1 END) as delivered,
+                COUNT(CASE WHEN m.delivered_at = 0 AND m.tries >= conf.max_retries THEN 1 END) as failed
             FROM queues q
+            JOIN queue_configurations conf ON q.id = conf.queue
             LEFT JOIN messages m ON q.id = m.queue
             JOIN user_permissions p ON p.namespace = q.ns
             JOIN namespaces n ON n.id = q.ns
@@ -727,7 +754,7 @@ impl Service {
             JOIN users u ON p.user = u.id
             JOIN users nu ON ns.created_by = nu.id
             LEFT JOIN queues q ON q.ns = ns.id
-            WHERE u.email = 'admin@fortress.build'
+            WHERE u.email = $1
             GROUP BY ns.id, nu.email
         ",
         )

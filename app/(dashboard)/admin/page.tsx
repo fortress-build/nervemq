@@ -31,8 +31,12 @@ export default function AdminPanel() {
   }
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [userToDelete, setUserToDelete] = useState<string | null>(null);
-  const [userToModify, setUserToModify] = useState<UserStatistics | null>(null);
+  const [userToDelete, setUserToDelete] = useState<string | undefined>(
+    undefined,
+  );
+  const [userToModify, setUserToModify] = useState<UserStatistics | undefined>(
+    undefined,
+  );
   const [searchQuery, setSearchQuery] = useState("");
   const [sorting, setSorting] = useState<SortingState>([]);
 
@@ -43,17 +47,17 @@ export default function AdminPanel() {
   } = useQuery({
     queryKey: ["users", searchQuery],
     queryFn: () => listUsers(),
+    select: (data) =>
+      data.filter((user) =>
+        user.email.toLowerCase().includes(searchQuery.toLowerCase()),
+      ),
   });
-
-  const filteredData = data.filter((user) =>
-    user.email.toLowerCase().includes(searchQuery.toLowerCase()),
-  );
 
   const confirmDeleteUser = async (email: string) => {
     try {
       await deleteUser({ email });
       await refetch();
-      setUserToDelete(null);
+      setUserToDelete(undefined);
       toast.success("User deleted successfully");
     } catch {
       toast.error("Failed to delete user");
@@ -73,7 +77,6 @@ export default function AdminPanel() {
     const fullUser = {
       email: user.email,
       role: user.role,
-      password: "",
       createdAt: user.createdAt,
       lastLogin: user.lastLogin,
     };
@@ -94,7 +97,7 @@ export default function AdminPanel() {
       <DataTable
         className="w-full"
         columns={columns}
-        data={filteredData}
+        data={data}
         isLoading={isLoading}
         meta={{ handleDeleteUser, handleModifyUser }}
         sorting={sorting}
@@ -113,7 +116,7 @@ export default function AdminPanel() {
 
       <Dialog
         open={!!userToDelete}
-        onOpenChange={(open) => (!open ? setUserToDelete(null) : null)}
+        onOpenChange={(open) => (!open ? setUserToDelete(undefined) : null)}
       >
         <DialogContent>
           <DialogHeader>
@@ -134,7 +137,10 @@ export default function AdminPanel() {
             >
               Delete
             </Button>
-            <Button variant="secondary" onClick={() => setUserToDelete(null)}>
+            <Button
+              variant="secondary"
+              onClick={() => setUserToDelete(undefined)}
+            >
               Cancel
             </Button>
           </DialogFooter>
@@ -143,10 +149,10 @@ export default function AdminPanel() {
 
       <ModifyUser
         open={!!userToModify}
-        close={() => setUserToModify(null)}
+        close={() => setUserToModify(undefined)}
         onSuccess={() => {
           refetch();
-          setUserToModify(null);
+          setUserToModify(undefined);
         }}
         user={userToModify as UserStatistics}
       />

@@ -26,6 +26,8 @@ git = "https://github.com/fortress-build/actix-extras"
 branch = "master"
 
 [dependencies]
+# schemars = { package = "apistos-schemars", version = "0.8" }
+# apistos = "0.4"
 actix-casbin = { version = "1.1.0", default-features = false, features = [
   "runtime-tokio",
   "tokio",
