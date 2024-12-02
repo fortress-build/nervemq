@@ -28,14 +28,6 @@ export type Queue = {
 };
 
 export default function Queues() {
-  const {
-    data = [],
-    isLoading,
-    refetch,
-  } = useQuery({
-    queryFn: () => listQueues(),
-    queryKey: ["queues"],
-  });
   const [isOpen, setIsOpen] = useState(false);
   const router = useRouter();
   const [queueToDelete, setQueueToDelete] = useState<{
@@ -46,9 +38,18 @@ export default function Queues() {
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [searchQuery, setSearchQuery] = useState("");
 
-  const filteredData = Array.from(data.values()).filter((queue: QueueStatistics) =>
-    queue.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const {
+    data = [],
+    isLoading,
+    refetch,
+  } = useQuery({
+    queryFn: () => listQueues(),
+    queryKey: ["queues"],
+    select: (data) =>
+      Array.from(data.values()).filter((queue: QueueStatistics) =>
+        queue.name.toLowerCase().includes(searchQuery.toLowerCase()),
+      ),
+  });
 
   const handleDeleteQueue = async (
     name: string,
@@ -73,10 +74,10 @@ export default function Queues() {
       <DataTable
         className="w-full"
         columns={columns}
-        data={filteredData}
+        data={data}
         isLoading={isLoading}
         onRowClick={(row: QueueStatistics) =>
-          router.push(`/queues/${row.name}-${row.ns}`)
+          router.push(`/queues/${row.ns}/${row.name}`)
         }
         meta={{ handleDeleteQueue }}
         sorting={sorting}

@@ -5,6 +5,7 @@ use actix_web::{
     get, post, web, Responder, Scope,
 };
 use serde::{Deserialize, Serialize};
+use sqlx::FromRow;
 
 use crate::{
     queue::Queue,
@@ -14,6 +15,13 @@ use crate::{
 #[derive(Serialize, Deserialize)]
 pub struct ListQueuesResponse {
     queues: Vec<Queue>,
+}
+
+#[derive(Debug, Clone, Serialize, FromRow)]
+pub struct QueueStats {
+    pub pending: u64,
+    pub delivered: u64,
+    pub failed: u64,
 }
 
 #[get("")]
@@ -74,7 +82,7 @@ async fn create_queue(
 }
 
 #[get("/{ns_name}/{queue_name}")]
-async fn queue_info(
+async fn queue_stats(
     service: web::Data<Service>,
     path: web::Path<(String, String)>,
     identity: Identity,
@@ -94,5 +102,5 @@ pub fn service() -> Scope {
         .service(list_ns_queues)
         .service(create_queue)
         .service(delete_queue)
-        .service(queue_info)
+        .service(queue_stats)
 }

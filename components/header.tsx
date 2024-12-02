@@ -8,7 +8,7 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import { useSession } from "@/lib/state/global";
-import { cn } from "@/lib/utils";
+import { capitalize, cn } from "@/lib/utils";
 import { Menu, Slash, User } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -29,22 +29,12 @@ export default function Header({ className }: { className?: string }) {
   const session = useSession();
   const router = useRouter();
 
-  let route: { label: string; href: string }[];
-  if (pathName === "/") {
-    route = [
-      {
-        label: "Queues",
-        href: "/",
-      },
-    ];
-  } else {
-    const cleanPath = pathName.split("?")[0];
-    const segments = cleanPath.split("/").filter((s) => s.length > 0);
-    route = segments.map((s, i) => ({
-      label: s.split("-")[0].charAt(0) + s.split("-")[0].slice(1),
-      href: `/${segments.slice(0, i + 1).join("/")}`,
-    }));
-  }
+  const segments = pathName.split("/").filter((s) => s.length > 0);
+  const route = segments.map((s, i) => ({
+    label:
+      i === 0 ? s.replace("-", " ").split(" ").map(capitalize).join(" ") : s,
+    href: `/${segments.slice(0, i + 1).join("/")}`,
+  }));
 
   const { isMobile, setOpenMobile, openMobile } = useSidebar();
 
