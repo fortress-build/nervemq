@@ -82,10 +82,10 @@ export const columns: ColumnDef<UserStatistics>[] = [
           onClick={async (e) => {
             const meta = row.table.options.meta as
               | {
-                  handleModifyUser: (email: string, e: unknown) => void;
+                  handleModifyUser: (user: UserStatistics, e: unknown) => void;
                 }
               | undefined;
-            meta?.handleModifyUser(row.row.original.email, e);
+            meta?.handleModifyUser(row.row.original, e);
           }}
         >
           <Pencil className="h-4 w-4" />
