@@ -5,6 +5,15 @@ export function middleware(request: NextRequest) {
     request.nextUrl.pathname.startsWith("/login") ||
     request.cookies.get("nervemq_session") !== undefined
   ) {
+    if (request.nextUrl.pathname.startsWith("/queues")) {
+      const split = request.nextUrl.pathname
+        .split("/")
+        .filter((s) => s.length > 0);
+      if (split.length !== 1 && split.length !== 3) {
+        return NextResponse.redirect(new URL("/queues", request.url));
+      }
+    }
+
     return NextResponse.next();
   }
 

@@ -52,6 +52,14 @@ impl From<eyre::Report> for Error {
     }
 }
 
+impl From<serde_json::Error> for Error {
+    fn from(e: serde_json::Error) -> Self {
+        Self::InternalServerError {
+            source: Some(e.into()),
+        }
+    }
+}
+
 impl From<actix_web::Error> for Error {
     fn from(source: actix_web::Error) -> Self {
         Self::InternalServerError {

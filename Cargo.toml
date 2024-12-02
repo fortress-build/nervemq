@@ -53,6 +53,7 @@ envy = "0.4.2"
 eyre = "0.6.12"
 hex = { version = "0.4.3", features = ["serde"] }
 hmac = { version = "0.12.1", features = ["std"] }
+md5 = "0.7.0"
 # openssl = "0.10.9"
 pom = "3.4.0"
 rand = "0.8.5"
@@ -77,6 +78,7 @@ tokio-stream = { version = "0.1.16", features = ["full"] }
 tracing = { version = "0.1.40", features = ["async-await"] }
 tracing-actix-web = "0.7.15"
 tracing-subscriber = { version = "0.3.18", features = ["tracing", "serde"] }
+url = { version = "2.5.4", features = ["serde"] }
 zeroize = { version = "1.8.1", features = ["serde", "derive"] }
 
 [dev-dependencies]

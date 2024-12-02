@@ -48,6 +48,10 @@ impl Service {
         Self::connect_with(Config::default()).await
     }
 
+    pub fn config(&self) -> &Config {
+        &self.config
+    }
+
     pub async fn connect_with(config: Config) -> Result<Self, Error> {
         let opts = SqliteConnectOptions::new()
             .filename(config.db_path())
