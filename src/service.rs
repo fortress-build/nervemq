@@ -154,7 +154,8 @@ impl Service {
             .bind(email)
             .fetch_one(&mut *self.db.acquire().await?)
             .await?;
-        if user.role != role {
+        if user.role < role {
+            tracing::error!("User: {user:?}");
             return Err(Error::Unauthorized);
         }
 

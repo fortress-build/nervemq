@@ -110,7 +110,7 @@ export async function updateUserRole({
       headers: {
         "Content-Type": "application/json",
       },
-      body: role,
+      body: JSON.stringify({ role }),
       next: {
         tags: ["users"],
       },

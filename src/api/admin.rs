@@ -221,11 +221,16 @@ async fn get_user_role(
     Ok(Json(role))
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct UpdateUserRoleRequest {
+    role: Role,
+}
+
 #[post("/users/{email}/role")]
 async fn set_user_role(
     service: web::Data<Service>,
     email: web::Path<String>,
-    role: web::Json<Role>,
+    data: web::Json<UpdateUserRoleRequest>,
 ) -> actix_web::Result<impl Responder> {
     let email = email.into_inner();
     sqlx::query(
@@ -236,7 +241,7 @@ async fn set_user_role(
         ",
     )
     .bind(&email)
-    .bind(role.into_inner())
+    .bind(&data.role)
     .execute(service.db())
     .await
     .map_err(ErrorInternalServerError)?;

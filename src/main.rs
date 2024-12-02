@@ -90,9 +90,9 @@ async fn main() -> eyre::Result<()> {
         let form_cfg = FormConfig::default();
 
         App::new()
+            // .wrap(ApiKeyAuth)
             .wrap(identity_middleware)
             .wrap(session_middleware)
-            .wrap(ApiKeyAuth)
             .wrap(cors)
             .wrap(TracingLogger::default())
             .wrap(NormalizePath::new(TrailingSlash::Trim))
