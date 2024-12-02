@@ -55,7 +55,7 @@ pub async fn create_token(
     sqlx::query(
         "
         INSERT INTO api_keys (name, user, key_id, hashed_key, validation_key)
-        VALUES ($1, (SELECT id FROM users WHERE email = $2), $3, $4)
+        VALUES ($1, (SELECT id FROM users WHERE email = $2), $3, $4, $5)
         ",
     )
     .bind(&data.name)

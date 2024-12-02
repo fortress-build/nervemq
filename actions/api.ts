@@ -10,6 +10,7 @@ import { SERVER_ENDPOINT } from "@/app/globals";
 import type { CreateUserRequest } from "@/schemas/create-user";
 import { toast } from "sonner";
 import type { ApiKey } from "@/components/api-keys/table";
+import type { Role } from "@/lib/state/global";
 
 export async function createNamespace(data: CreateNamespaceRequest) {
   await fetch(`${SERVER_ENDPOINT}/ns/${data.name}`, {
@@ -45,6 +46,76 @@ export async function listNamespaces(): Promise<NamespaceStatistics[]> {
 
       return [];
     });
+}
+
+export async function listUserAllowedNamespaces({
+  email,
+}: {
+  email?: string;
+}): Promise<string[]> {
+  if (email === undefined) {
+    throw new Error("Email is required");
+  }
+
+  return await fetch(
+    `${SERVER_ENDPOINT}/admin/users/${encodeURIComponent(email)}/permissions`,
+    {
+      method: "GET",
+      credentials: "include",
+      cache: "no-store",
+      next: {
+        tags: ["namespaces", "user-namespaces"],
+      },
+    },
+  ).then((res) => res.json());
+}
+
+export async function updateUserAllowedNamespaces({
+  email,
+  namespaces,
+}: {
+  email: string;
+  namespaces: string[];
+}) {
+  await fetch(
+    `${SERVER_ENDPOINT}/admin/users/${encodeURIComponent(email)}/permissions`,
+    {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(namespaces),
+      next: {
+        tags: ["namespaces", "user-namespaces"],
+      },
+    },
+  ).catch(() => {
+    toast.error("Something went wrong");
+  });
+}
+
+export async function updateUserRole({
+  email,
+  role,
+}: {
+  email: string;
+  role: Role;
+}) {
+  await fetch(
+    `${SERVER_ENDPOINT}/admin/users/${encodeURIComponent(email)}/role`,
+    {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: role,
+      next: {
+        tags: ["users"],
+      },
+    },
+  ).catch(() => toast.error("Something went wrong"));
 }
 
 export async function createQueue(data: CreateQueueRequest) {
@@ -88,15 +159,18 @@ export async function listQueues(): Promise<Map<string, QueueStatistics>> {
 // Mock function
 export async function fetchQueue(
   namespace: string,
-  queueName: string
+  queueName: string,
 ): Promise<QueueStatistics | undefined> {
-  return await fetch(`${SERVER_ENDPOINT}/stats/queue/${namespace}/${queueName}`, {
-    method: "GET",
-    credentials: "include",
-    next: {
-      tags: ["queues"],
+  return await fetch(
+    `${SERVER_ENDPOINT}/stats/queue/${namespace}/${queueName}`,
+    {
+      method: "GET",
+      credentials: "include",
+      next: {
+        tags: ["queues"],
+      },
     },
-  })
+  )
     .then((res) => res.json())
     .catch(() => {
       toast.error("Something went wrong");
@@ -196,20 +270,20 @@ export async function listUsers(): Promise<UserStatistics[]> {
     .catch(() => toast.error("Something went wrong"));
 }
 
-//SUBJECT TO CHANGE
-export async function updateUser(data: CreateUserRequest): Promise<void> {
-  await fetch(`${SERVER_ENDPOINT}/admin/users`, {
-    method: "POST",
-    credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(data),
-    next: {
-      tags: ["users"],
-    },
-  }).catch(() => toast.error("Something went wrong"));
-}
+// //SUBJECT TO CHANGE
+// export async function updateUser(data: CreateUserRequest): Promise<void> {
+//   await fetch(`${SERVER_ENDPOINT}/admin/users`, {
+//     method: "POST",
+//     credentials: "include",
+//     headers: {
+//       "Content-Type": "application/json",
+//     },
+//     body: JSON.stringify(data),
+//     next: {
+//       tags: ["users"],
+//     },
+//   }).catch(() => toast.error("Something went wrong"));
+// }
 
 export async function updateQueueSettings(data: QueueSettingsType) {
   return await fetch(
