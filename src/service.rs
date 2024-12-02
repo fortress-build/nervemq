@@ -155,7 +155,6 @@ impl Service {
             .fetch_one(&mut *self.db.acquire().await?)
             .await?;
         if user.role < role {
-            tracing::error!("User: {user:?}");
             return Err(Error::Unauthorized);
         }
 
@@ -727,7 +726,7 @@ impl Service {
             JOIN users u ON p.user = u.id
             JOIN users nu ON ns.created_by = nu.id
             LEFT JOIN queues q ON q.ns = ns.id
-            WHERE u.email = 'admin@fortress.build'
+            WHERE u.email = $1
             GROUP BY ns.id, nu.email
         ",
         )
