@@ -47,11 +47,11 @@ export default function AdminPanel() {
   } = useQuery({
     queryKey: ["users", searchQuery],
     queryFn: () => listUsers(),
+    select: (data) =>
+      data.filter((user) =>
+        user.email.toLowerCase().includes(searchQuery.toLowerCase()),
+      ),
   });
-
-  const filteredData = data.filter((user) =>
-    user.email.toLowerCase().includes(searchQuery.toLowerCase()),
-  );
 
   const confirmDeleteUser = async (email: string) => {
     try {
@@ -97,7 +97,7 @@ export default function AdminPanel() {
       <DataTable
         className="w-full"
         columns={columns}
-        data={filteredData}
+        data={data}
         isLoading={isLoading}
         meta={{ handleDeleteUser, handleModifyUser }}
         sorting={sorting}
