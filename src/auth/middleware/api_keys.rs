@@ -5,7 +5,7 @@ use std::task::{Context, Poll};
 
 use actix_identity::Identity;
 use actix_web::dev::{Service, Transform};
-use actix_web::error::ErrorUnauthorized;
+use actix_web::error::{ErrorInternalServerError, ErrorUnauthorized};
 use actix_web::http::header::{self};
 use actix_web::web::Data;
 use actix_web::HttpMessage;
@@ -68,18 +68,23 @@ where
 
             let auth_req = {
                 let Some(auth_header) = req.headers().get(header::AUTHORIZATION) else {
-                    return Err(ErrorUnauthorized("API Key not provided"));
+                    // If there's no auth header, allow the request to pass through.
+                    // Authorization will be enforced past this point by the identity system.
+                    //
+                    // This is necessary for user authentication, since it is checked later based
+                    // on cookies.
+                    return svc.call(req).await;
                 };
 
                 match auth_header.to_str() {
                     Ok(str) => str.to_owned(),
-                    Err(_) => return Err(ErrorUnauthorized("Invalid authorization")),
+                    Err(e) => return Err(ErrorInternalServerError(e)),
                 }
             };
 
             let auth_header = crate::auth::header::auth_header()
                 .parse_str(&auth_req)
-                .map_err(|_| ErrorUnauthorized("Invalid authorization"))?;
+                .map_err(|e| ErrorInternalServerError(e))?;
 
             let user = match auth_header {
                 AuthHeader::NerveMqApiV1(token) => {
