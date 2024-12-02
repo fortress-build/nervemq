@@ -162,7 +162,7 @@ export default function CreateApiKey({
                 selector={(state) => [state.canSubmit, state.isSubmitting]}
               >
                 {([canSubmit, isSubmitting]) => (
-                  <>
+                  <div className="flex flex-col sm:flex-row gap-2">
                     <Button type="submit" disabled={!canSubmit}>
                       {isSubmitting ? (
                         <>
@@ -182,7 +182,7 @@ export default function CreateApiKey({
                         Cancel
                       </Button>
                     </DialogClose>
-                  </>
+                  </div>
                 )}
               </form.Subscribe>
             </DialogFooter>
