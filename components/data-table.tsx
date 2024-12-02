@@ -61,10 +61,11 @@ export function DataTable<TData, TValue>({
     getExpandedRowModel: getExpandedRowModel(),
     ...(sorting !== undefined && {
       getSortedRowModel: getSortedRowModel(),
-      onSortingChange: setSorting 
-        ? (updater) => setSorting(
-            typeof updater === 'function' ? updater(sorting ?? []) : updater
-          )
+      onSortingChange: setSorting
+        ? (updater) =>
+            setSorting(
+              typeof updater === "function" ? updater(sorting ?? []) : updater,
+            )
         : undefined,
       state: {
         sorting: sorting ?? [],
@@ -73,9 +74,12 @@ export function DataTable<TData, TValue>({
     ...(columnFilters !== undefined && {
       getFilteredRowModel: getFilteredRowModel(),
       onColumnFiltersChange: setColumnFilters
-        ? (updater) => setColumnFilters(
-            typeof updater === 'function' ? updater(columnFilters ?? []) : updater
-          )
+        ? (updater) =>
+            setColumnFilters(
+              typeof updater === "function"
+                ? updater(columnFilters ?? [])
+                : updater,
+            )
         : undefined,
       state: {
         columnFilters: columnFilters ?? [],
@@ -114,23 +118,26 @@ export function DataTable<TData, TValue>({
             table.getRowModel().rows.map((row) => (
               <React.Fragment key={row.id}>
                 <TableRow
-                  data-state={row.getIsSelected() && "selected"}
+                  data-state={row.getIsSelected() ? "selected" : undefined}
                   onClick={() => onRowClick?.(row.original)}
                   className={onRowClick ? "cursor-pointer hover:bg-muted" : ""}
                 >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id}>
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      {flexRender(
+                        cell.column.columnDef.cell,
+                        cell.getContext(),
+                      )}
                     </TableCell>
                   ))}
                 </TableRow>
-                {row.getIsExpanded() && renderSubComponent && (
+                {row.getIsExpanded() && renderSubComponent ? (
                   <tr>
                     <td colSpan={row.getVisibleCells().length}>
                       {renderSubComponent({ row })}
                     </td>
                   </tr>
-                )}
+                ) : null}
               </React.Fragment>
             ))
           ) : (

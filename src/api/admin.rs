@@ -43,11 +43,12 @@ pub async fn create_user(
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct UserInfo {
     email: String,
+    role: Role,
 }
 
 #[get("/users")]
 pub async fn list_users(service: web::Data<Service>) -> actix_web::Result<impl Responder> {
-    let users: Vec<UserInfo> = sqlx::query_as("SELECT email FROM users")
+    let users: Vec<UserInfo> = sqlx::query_as("SELECT * FROM users")
         .fetch_all(service.db())
         .await
         .map_err(ErrorInternalServerError)?;

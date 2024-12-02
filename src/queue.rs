@@ -22,4 +22,7 @@ pub struct QueueStatistics {
     pub queue: Queue,
     pub message_count: u64,
     pub avg_size_bytes: f64,
+    pub pending: u64,
+    pub delivered: u64,
+    pub failed: u64,
 }

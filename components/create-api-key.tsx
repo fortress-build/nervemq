@@ -19,7 +19,12 @@ import { Input } from "@/components/ui/input";
 import { useInvalidate } from "@/hooks/use-invalidate";
 import { DialogHeader } from "./ui/dialog";
 import { createAPIKey } from "@/actions/api";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { Copy as CopyIcon, Info as InfoIcon } from "lucide-react";
 // Add schema
 export const createApiKeySchema = object({
@@ -69,7 +74,6 @@ export default function CreateApiKey({
     onSubmit: async ({ value: data, formApi }) => {
       await createAPIKey(data)
         .then((result) => {
-          console.log(result);
           setApiKey(result);
           setShowKey(true);
           invalidate();
@@ -84,15 +88,14 @@ export default function CreateApiKey({
     },
   });
 
-
   const downloadKey = useCallback(() => {
     if (apiKey?.token) {
       const content = [
-        `Platform API Key: ${apiKey.token}`,
+        `Platform API Key: nervemq_${apiKey.access_key}_${apiKey.secret_key}`,
         `Access Key: ${apiKey.access_key}`,
         `Secret Key: ${apiKey.secret_key}`,
-      ].join('\n');
-      
+      ].join("\n");
+
       const blob = new Blob([content], { type: "text/plain" });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -115,7 +118,7 @@ export default function CreateApiKey({
       }}
     >
       <DialogContent className="rounded-lg sm:rounded-lg">
-      {!showKey ? (
+        {!showKey ? (
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -192,8 +195,8 @@ export default function CreateApiKey({
             <DialogHeader>
               <DialogTitle>API Key Created</DialogTitle>
               <DialogDescription>
-                Please copy or download your API keys now. You won&apos;t be able
-                to see them again!
+                Please copy or download your API keys now. You won&apos;t be
+                able to see them again!
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
@@ -217,7 +220,7 @@ export default function CreateApiKey({
                     <Input
                       id="combined-key"
                       readOnly
-                      value={apiKey?.token}
+                      value={`nervemq_${apiKey?.access_key}_${apiKey?.secret_key}`}
                       type="text"
                       className="font-mono"
                     />
@@ -227,7 +230,9 @@ export default function CreateApiKey({
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => navigator.clipboard.writeText(apiKey?.token || '')}
+                            onClick={() =>
+                              navigator.clipboard.writeText(apiKey?.token || "")
+                            }
                           >
                             <CopyIcon className="h-4 w-4" />
                           </Button>
@@ -272,7 +277,11 @@ export default function CreateApiKey({
                             <Button
                               variant="ghost"
                               size="icon"
-                              onClick={() => navigator.clipboard.writeText(apiKey?.access_key || '')}
+                              onClick={() =>
+                                navigator.clipboard.writeText(
+                                  apiKey?.access_key || "",
+                                )
+                              }
                             >
                               <CopyIcon className="h-4 w-4" />
                             </Button>
@@ -301,7 +310,11 @@ export default function CreateApiKey({
                             <Button
                               variant="ghost"
                               size="icon"
-                              onClick={() => navigator.clipboard.writeText(apiKey?.secret_key || '')}
+                              onClick={() =>
+                                navigator.clipboard.writeText(
+                                  apiKey?.secret_key || "",
+                                )
+                              }
                             >
                               <CopyIcon className="h-4 w-4" />
                             </Button>
