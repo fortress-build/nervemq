@@ -1,5 +1,5 @@
 "use client";
-import ClientList from "@/app/(dashboard)/queues/list";
+import MessageList from "@/app/(dashboard)/queues/list";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import type { QueueStatistics } from "@/components/queues/table";
@@ -86,9 +86,9 @@ export default function QueuePage() {
               {queue ? (
                 <>
                   <div>
-                    <p className="text-gray-600 break-words">Message Size (avg)</p>
-                    <p className="text-2xl font-medium overflow-hidden text-ellipsis">
-                      {(queue.avgSizeBytes ?? 0).toFixed(2)} bytes
+                    <p className="text-gray-600">Message Size (avg)</p>
+                    <p className="text-2xl font-medium">
+                      {(queue.avg_size_bytes ?? 0).toFixed(2)} bytes
                     </p>
                   </div>
                   <div>
@@ -99,12 +99,6 @@ export default function QueuePage() {
                         : queue.failed / (queue.delivered + queue.failed)
                       ).toFixed(2)}
                       %
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-gray-600 break-words">Total Operations</p>
-                    <p className="text-2xl font-medium">
-                      {(queue.queue_operations_total ?? 0).toFixed(2)}
                     </p>
                   </div>
                 </>
@@ -119,7 +113,7 @@ export default function QueuePage() {
             <CardTitle>Messages</CardTitle>
           </CardHeader>
           <CardContent>
-            <ClientList />
+            <MessageList queue={name} namespace={namespace} />
           </CardContent>
         </Card>
       </div>

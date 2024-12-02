@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 
 use crate::{
+    message::Message,
     queue::Queue,
     service::{Error, Service},
 };
@@ -96,6 +97,34 @@ async fn queue_stats(
     }
 }
 
+#[get("/{ns_name}/{queue_name}/messages")]
+async fn list_messages(
+    service: web::Data<Service>,
+    path: web::Path<(String, String)>,
+    identity: Identity,
+) -> actix_web::Result<web::Json<Vec<Message>>> {
+    let (namespace, name) = &*path;
+
+    let ns_id = match service.get_namespace_id(namespace, service.db()).await {
+        Ok(Some(id)) => id,
+        Ok(None) => return Err(ErrorInternalServerError("Namespace not found")),
+        Err(e) => return Err(ErrorInternalServerError(e)),
+    };
+
+    match service
+        .check_user_access(&identity, ns_id, service.db())
+        .await
+    {
+        Ok(_) => {}
+        Err(e) => return Err(ErrorUnauthorized(e)),
+    }
+
+    match service.list_messages(namespace, name).await {
+        Ok(messages) => Ok(web::Json(messages)),
+        Err(e) => Err(ErrorInternalServerError(e)),
+    }
+}
+
 pub fn service() -> Scope {
     web::scope("/queue")
         .service(list_all_queues)
@@ -103,4 +132,5 @@ pub fn service() -> Scope {
         .service(create_queue)
         .service(delete_queue)
         .service(queue_stats)
+        .service(list_messages)
 }

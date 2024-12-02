@@ -11,6 +11,7 @@ import type { CreateUserRequest } from "@/schemas/create-user";
 import { toast } from "sonner";
 import type { ApiKey } from "@/components/api-keys/table";
 import type { Role } from "@/lib/state/global";
+import { MessageObject } from "@/app/(dashboard)/queues/list";
 
 export async function createNamespace(data: CreateNamespaceRequest) {
   await fetch(`${SERVER_ENDPOINT}/ns/${data.name}`, {
@@ -167,6 +168,32 @@ export async function fetchQueue(
       tags: ["queues"],
     },
   }).then((res) => res.json());
+}
+
+export async function listMessages({
+  queue,
+  namespace,
+}: {
+  queue: string;
+  namespace: string;
+}): Promise<MessageObject[]> {
+  return await fetch(
+    `${SERVER_ENDPOINT}/queue/${namespace}/${queue}/messages`,
+    {
+      method: "GET",
+      credentials: "include",
+      next: {
+        tags: ["queues", "queue-messages"],
+      },
+    },
+  )
+    .then((res) => res.json())
+    .catch(() => {
+      toast.error(
+        `Something went wrong: failed to list messages for queue ${queue}`,
+      );
+      return [];
+    });
 }
 
 export async function listAPIKeys(): Promise<ApiKey[]> {
