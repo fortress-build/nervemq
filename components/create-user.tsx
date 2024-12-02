@@ -274,12 +274,12 @@ export default function CreateUser({
                                   field.handleChange(currentNamespaces);
                                 }}
                               >
-                                <div className="flex items-center gap-2">
-                                  {field.state.value.has(namespace.name) ? (
+                                <div className="flex items-center gap-2 w-4">
+                                {field.state.value.has(namespace.name) ? (
                                     <Check className="h-4 w-4" />
                                   ) : null}
-                                  {namespace.name}
                                 </div>
+                                {namespace.name}
                               </CommandItem>
                             ))}
                           </CommandGroup>
