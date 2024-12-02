@@ -31,8 +31,7 @@ export type Queue = {
 
 export type QueueStatistics = Queue & {
   messageCount: number;
-  avgSizeBytes: number;
-  queue_operations_total: number;
+  avg_size_bytes: number;
   active_connections: number;
   pending: number;
   delivered: number;
@@ -132,7 +131,7 @@ export const columns: ColumnDef<QueueStatistics>[] = [
     },
   },
   {
-    accessorKey: "messageCount",
+    accessorKey: "pending",
     header: ({ column }) => (
       <div className="flex items-center gap-2">
         <Activity className="h-4 w-4" />

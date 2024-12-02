@@ -13,6 +13,7 @@ use sqlx::{
     },
     Acquire, FromRow, Sqlite, SqlitePool,
 };
+use tokio::task::JoinSet;
 use tokio_stream::StreamExt as _;
 
 use crate::{
@@ -239,7 +240,7 @@ impl Service {
         Ok(())
     }
 
-    async fn check_user_access<'a>(
+    pub async fn check_user_access<'a>(
         &self,
         identity: &Identity,
         ns: u64,
@@ -543,9 +544,15 @@ impl Service {
                     m.body,
                     m.delivered_at,
                     m.sent_by,
-                    q.name as queue
+                    q.name as queue,
+                    (CASE
+                        WHEN m.delivered_at IS NULL AND m.tries < conf.max_retries THEN 'pending'
+                        WHEN m.delivered_at IS NULL AND m.tries >= conf.max_retries THEN 'failed'
+                        ELSE 'delivered'
+                    END) as status
                 FROM messages m
                 JOIN queues q ON m.queue = q.id
+                JOIN queue_configurations conf ON q.id = conf.queue
                 JOIN namespaces n ON q.ns = n.id
                 WHERE n.name = $1
                 AND q.name = $2
@@ -586,9 +593,15 @@ impl Service {
                     m.body,
                     m.delivered_at,
                     m.sent_by,
-                    q.name as queue_name
+                    q.name as queue_name,
+                    (CASE
+                        WHEN m.delivered_at IS NULL AND m.tries < conf.max_retries THEN 'pending'
+                        WHEN m.delivered_at IS NULL AND m.tries >= conf.max_retries THEN 'failed'
+                        ELSE 'delivered'
+                    END) as status
                 FROM messages m
                 JOIN queues q ON m.queue = q.id
+                JOIN queue_configurations conf ON q.id = conf.queue
                 JOIN namespaces n ON q.ns = n.id
                 WHERE n.name = $1
                 AND q.name = $2
@@ -618,8 +631,17 @@ impl Service {
 
         sqlx::query_as(
             "
-            SELECT m.* FROM messages m
+            SELECT
+                m.*,
+                q.name as queue,
+                (CASE
+                    WHEN m.delivered_at IS NULL AND m.tries < conf.max_retries THEN 'pending'
+                    WHEN m.delivered_at IS NULL AND m.tries >= conf.max_retries THEN 'failed'
+                    ELSE 'delivered'
+                END) as status
+            FROM messages m
             JOIN queues q ON m.queue = q.id
+            JOIN queue_configurations conf ON q.id = conf.queue
             JOIN namespaces n ON q.ns = n.id
             WHERE n.name = $1 AND q.name = $2 AND m.id = $3
             ",
@@ -635,16 +657,53 @@ impl Service {
     pub async fn list_messages(&self, namespace: &str, queue: &str) -> eyre::Result<Vec<Message>> {
         let mut db = self.db().acquire().await?;
 
-        Ok(sqlx::query_as::<_, Message>(
+        let mut messages = sqlx::query_as::<_, Message>(
             "
-            SELECT m.*, q.name as queue FROM messages m
+            SELECT
+                m.*,
+                q.name as queue,
+                (CASE
+                    WHEN m.delivered_at IS NULL AND m.tries < conf.max_retries THEN 'pending'
+                    WHEN m.delivered_at IS NULL AND m.tries >= conf.max_retries THEN 'failed'
+                    ELSE 'delivered'
+                END) as status
+            FROM messages m
             JOIN queues q ON m.queue = q.id
+            JOIN queue_configurations conf ON q.id = conf.queue
         ",
         )
         .bind(namespace)
         .bind(queue)
-        .fetch_all(&mut *db)
-        .await?)
+        .fetch(&mut *db);
+
+        let mut join_set = JoinSet::new();
+        while let Some(mut message) = messages.next().await.transpose()? {
+            let db = self.db().clone();
+            join_set.spawn(async move {
+                let mut conn = db.acquire().await?;
+                let mut kv_pairs = sqlx::query_as(
+                    "
+                    SELECT k, v FROM kv_pairs WHERE message = $1
+                ",
+                )
+                .bind(message.id as i64)
+                .fetch(&mut *conn);
+
+                while let Some((k, v)) = kv_pairs.next().await.transpose()? {
+                    message.kv.insert(k, v);
+                }
+
+                Result::<_, eyre::Report>::Ok(message)
+            });
+        }
+
+        let mut messages = Vec::new();
+
+        while let Some(result) = join_set.join_next().await.transpose()?.transpose()? {
+            messages.push(result);
+        }
+
+        Ok(messages)
     }
 
     pub async fn queue_configuration(&self, queue: u64) -> eyre::Result<QueueConfig> {
@@ -677,9 +736,9 @@ impl Service {
                 n.name as ns,
                 COUNT(m.id) AS message_count,
                 IFNULL(AVG(LENGTH(m.body)), 0.0) as avg_size_bytes,
-                COUNT(CASE WHEN m.delivered_at = 0 AND m.tries < conf.max_retries THEN 1 END) as pending,
-                COUNT(CASE WHEN m.delivered_at > 0  THEN 1 END) as delivered,
-                COUNT(CASE WHEN m.delivered_at = 0 AND m.tries >= conf.max_retries THEN 1 END) as failed
+                COUNT(CASE WHEN m.delivered_at IS NULL AND m.tries < conf.max_retries THEN 1 END) as pending,
+                COUNT(CASE WHEN m.delivered_at IS NOT NULL THEN 1 END) as delivered,
+                COUNT(CASE WHEN m.delivered_at IS NULL AND m.tries >= conf.max_retries THEN 1 END) as failed
             FROM queues q
             JOIN queue_configurations conf ON q.id = conf.queue
             LEFT JOIN messages m ON q.id = m.queue
@@ -713,9 +772,9 @@ impl Service {
                 n.name as ns,
                 COUNT(m.id) AS message_count,
                 IFNULL(AVG(LENGTH(m.body)), 0.0) as avg_size_bytes,
-                COUNT(CASE WHEN m.delivered_at = 0 AND m.tries < conf.max_retries THEN 1 END) as pending,
-                COUNT(CASE WHEN m.delivered_at > 0  THEN 1 END) as delivered,
-                COUNT(CASE WHEN m.delivered_at = 0 AND m.tries >= conf.max_retries THEN 1 END) as failed
+                COUNT(CASE WHEN m.delivered_at IS NULL AND m.tries < conf.max_retries THEN 1 END) as pending,
+                COUNT(CASE WHEN m.delivered_at IS NOT NULL  THEN 1 END) as delivered,
+                COUNT(CASE WHEN m.delivered_at IS NULL AND m.tries >= conf.max_retries THEN 1 END) as failed
             FROM queues q
             JOIN queue_configurations conf ON q.id = conf.queue
             LEFT JOIN messages m ON q.id = m.queue

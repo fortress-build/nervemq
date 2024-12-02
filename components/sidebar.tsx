@@ -68,6 +68,7 @@ function SidebarItem({
             }
           }}
           href={url}
+          className="whitespace-nowrap"
         >
           <Icon />
           {title}
