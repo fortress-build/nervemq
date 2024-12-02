@@ -7,6 +7,36 @@ import { fetchQueue } from "@/actions/api";
 import { useParams, useRouter } from "next/navigation";
 import { QueueSettings } from "@/components/queue-settings";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@nextui-org/spinner";
+import { createContext, useContext } from "react";
+
+const IsLoadingContext = createContext(false);
+
+function Metric({ title, value }: { title: string; value: React.ReactNode }) {
+  const isLoading = useContext(IsLoadingContext);
+
+  return (
+    <div>
+      <p className="text-gray-600 break-words">{title}</p>
+      {isLoading ? (
+        <div className="relative flex items-center justify-start">
+          <Spinner size="sm" className="absolute" />
+          <p className="text-2xl font-medium opacity-0">{"0"}</p>
+        </div>
+      ) : (
+        <p className="text-2xl font-medium">{value}</p>
+      )}
+    </div>
+  );
+}
+
+// const delayResolve = (promise: Promise<unknown>, ms: number) => {
+//   return new Promise((resolve, reject) => {
+//     setTimeout(() => {
+//       promise.then(resolve, reject);
+//     }, ms);
+//   });
+// };
 
 export default function QueuePage() {
   const router = useRouter();
@@ -18,7 +48,11 @@ export default function QueuePage() {
 
   const [namespace, name] = queueId;
 
-  const { data: queue, error } = useQuery<QueueStatistics, Error>({
+  const {
+    data: queue,
+    error,
+    isLoading,
+  } = useQuery<QueueStatistics, Error>({
     queryKey: ["queues", name, namespace],
     queryFn: () => {
       if (!name || !namespace) {
@@ -29,7 +63,7 @@ export default function QueuePage() {
     refetchInterval: 30000,
   });
 
-  if (error instanceof Error && "status" in error && error.status === 403) {
+  if (error !== null && error.cause === 403) {
     return (
       <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center">
         <Card className="w-[400px] border">
@@ -49,74 +83,75 @@ export default function QueuePage() {
     );
   }
 
-  return (
-    <>
-      <div className="grid gap-4">
-        {/* Queue Status Section */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle>Queue Status</CardTitle>
-            <QueueSettings queue={queue} />
+  if (queue === undefined && !isLoading) {
+    return (
+      <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center">
+        <Card className="w-[400px] border">
+          <CardHeader className="text-center">
+            <CardTitle>Not Found</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              <div>
-                <p className="text-gray-600 break-words">Pending</p>
-                <p className="text-2xl font-medium">{queue?.pending ?? 0}</p>
-              </div>
-              <div>
-                <p className="text-gray-600 break-words">Delivered</p>
-                <p className="text-2xl font-medium">{queue?.delivered ?? 0}</p>
-              </div>
-              <div>
-                <p className="text-gray-600 break-words">Failed</p>
-                <p className="text-2xl font-medium">{queue?.failed ?? 0}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Metrics Section */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Metrics</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {queue ? (
-                <>
-                  <div>
-                    <p className="text-gray-600">Message Size (avg)</p>
-                    <p className="text-2xl font-medium">
-                      {(queue.avg_size_bytes ?? 0).toFixed(2)} bytes
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-gray-600 break-words">Error Rate</p>
-                    <p className="text-2xl font-medium">
-                      {(queue.failed + queue.delivered === 0
-                        ? 0
-                        : queue.failed / (queue.delivered + queue.failed)
-                      ).toFixed(2)}
-                      %
-                    </p>
-                  </div>
-                </>
-              ) : null}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Current Queue Items */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Messages</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <MessageList queue={name} namespace={namespace} />
+          <CardContent className="text-center">
+            <p className="mb-4">
+              The queue you are looking for does not exist.
+            </p>
+            <Button onClick={() => router.replace("/queues")}>
+              Return to Queues
+            </Button>
           </CardContent>
         </Card>
       </div>
+    );
+  }
+
+  return (
+    <>
+      <IsLoadingContext.Provider value={isLoading}>
+        <div className="grid gap-4">
+          {/* Queue Status Section */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle>Status</CardTitle>
+              <QueueSettings queue={queue} />
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <Metric title="Pending" value={queue?.pending ?? "0"} />
+                <Metric title="Delivered" value={queue?.delivered ?? "0"} />
+                <Metric title="Failed" value={queue?.failed ?? "0"} />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Metrics Section */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Metrics</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <Metric
+                  title="Message Size (avg)"
+                  value={`${(queue?.avg_size_bytes ?? 0).toFixed(2)} bytes`}
+                />
+                <Metric
+                  title="Error Rate"
+                  value={`${((queue?.failed ?? 0) + (queue?.delivered ?? 0) === 0 ? 0 : ((queue?.failed ?? 0) / ((queue?.delivered ?? 0) + (queue?.failed ?? 0))) * 100).toFixed(2)}%`}
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Current Queue Items */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Messages</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <MessageList queue={name} namespace={namespace} />
+            </CardContent>
+          </Card>
+        </div>
+      </IsLoadingContext.Provider>
     </>
   );
 }

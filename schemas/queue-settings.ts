@@ -1,10 +1,16 @@
 import { type InferType, object, number, string } from "yup";
 
-export const queueSettingsSchema = object({
-  namespace: string().required(),
-  queue: string().required(),
-  maxRetries: number().required().min(0).max(10),
-  timeout: number().required().min(1).max(300),
+export const updateQueueConfigSchema = object({
+  maxRetries: number().required().min(0).max(999),
+  deadLetterQueue: string().optional(),
 });
 
-export type QueueSettingsType = InferType<typeof queueSettingsSchema>;
+export type QueueConfig = InferType<typeof updateQueueConfigSchema>;
+
+export type UpdateQueueConfigRequest = {
+  queue: string;
+  namespace: string;
+  maxRetries: number;
+  deadLetterQueue?: string;
+};
+

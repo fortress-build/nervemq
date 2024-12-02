@@ -2,15 +2,16 @@ use actix_identity::Identity;
 use actix_web::{
     delete,
     error::{ErrorInternalServerError, ErrorUnauthorized},
-    get, post, web, Responder, Scope,
+    get, post, web, HttpResponse, Responder, Scope,
 };
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 
 use crate::{
+    error::Error,
     message::Message,
     queue::Queue,
-    service::{Error, Service},
+    service::{QueueConfig, Service},
 };
 
 #[derive(Serialize, Deserialize)]
@@ -125,6 +126,85 @@ async fn list_messages(
     }
 }
 
+#[get("/{ns_name}/{queue_name}/config")]
+async fn get_queue_config(
+    service: web::Data<Service>,
+    path: web::Path<(String, String)>,
+    identity: Identity,
+) -> Result<web::Json<QueueConfig>, Error> {
+    let (namespace, name) = &*path;
+
+    let ns_id = match service.get_namespace_id(namespace, service.db()).await {
+        Ok(Some(id)) => id,
+        Ok(None) => return Err(Error::NotFound),
+        Err(e) => return Err(e),
+    };
+
+    service
+        .check_user_access(&identity, ns_id, service.db())
+        .await?;
+
+    let queue_id = match service.get_queue_id(namespace, name, service.db()).await? {
+        Some(id) => id,
+        None => return Err(Error::NotFound),
+    };
+
+    let config = service.get_queue_configuration(queue_id).await?;
+
+    Ok(web::Json(config))
+}
+
+#[derive(Debug, Deserialize)]
+struct UpdateQueueConfigRequest {
+    max_retries: u64,
+    dead_letter_queue: Option<String>,
+}
+
+#[post("/{ns_name}/{queue_name}/config")]
+async fn update_queue_config(
+    service: web::Data<Service>,
+    path: web::Path<(String, String)>,
+    updates: web::Json<UpdateQueueConfigRequest>,
+    identity: Identity,
+) -> Result<impl Responder, Error> {
+    let (namespace, name) = &*path;
+
+    let ns_id = match service.get_namespace_id(namespace, service.db()).await {
+        Ok(Some(id)) => id,
+        Ok(None) => return Err(Error::NotFound),
+        Err(e) => return Err(e),
+    };
+
+    service
+        .check_user_access(&identity, ns_id, service.db())
+        .await?;
+
+    let queue_id = match service.get_queue_id(namespace, name, service.db()).await? {
+        Some(id) => id,
+        None => return Err(Error::NotFound),
+    };
+
+    let dead_letter_queue = match &updates.dead_letter_queue {
+        Some(dlq) => match service.get_queue_id(namespace, dlq, service.db()).await? {
+            Some(id) => Some(id),
+            None => return Err(Error::NotFound),
+        },
+        None => None,
+    };
+
+    let new_config = QueueConfig {
+        queue: queue_id,
+        max_retries: updates.max_retries,
+        dead_letter_queue,
+    };
+
+    service
+        .update_queue_configuration(queue_id, new_config)
+        .await?;
+
+    Ok(HttpResponse::Ok())
+}
+
 pub fn service() -> Scope {
     web::scope("/queue")
         .service(list_all_queues)
@@ -133,4 +213,6 @@ pub fn service() -> Scope {
         .service(delete_queue)
         .service(queue_stats)
         .service(list_messages)
+        .service(get_queue_config)
+        .service(update_queue_config)
 }

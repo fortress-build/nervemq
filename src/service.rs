@@ -1,11 +1,10 @@
 use std::{collections::HashMap, sync::Arc};
 
-use actix_identity::{error::GetIdentityError, Identity};
+use actix_identity::Identity;
 use actix_web::web;
 use secrecy::SecretString;
 use serde::{Deserialize, Serialize};
 use serde_email::Email;
-use snafu::Snafu;
 use sqlx::{
     sqlite::{
         SqliteAutoVacuum, SqliteConnectOptions, SqliteJournalMode, SqliteLockingMode,
@@ -20,47 +19,11 @@ use crate::{
     api::auth::{Permission, Role, User},
     auth::crypto::hash_secret,
     config::Config,
+    error::Error,
     message::Message,
     namespace::{Namespace, NamespaceStatistics},
     queue::{Queue, QueueStatistics},
 };
-
-#[derive(Debug, Snafu)]
-pub enum Error {
-    Unauthorized,
-
-    Sqlx {
-        source: sqlx::Error,
-    },
-
-    #[snafu(whatever, display("{message}"))]
-    Whatever {
-        message: String,
-        #[snafu(source(from(eyre::Report, Some)))]
-        source: Option<eyre::Report>,
-    },
-}
-
-impl From<sqlx::Error> for Error {
-    fn from(value: sqlx::Error) -> Self {
-        Self::Sqlx { source: value }
-    }
-}
-
-impl From<eyre::Report> for Error {
-    fn from(value: eyre::Report) -> Self {
-        Error::Whatever {
-            message: format!("{value}"),
-            source: Some(value),
-        }
-    }
-}
-
-impl From<GetIdentityError> for Error {
-    fn from(_: GetIdentityError) -> Self {
-        Self::Unauthorized
-    }
-}
 
 #[derive(Debug, Serialize, Deserialize, FromRow)]
 pub struct QueueConfig {
@@ -81,11 +44,11 @@ impl Service {
         &self.db
     }
 
-    pub async fn connect() -> eyre::Result<Self> {
+    pub async fn connect() -> Result<Self, Error> {
         Self::connect_with(Config::default()).await
     }
 
-    pub async fn connect_with(config: Config) -> eyre::Result<Self> {
+    pub async fn connect_with(config: Config) -> Result<Self, Error> {
         let opts = SqliteConnectOptions::new()
             .filename(config.db_path())
             .create_if_missing(true)
@@ -97,7 +60,10 @@ impl Service {
 
         let pool = SqlitePoolOptions::new().connect_with(opts).await?;
 
-        sqlx::migrate!("./migrations").run(&pool).await?;
+        sqlx::migrate!("./migrations")
+            .run(&pool)
+            .await
+            .map_err(|e| eyre::eyre!(e))?;
 
         Ok(Self {
             db: pool,
@@ -110,7 +76,7 @@ impl Service {
         namespace: &str,
         name: &str,
         exec: impl Acquire<'_, Database = Sqlite>,
-    ) -> Result<u64, Error> {
+    ) -> Result<Option<u64>, Error> {
         Ok(sqlx::query_scalar(
             "
             SELECT q.id FROM queues q
@@ -120,7 +86,7 @@ impl Service {
         )
         .bind(namespace)
         .bind(name)
-        .fetch_one(&mut *exec.acquire().await?)
+        .fetch_optional(&mut *exec.acquire().await?)
         .await?)
     }
 
@@ -128,16 +94,15 @@ impl Service {
         &self,
         name: &str,
         ex: impl Acquire<'a, Database = Sqlite>,
-    ) -> eyre::Result<Option<u64>> {
-        sqlx::query_scalar(
+    ) -> Result<Option<u64>, Error> {
+        Ok(sqlx::query_scalar(
             "
-                    SELECT id FROM namespaces WHERE name = $1
-                ",
+            SELECT id FROM namespaces WHERE name = $1
+            ",
         )
         .bind(name)
         .fetch_optional(&mut *ex.acquire().await?)
-        .await
-        .map_err(|e| eyre::eyre!(e))
+        .await?)
     }
 
     pub async fn list_namespaces(&self, identity: Identity) -> Result<Vec<Namespace>, Error> {
@@ -318,7 +283,7 @@ impl Service {
         namespace: &str,
         name: &str,
         identity: Identity,
-    ) -> eyre::Result<()> {
+    ) -> Result<(), Error> {
         let mut tx = self.db().begin().await?;
 
         let namespace_id = self
@@ -329,7 +294,10 @@ impl Service {
         self.check_user_access(&identity, namespace_id, &mut tx)
             .await?;
 
-        let id = self.get_queue_id(namespace, name, &mut tx).await?;
+        let id = self
+            .get_queue_id(namespace, name, &mut tx)
+            .await?
+            .ok_or_else(|| eyre::eyre!("Queue {name} does not exist"))?;
 
         sqlx::query("DELETE FROM queues WHERE id = $1")
             .bind(id as i64)
@@ -413,8 +381,10 @@ impl Service {
         password: SecretString,
         role: Option<Role>,
         namespaces: Vec<String>,
-    ) -> eyre::Result<()> {
-        let hashed_password = web::block(move || hash_secret(password)).await??;
+    ) -> Result<(), Error> {
+        let hashed_password = web::block(move || hash_secret(password))
+            .await
+            .map_err(|e| Error::internal(e))??;
 
         let mut tx = self.db().begin().await?;
 
@@ -454,7 +424,7 @@ impl Service {
         queue: u64,
         message: &[u8],
         kv: HashMap<String, String>,
-    ) -> eyre::Result<u64> {
+    ) -> Result<u64, Error> {
         let mut tx = self.db().begin().await?;
 
         let msg_id: u64 =
@@ -483,7 +453,7 @@ impl Service {
         namespace: &str,
         queue: &str,
         messages: Vec<(Vec<u8>, HashMap<String, String>)>,
-    ) -> eyre::Result<Vec<u64>> {
+    ) -> Result<Vec<u64>, Error> {
         let mut tx = self.db().begin().await?;
 
         // Get queue ID once for all messages
@@ -532,7 +502,7 @@ impl Service {
         &self,
         namespace: impl AsRef<str>,
         queue: impl AsRef<str>,
-    ) -> eyre::Result<Option<Message>> {
+    ) -> Result<Option<Message>, Error> {
         let mut tx = self.db().begin().await?;
 
         // Get the first undelivered message and mark it as delivered in one atomic operation
@@ -581,7 +551,7 @@ impl Service {
         namespace: &str,
         queue: &str,
         max_messages: usize,
-    ) -> eyre::Result<Vec<Message>> {
+    ) -> Result<Vec<Message>, Error> {
         let mut tx = self.db().begin().await?;
 
         // Get multiple undelivered messages and mark them as delivered in one atomic operation
@@ -654,7 +624,7 @@ impl Service {
         .ok()?
     }
 
-    pub async fn list_messages(&self, namespace: &str, queue: &str) -> eyre::Result<Vec<Message>> {
+    pub async fn list_messages(&self, namespace: &str, queue: &str) -> Result<Vec<Message>, Error> {
         let mut db = self.db().acquire().await?;
 
         let mut messages = sqlx::query_as::<_, Message>(
@@ -679,7 +649,7 @@ impl Service {
         let mut join_set = JoinSet::new();
         while let Some(mut message) = messages.next().await.transpose()? {
             let db = self.db().clone();
-            join_set.spawn(async move {
+            join_set.spawn_local(async move {
                 let mut conn = db.acquire().await?;
                 let mut kv_pairs = sqlx::query_as(
                     "
@@ -693,20 +663,26 @@ impl Service {
                     message.kv.insert(k, v);
                 }
 
-                Result::<_, eyre::Report>::Ok(message)
+                Result::<_, Error>::Ok(message)
             });
         }
 
         let mut messages = Vec::new();
 
-        while let Some(result) = join_set.join_next().await.transpose()?.transpose()? {
+        while let Some(result) = join_set
+            .join_next()
+            .await
+            .transpose()
+            .map_err(Error::internal)?
+            .transpose()?
+        {
             messages.push(result);
         }
 
         Ok(messages)
     }
 
-    pub async fn queue_configuration(&self, queue: u64) -> eyre::Result<QueueConfig> {
+    pub async fn get_queue_configuration(&self, queue: u64) -> Result<QueueConfig, Error> {
         let mut db = self.db().acquire().await?;
         Ok(sqlx::query_as(
             "
@@ -716,6 +692,29 @@ impl Service {
         .bind(queue as i64)
         .fetch_one(&mut *db)
         .await?)
+    }
+
+    pub async fn update_queue_configuration(
+        &self,
+        queue: u64,
+        new_config: QueueConfig,
+    ) -> Result<(), Error> {
+        let mut db = self.db().acquire().await?;
+
+        sqlx::query(
+            "
+            UPDATE queue_configurations
+            SET max_retries = $1, dead_letter_queue = $2
+            WHERE queue = $3
+            ",
+        )
+        .bind(new_config.max_retries as i64)
+        .bind(new_config.dead_letter_queue.map(|id| id as i64))
+        .bind(queue as i64)
+        .execute(&mut *db)
+        .await?;
+
+        Ok(())
     }
 
     pub async fn queue_statistics(
