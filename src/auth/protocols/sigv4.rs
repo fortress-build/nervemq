@@ -3,9 +3,12 @@ use hmac::Mac;
 use secrecy::ExposeSecret;
 use sha2::Sha256;
 
-use crate::auth::{
-    crypto::{gen_signature_key, sha256_hex},
-    error::Error,
+use crate::{
+    api::auth::User,
+    auth::{
+        crypto::{gen_signature_key, sha256_hex},
+        error::Error,
+    },
 };
 
 #[derive(Debug)]
@@ -22,7 +25,7 @@ pub struct SigV4Header<'a> {
 pub async fn authenticate_sigv4(
     req: &mut ServiceRequest,
     header: SigV4Header<'_>,
-) -> Result<(), Error> {
+) -> Result<User, Error> {
     let payload_hash = {
         let payload: actix_web::web::Payload = req
             .extract::<actix_web::web::Payload>()
@@ -132,5 +135,17 @@ pub async fn authenticate_sigv4(
         return Err(Error::Unauthorized);
     }
 
-    Ok(())
+    let user: User = sqlx::query_as(
+        "
+        SELECT u.* FROM api_keys k
+        JOIN users u ON u.id = k.user
+        WHERE k.key_id = $1
+        ",
+    )
+    .bind(&header.key_id)
+    .fetch_one(pool)
+    .await
+    .map_err(|_| Error::InternalError)?;
+
+    Ok(user)
 }

@@ -148,6 +148,20 @@ impl Service {
         .await?)
     }
 
+    pub async fn check_user_role(&self, identity: Identity, role: Role) -> Result<(), Error> {
+        let email = identity.id()?;
+        let user: User = sqlx::query_as("SELECT * FROM users WHERE email = $1")
+            .bind(email)
+            .fetch_one(&mut *self.db.acquire().await?)
+            .await?;
+        if user.role < role {
+            tracing::error!("User: {user:?}");
+            return Err(Error::Unauthorized);
+        }
+
+        return Ok(());
+    }
+
     pub async fn create_namespace(&self, name: &str, identity: Identity) -> Result<u64, Error> {
         let mut tx = self.db().begin().await?;
 

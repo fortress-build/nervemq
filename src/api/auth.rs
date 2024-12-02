@@ -25,16 +25,18 @@ pub struct SessionResponse {
     role: Role,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default, sqlx::Type, PartialEq, Eq)]
+#[derive(
+    Debug, Clone, Serialize, Deserialize, Default, sqlx::Type, PartialEq, Eq, PartialOrd, Ord,
+)]
 #[sqlx(type_name = "text")]
 pub enum Role {
     #[default]
     #[serde(rename = "user")]
     #[sqlx(rename = "user")]
-    User,
+    User = 0,
     #[serde(rename = "admin")]
     #[sqlx(rename = "admin")]
-    Admin,
+    Admin = 1,
 }
 
 #[derive(Debug, Clone, Deserialize, FromRow)]

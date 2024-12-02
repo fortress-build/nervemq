@@ -14,7 +14,12 @@ import { yupValidator } from "@tanstack/yup-form-adapter";
 import { useQuery } from "@tanstack/react-query";
 import { Label } from "./ui/label";
 import { cn } from "@/lib/utils";
-import { listNamespaces, updateUser } from "@/actions/api";
+import {
+  listNamespaces,
+  listUserAllowedNamespaces,
+  updateUserAllowedNamespaces,
+  updateUserRole,
+} from "@/actions/api";
 import { Spinner } from "@nextui-org/react";
 import { ChevronsUpDown, Plus, Check } from "lucide-react";
 import {
@@ -40,7 +45,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "./ui/select";
-
+import { Role, useSession } from "@/lib/state/global";
 
 export default function ModifyUser({
   open,
@@ -56,19 +61,34 @@ export default function ModifyUser({
   const [showCreateNamespace, setShowCreateNamespace] = useState(false);
   const [nsPopoverOpen, setNsPopoverOpen] = useState(false);
 
+  const session = useSession();
+
   const { data: namespaces = [], isLoading } = useQuery({
     queryFn: () => listNamespaces(),
     queryKey: ["namespaces"],
   });
 
-  const invalidate = useInvalidate(["users"]);
+  const { data: userNamespaces, isLoading: userNamespacesLoading } = useQuery({
+    queryKey: [
+      "users",
+      "namespaces",
+      "user-namespaces",
+      { email: user?.email },
+    ],
+    queryFn: () =>
+      listUserAllowedNamespaces({
+        email: session?.email,
+      }),
+  });
+
+  const invalidate = useInvalidate(["users", "user-namespaces"]);
 
   const form = useForm({
     defaultValues: {
-      email: user?.email ?? '',
+      email: user?.email ?? "",
       password: "",
-      namespaces: new Set(user?.namespaces ?? []) as Set<string>,
-      role: user?.role ?? 'user',
+      namespaces: new Set(userNamespaces ?? []) as Set<string>,
+      role: user?.role ?? Role.User,
     },
     validatorAdapter: yupValidator(),
     validators: {
@@ -77,15 +97,19 @@ export default function ModifyUser({
       onSubmit: modifyUserSchema,
     },
     onSubmit: async ({ value: data, formApi }) => {
-      await updateUser({
-        email: user?.email ?? '',
-        namespaces: [...data.namespaces.keys()],
-        role: data.role,
-        password: data?.password ?? ''
-      })
+      await Promise.all([
+        updateUserAllowedNamespaces({
+          email: session?.email ?? "",
+          namespaces: data.namespaces.keys().toArray(),
+        }),
+        updateUserRole({
+          email: session?.email ?? "",
+          role: data.role,
+        }),
+      ])
         .then(() => {
           invalidate();
-          onSuccess?.(user?.email ?? '');
+          onSuccess?.(session?.email ?? "");
           close();
           formApi.reset();
         })
@@ -135,7 +159,7 @@ export default function ModifyUser({
                   <Label htmlFor={field.name}>Role</Label>
                   <Select
                     value={field.state.value}
-                    onValueChange={field.handleChange}
+                    onValueChange={(value) => field.handleChange(value as Role)}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select a role" />
@@ -164,8 +188,6 @@ export default function ModifyUser({
                     <PopoverTrigger asChild>
                       <Button
                         variant="outline"
-                        // biome-ignore lint/a11y/useSemanticElements: <explanation>
-                        role="combobox"
                         className={cn(
                           "w-full justify-between",
                           field.state.value?.size > 0
@@ -174,13 +196,15 @@ export default function ModifyUser({
                         )}
                       >
                         {field.state.value?.size > 0
-                          ? (Array.from(field.state.value)
-                              .reduce((acc: string, curr: string, idx: number) => {
+                          ? (Array.from(field.state.value).reduce(
+                              (acc: string, curr: string, idx: number) => {
                                 if (idx > 0) {
                                   return `${acc}, ${curr}`;
                                 }
                                 return curr;
-                              }, "") as string)
+                              },
+                              "",
+                            ) as string)
                           : "Select namespaces to grant access"}
                         <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                       </Button>
@@ -190,7 +214,7 @@ export default function ModifyUser({
                         <CommandInput placeholder="Search namespace..." />
                         <CommandList>
                           <CommandEmpty>
-                            {isLoading ? (
+                            {isLoading || userNamespacesLoading ? (
                               <Spinner />
                             ) : (
                               <div className="flex flex-col items-center justify-center py-4 gap-2">

@@ -77,12 +77,14 @@ pub async fn delete_user(
 #[get("/users/{email}/permissions")]
 pub async fn list_user_permissions(
     service: web::Data<Service>,
-    email: String,
-) -> actix_web::Result<impl Responder> {
+    email: web::Path<String>,
+) -> actix_web::Result<web::Json<Vec<String>>> {
+    let email = email.into_inner();
+
     let permissions: Vec<String> = sqlx::query_scalar(
         "
-            SELECT name FROM user_permissions p
-            JOIN namespaces ON p.namespace = ns.id
+            SELECT ns.name FROM user_permissions p
+            JOIN namespaces ns ON p.namespace = ns.id
             JOIN users u ON u.id = p.user
             WHERE u.email = $1
         ",
@@ -91,15 +93,17 @@ pub async fn list_user_permissions(
     .fetch_all(service.db())
     .await
     .map_err(ErrorInternalServerError)?;
+
     Ok(Json(permissions))
 }
 
 #[put("/users/{email}/permissions")]
 pub async fn grant_user_permissions(
     service: web::Data<Service>,
-    email: String,
+    email: web::Path<String>,
     data: Json<Vec<String>>,
 ) -> actix_web::Result<impl Responder> {
+    let email = email.into_inner();
     let mut tx = service
         .db()
         .begin()
@@ -126,9 +130,10 @@ pub async fn grant_user_permissions(
 #[delete("/users/{email}/permissions")]
 pub async fn revoke_user_permissions(
     service: web::Data<Service>,
-    email: String,
+    email: web::Path<String>,
     data: Json<Vec<String>>,
 ) -> actix_web::Result<impl Responder> {
+    let email = email.into_inner();
     let mut tx = service
         .db()
         .begin()
@@ -152,12 +157,14 @@ pub async fn revoke_user_permissions(
     Ok(HttpResponse::Ok())
 }
 
-#[put("/users/{email}/permissions")]
+#[post("/users/{email}/permissions")]
 pub async fn update_user_permissions(
     service: web::Data<Service>,
-    email: String,
+    email: web::Path<String>,
     data: Json<Vec<String>>,
 ) -> actix_web::Result<impl Responder> {
+    let email = email.into_inner();
+
     let mut tx = service
         .db()
         .begin()
@@ -195,6 +202,52 @@ pub async fn update_user_permissions(
     Ok(HttpResponse::Ok())
 }
 
+#[get("/users/{email}/role")]
+async fn get_user_role(
+    service: web::Data<Service>,
+    email: web::Path<String>,
+) -> actix_web::Result<web::Json<Role>> {
+    let email = email.into_inner();
+    let role: Role = sqlx::query_scalar(
+        "
+            SELECT role FROM users
+            WHERE email = $1
+        ",
+    )
+    .bind(&email)
+    .fetch_one(service.db())
+    .await
+    .map_err(ErrorInternalServerError)?;
+    Ok(Json(role))
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct UpdateUserRoleRequest {
+    role: Role,
+}
+
+#[post("/users/{email}/role")]
+async fn set_user_role(
+    service: web::Data<Service>,
+    email: web::Path<String>,
+    data: web::Json<UpdateUserRoleRequest>,
+) -> actix_web::Result<impl Responder> {
+    let email = email.into_inner();
+    sqlx::query(
+        "
+            UPDATE users
+            SET role = $2
+            WHERE email = $1
+        ",
+    )
+    .bind(&email)
+    .bind(&data.role)
+    .execute(service.db())
+    .await
+    .map_err(ErrorInternalServerError)?;
+    Ok(HttpResponse::Ok())
+}
+
 pub fn service() -> Scope {
     web::scope("/admin")
         .service(create_user)
@@ -204,4 +257,6 @@ pub fn service() -> Scope {
         .service(grant_user_permissions)
         .service(revoke_user_permissions)
         .service(update_user_permissions)
+        .service(get_user_role)
+        .service(set_user_role)
 }
