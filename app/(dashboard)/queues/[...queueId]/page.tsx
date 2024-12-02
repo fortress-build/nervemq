@@ -30,21 +30,9 @@ function Metric({ title, value }: { title: string; value: React.ReactNode }) {
   );
 }
 
-// const delayResolve = (promise: Promise<unknown>, ms: number) => {
-//   return new Promise((resolve, reject) => {
-//     setTimeout(() => {
-//       promise.then(resolve, reject);
-//     }, ms);
-//   });
-// };
-
 export default function QueuePage() {
   const router = useRouter();
   const { queueId }: { queueId: [string, string] } = useParams();
-
-  if (queueId.length < 2) {
-    router.replace("/queues");
-  }
 
   const [namespace, name] = queueId;
 

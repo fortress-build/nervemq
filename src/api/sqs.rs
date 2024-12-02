@@ -1,10 +1,16 @@
 use std::rc::Rc;
 
+use actix_identity::Identity;
 use actix_web::{
     dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Transform},
-    HttpMessage,
+    post,
+    web::Data,
+    FromRequest, HttpMessage, Responder,
 };
 use pom::utf8::{seq, sym};
+use url::Url;
+
+use crate::error::Error;
 
 const SQS_METHOD_PREFIX: &str = "AmazonSQS";
 
@@ -25,7 +31,9 @@ impl Method {
     pub fn parse(method: &str) -> Result<Self, Error> {
         let parser = seq(SQS_METHOD_PREFIX) * sym('.') * seq(method);
 
-        match parser.parse_str(method).map_err(|_| Error::InvalidMethod)? {
+        match parser.parse_str(method).map_err(|_| Error::InvalidHeader {
+            header: "X-Amz-Target".to_owned(),
+        })? {
             "SendMessage" => Ok(Self::SendMessage),
             "SendMessageBatch" => Ok(Self::SendMessageBatch),
             "ReceiveMessage" => Ok(Self::ReceiveMessage),
@@ -35,13 +43,25 @@ impl Method {
             "CreateQueue" => Ok(Self::CreateQueue),
             "GetQueueAttributes" => Ok(Self::GetQueueAttributes),
             "PurgeQueue" => Ok(Self::PurgeQueue),
-            _ => Err(Error::InvalidMethod),
+            _ => Err(Error::InvalidHeader {
+                header: "X-Amz-Target".to_owned(),
+            }),
         }
     }
 }
 
-pub enum Error {
-    InvalidMethod,
+impl FromRequest for Method {
+    type Error = Error;
+
+    type Future = std::future::Ready<Result<Self, Self::Error>>;
+
+    fn from_request(req: &actix_web::HttpRequest, _: &mut actix_web::dev::Payload) -> Self::Future {
+        std::future::ready(req.extensions().get::<Method>().cloned().ok_or_else(|| {
+            Error::MissingHeader {
+                header: "X-Amz-Target".to_owned(),
+            }
+        }))
+    }
 }
 
 pub struct SqsApi;
@@ -93,12 +113,189 @@ where
                 .headers()
                 .get("X-Amz-Target")
                 .and_then(|header| header.to_str().ok())
-                .ok_or_else(|| Error::InvalidMethod)
+                .ok_or_else(|| Error::InvalidHeader {
+                    header: "X-Amz-Target".to_owned(),
+                })
                 .and_then(Method::parse)?;
 
             req.extensions_mut().insert(method);
 
             service.call(req).await
         })
+    }
+}
+
+pub mod types {
+    use std::collections::HashMap;
+    use url::Url;
+
+    #[derive(Debug, serde::Deserialize)]
+    #[serde(rename_all = "PascalCase")]
+    pub struct SendMessageRequest {
+        pub queue_url: Url,
+        pub message_body: Vec<u8>,
+        pub delay_seconds: Option<u64>,
+        pub message_attributes: HashMap<String, String>,
+        pub message_deduplication_id: Option<String>,
+        pub message_group_id: Option<String>,
+    }
+
+    #[derive(Debug, serde::Serialize)]
+    #[serde(rename_all = "PascalCase")]
+    pub struct SendMessageResponse {
+        pub message_id: u64,
+        pub md5_of_message_body: String,
+    }
+
+    #[derive(Debug, serde::Deserialize)]
+    #[serde(rename_all = "PascalCase")]
+    pub struct GetQueueUrlRequest {
+        pub queue_name: String,
+        pub queue_owner_aws_account_id: String,
+    }
+
+    #[derive(Debug, serde::Serialize)]
+    #[serde(rename_all = "PascalCase")]
+    pub struct GetQueueUrlResponse {
+        pub queue_url: Url,
+    }
+
+    #[derive(Debug, serde::Deserialize)]
+    #[serde(rename_all = "PascalCase")]
+    pub struct CreateQueueRequest {
+        pub queue_name: String,
+        pub attributes: HashMap<String, String>,
+        pub tags: HashMap<String, String>,
+    }
+
+    #[derive(Debug, serde::Serialize)]
+    #[serde(rename_all = "PascalCase")]
+    pub struct CreateQueueResponse {
+        pub queue_url: Url,
+    }
+
+    #[derive(Debug, serde::Serialize)]
+    #[serde(rename_all = "PascalCase", untagged)]
+    pub enum SqsResponse {
+        SendMessage(SendMessageResponse),
+        GetQueueUrl(GetQueueUrlResponse),
+        CreateQueue(CreateQueueResponse),
+    }
+}
+use types::*;
+
+fn queue_url(mut host: Url, queue_name: &str, namespace_name: &str) -> Result<url::Url, Error> {
+    host.path_segments_mut()
+        .map_err(|_| Error::InternalServerError { source: None })?
+        .push("sqs")
+        .push(namespace_name)
+        .push(queue_name);
+    Ok(host)
+}
+
+#[post("/sqs")]
+pub async fn sqs_service(
+    service: Data<crate::service::Service>,
+    method: Method,
+    data: actix_web::web::Json<serde_json::Value>,
+    identity: Identity,
+) -> Result<impl Responder, Error> {
+    let data = data.into_inner();
+
+    match method {
+        Method::SendMessage => {
+            let request: types::SendMessageRequest = serde_json::from_value(data)?;
+
+            let mut path = request
+                .queue_url
+                .path_segments()
+                .ok_or_else(|| Error::NotFound)?;
+
+            let (queue_name, namespace_name) = path
+                .next_back()
+                .and_then(|queue_name| path.next_back().map(|ns_name| (queue_name, ns_name)))
+                .ok_or_else(|| Error::NotFound)?;
+
+            let ns_id = service
+                .get_namespace_id(namespace_name, service.db())
+                .await?
+                .ok_or_else(|| Error::NotFound)?;
+
+            service
+                .check_user_access(&identity, ns_id, service.db())
+                .await?;
+
+            let queue_id = service
+                .get_queue_id(namespace_name, queue_name, service.db())
+                .await?
+                .ok_or_else(|| Error::NotFound)?;
+
+            // FIXME: Implement delay_seconds and typed attributes
+            let message_id = service
+                .send_message(queue_id, &request.message_body, request.message_attributes)
+                .await?;
+
+            let digest = hex::encode(md5::compute(&request.message_body).as_ref());
+
+            Ok(actix_web::web::Json(SqsResponse::SendMessage(
+                SendMessageResponse {
+                    message_id,
+                    md5_of_message_body: digest,
+                },
+            )))
+        }
+        Method::SendMessageBatch => todo!(),
+        Method::ReceiveMessage => todo!(),
+        Method::DeleteMessage => todo!(),
+        Method::ListQueues => todo!(),
+        Method::GetQueueUrl => {
+            let request: types::GetQueueUrlRequest = serde_json::from_value(data)?;
+
+            let namespace_id = service
+                .get_namespace_id(&request.queue_owner_aws_account_id, service.db())
+                .await?
+                .ok_or_else(|| Error::NotFound)?;
+
+            service
+                .check_user_access(&identity, namespace_id, service.db())
+                .await?;
+
+            let url = queue_url(
+                service.config().host.clone(),
+                &request.queue_name,
+                &request.queue_owner_aws_account_id,
+            )?;
+
+            Ok(actix_web::web::Json(SqsResponse::GetQueueUrl(
+                GetQueueUrlResponse { queue_url: url },
+            )))
+        }
+        Method::CreateQueue => {
+            let request: types::CreateQueueRequest = serde_json::from_value(data)?;
+
+            // FIXME: Get namespace from api key
+            let namespace_id = service
+                .get_namespace_id(&request.queue_name, service.db())
+                .await?
+                .ok_or_else(|| Error::NotFound)?;
+
+            service
+                .check_user_access(&identity, namespace_id, service.db())
+                .await?;
+
+            // service.create_queue()
+
+            let url = queue_url(
+                service.config().host.clone(),
+                &request.queue_name,
+                &request.queue_name,
+            )?;
+
+            Ok(actix_web::web::Json(SqsResponse::CreateQueue(
+                CreateQueueResponse { queue_url: url },
+            )))
+        }
+        Method::GetQueueAttributes => todo!(),
+        Method::PurgeQueue => todo!(),
     }
 }
