@@ -77,10 +77,7 @@ const mockMessages: MessageObject[] = [
     status: "pending",
     attempts: 0,
     messages: [
-      {
-        key: "Inventory Update Start",
-        value: "Started updating product inventory"
-      }
+
     ]
   },
   {
@@ -125,23 +122,29 @@ function MessageDetails({ message }: { message: MessageObject }) {
   return (
     <div className="p-6 space-y-4 bg-gray-50">
       <h3 className="font-semibold text-gray-700 mb-2">Message Details</h3>
-      <div className="grid gap-3">
-        {message.messages?.map((message, index) => (
-          // biome-ignore lint/suspicious/noArrayIndexKey: <explanation>
-          <div key={index} className="bg-white p-4 rounded-lg border border-gray-200">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <span className="text-xs uppercase text-gray-400">Key</span>
-                <div className="mt-1 text-sm font-medium text-gray-700">{message.key}</div>
-              </div>
-              <div>
-                <span className="text-xs uppercase text-gray-400">Value</span>
-                <div className="mt-1 text-sm text-gray-700">{message.value}</div>
+      {!message.messages || message.messages.length === 0 ? (
+        <div className="bg-white p-4 rounded-lg border border-gray-200 text-gray-500 text-sm">
+          No message details available
+        </div>
+      ) : (
+        <div className="grid gap-3">
+          {message.messages.map((message, index) => (
+            // biome-ignore lint/suspicious/noArrayIndexKey: <explanation>
+            <div key={index} className="bg-white p-4 rounded-lg border border-gray-200">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <span className="text-xs uppercase text-gray-400">Key</span>
+                  <div className="mt-1 text-sm font-medium text-gray-700">{message.key}</div>
+                </div>
+                <div>
+                  <span className="text-xs uppercase text-gray-400">Value</span>
+                  <div className="mt-1 text-sm text-gray-700">{message.value}</div>
+                </div>
               </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -177,13 +180,6 @@ const columns: ColumnDef<MessageObject>[] = [
     header: "Message",
   },
   {
-    accessorKey: "timestamp",
-    header: "Time",
-    cell: ({ row }) => {
-      return new Date(row.getValue("timestamp")).toLocaleString();
-    },
-  },
-  {
     accessorKey: "status",
     header: "Status",
     cell: ({ row }) => {
@@ -206,11 +202,6 @@ const columns: ColumnDef<MessageObject>[] = [
   {
     accessorKey: "attempts",
     header: "Attempts",
-  },
-  {
-    accessorKey: "error",
-    header: "Error",
-    cell: ({ row }) => row.getValue("error") || "-",
   },
 ];
 
