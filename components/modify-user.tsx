@@ -46,6 +46,7 @@ import {
   SelectValue,
 } from "./ui/select";
 import { Role, useSession } from "@/lib/state/global";
+import React from "react";
 
 export default function ModifyUser({
   open,
@@ -77,7 +78,7 @@ export default function ModifyUser({
     ],
     queryFn: () =>
       listUserAllowedNamespaces({
-        email: session?.email,
+        email: user?.email,
       }),
   });
 
@@ -87,7 +88,7 @@ export default function ModifyUser({
     defaultValues: {
       email: user?.email ?? "",
       password: "",
-      namespaces: new Set(userNamespaces ?? []) as Set<string>,
+      namespaces: new Set() as Set<string>,
       role: user?.role ?? Role.User,
     },
     validatorAdapter: yupValidator(),
@@ -118,6 +119,15 @@ export default function ModifyUser({
         });
     },
   });
+
+  React.useEffect(() => {
+    if (userNamespaces) {
+      form.setFieldValue(
+        "namespaces",
+        new Set(userNamespaces)
+      );
+    }
+  }, [userNamespaces, form]);
 
   const handleNamespaceCreated = async (namespaceName: string) => {
     form.setFieldValue("namespaces", (set) => {
@@ -241,9 +251,11 @@ export default function ModifyUser({
                                 }}
                               >
                                 <div className="flex items-center gap-2">
-                                  {field.state.value.has(namespace.name) ? (
-                                    <Check className="h-4 w-4" />
-                                  ) : null}
+                                  <div className="w-4 h-4 flex items-center justify-center">
+                                    {field.state.value.has(namespace.name) && (
+                                      <Check className="h-4 w-4" />
+                                    )}
+                                  </div>
                                   {namespace.name}
                                 </div>
                               </CommandItem>
