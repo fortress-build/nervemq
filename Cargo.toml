@@ -26,17 +26,6 @@ git = "https://github.com/fortress-build/actix-extras"
 branch = "master"
 
 [dependencies]
-# schemars = { package = "apistos-schemars", version = "0.8" }
-# apistos = "0.4"
-actix-casbin = { version = "1.1.0", default-features = false, features = [
-  "runtime-tokio",
-  "tokio",
-] }
-actix-casbin-auth = { version = "1.1.0", default-features = false, features = [
-  "runtime-tokio",
-  "tokio",
-] }
-
 actix-web = { version = "4.9.0", features = [
   "actix-tls",
   # "openssl",
@@ -55,7 +44,6 @@ eyre = "0.6.12"
 hex = { version = "0.4.3", features = ["serde"] }
 hmac = { version = "0.12.1", features = ["std"] }
 md5 = "0.7.0"
-# openssl = "0.10.9"
 pom = "3.4.0"
 rand = "0.8.5"
 secrecy = { version = "0.10.3", features = ["serde"] }
@@ -78,7 +66,12 @@ tokio = { version = "1.41.1", features = ["full"] }
 tokio-stream = { version = "0.1.16", features = ["full"] }
 tracing = { version = "0.1.40", features = ["async-await"] }
 tracing-actix-web = "0.7.15"
-tracing-subscriber = { version = "0.3.18", features = ["tracing", "serde"] }
+tracing-subscriber = { version = "0.3.18", features = [
+  "tracing",
+  "serde",
+  "json",
+  "env-filter",
+] }
 url = { version = "2.5.4", features = ["serde"] }
 zeroize = { version = "1.8.1", features = ["serde", "derive"] }
 

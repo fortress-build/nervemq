@@ -8,39 +8,48 @@ use actix_web::web::{FormConfig, JsonConfig};
 use actix_web::{web::Data, App, HttpServer};
 
 use chrono::TimeDelta;
-use nervemq::api::auth::{self, Role};
+use nervemq::api::auth::{self};
 use nervemq::api::{admin, data, namespace, queue, tokens};
 use nervemq::auth::middleware::api_keys::ApiKeyAuth;
 use nervemq::auth::middleware::protected_route::Protected;
 use nervemq::auth::session::SqliteSessionStore;
 use nervemq::config::Config;
 use nervemq::service::Service;
-use serde_email::Email;
+use tracing::level_filters::LevelFilter;
 // use openssl::ssl::{SslAcceptor, SslFiletype, SslMethod};
 use tracing_actix_web::TracingLogger;
+use tracing_subscriber::util::SubscriberInitExt;
+use tracing_subscriber::{EnvFilter, FmtSubscriber};
 
 #[tokio::main]
 async fn main() -> eyre::Result<()> {
-    tracing_subscriber::fmt::init();
+    if cfg!(debug_assertions) {
+        FmtSubscriber::builder()
+            .pretty()
+            .with_env_filter(
+                EnvFilter::builder()
+                    .with_env_var("NERVEMQ_LOG")
+                    .with_default_directive(LevelFilter::INFO.into())
+                    .from_env()?,
+            )
+            .finish()
+            .try_init()?;
+    } else {
+        FmtSubscriber::builder()
+            .json()
+            .with_env_filter(
+                EnvFilter::builder()
+                    .with_env_var("NERVEMQ_LOG")
+                    .with_default_directive(LevelFilter::INFO.into())
+                    .from_env()?,
+            )
+            .finish()
+            .try_init()?;
+    }
 
     let config = Config::load()?;
 
     let service = Service::connect_with(config).await?;
-
-    // FIXME: Remove after dev
-
-    match service
-        .create_user(
-            Email::from_str("admin@fortress.build").unwrap(),
-            "password".to_owned().into(),
-            Some(Role::Admin),
-            vec![],
-        )
-        .await
-    {
-        Ok(_) => {}
-        Err(e) => tracing::warn!("{e}"),
-    };
 
     let session_store = SqliteSessionStore::new(service.db().clone());
     let secret_key = actix_web::cookie::Key::generate();
