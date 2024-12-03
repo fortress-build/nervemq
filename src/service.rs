@@ -841,6 +841,7 @@ impl Service {
             FROM messages m
             JOIN queues q ON m.queue = q.id
             JOIN queue_configurations conf ON q.id = conf.queue
+            WHERE q.ns = (SELECT id FROM namespaces WHERE name = $1) AND q.name = $2
         ",
         )
         .bind(namespace)
