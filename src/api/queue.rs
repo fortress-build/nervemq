@@ -149,7 +149,7 @@ async fn get_queue_config(
 
     let ns_id = match service.get_namespace_id(namespace, service.db()).await {
         Ok(Some(id)) => id,
-        Ok(None) => return Err(Error::NotFound),
+        Ok(None) => return Err(Error::namespace_not_found(namespace)),
         Err(e) => return Err(e),
     };
 
@@ -159,7 +159,7 @@ async fn get_queue_config(
 
     let queue_id = match service.get_queue_id(namespace, name, service.db()).await? {
         Some(id) => id,
-        None => return Err(Error::NotFound),
+        None => return Err(Error::queue_not_found(name, namespace)),
     };
 
     let config = service.get_queue_configuration(queue_id).await?;
@@ -184,7 +184,7 @@ async fn update_queue_config(
 
     let ns_id = match service.get_namespace_id(namespace, service.db()).await {
         Ok(Some(id)) => id,
-        Ok(None) => return Err(Error::NotFound),
+        Ok(None) => return Err(Error::namespace_not_found(namespace)),
         Err(e) => return Err(e),
     };
 
@@ -194,13 +194,13 @@ async fn update_queue_config(
 
     let queue_id = match service.get_queue_id(namespace, name, service.db()).await? {
         Some(id) => id,
-        None => return Err(Error::NotFound),
+        None => return Err(Error::queue_not_found(name, namespace)),
     };
 
     let dead_letter_queue = match &updates.dead_letter_queue {
         Some(dlq) => match service.get_queue_id(namespace, dlq, service.db()).await? {
             Some(id) => Some(id),
-            None => return Err(Error::NotFound),
+            None => return Err(Error::queue_not_found(dlq, namespace)),
         },
         None => None,
     };

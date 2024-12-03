@@ -355,14 +355,14 @@ impl Service {
         let ns_id = self
             .get_namespace_id(ns, &mut *db)
             .await?
-            .ok_or(Error::NotFound)?;
+            .ok_or(Error::namespace_not_found(ns))?;
 
         self.check_user_access(&identity, ns_id, &mut *db).await?;
 
         let queue_id = self
             .get_queue_id(ns, queue, &mut *db)
             .await?
-            .ok_or(Error::NotFound)?;
+            .ok_or(Error::queue_not_found(queue, ns))?;
 
         let set = names.iter().collect::<HashSet<_>>();
 
@@ -389,14 +389,14 @@ impl Service {
         let ns_id = self
             .get_namespace_id(ns, &mut *db)
             .await?
-            .ok_or(Error::NotFound)?;
+            .ok_or(Error::namespace_not_found(ns))?;
 
         self.check_user_access(&identity, ns_id, &mut *db).await?;
 
         let queue_id = self
             .get_queue_id(ns, queue, &mut *db)
             .await?
-            .ok_or(Error::NotFound)?;
+            .ok_or(Error::queue_not_found(queue, ns))?;
 
         let res = sqlx::query_as(
             "
@@ -554,7 +554,7 @@ impl Service {
     pub async fn sqs_send(
         &self,
         queue: u64,
-        message: &[u8],
+        message: &String,
         kv: HashMap<String, SqsMessageAttribute>,
     ) -> Result<u64, Error> {
         let mut tx = self.db().begin().await?;
@@ -722,12 +722,7 @@ impl Service {
                     m.body,
                     m.delivered_at,
                     m.sent_by,
-                    q.name as queue_name,
-                    (CASE
-                        WHEN m.delivered_at IS NULL AND m.tries < conf.max_retries THEN 'pending'
-                        WHEN m.delivered_at IS NULL AND m.tries >= conf.max_retries THEN 'failed'
-                        ELSE 'delivered'
-                    END) as status
+                    q.name as queue_name
                 FROM messages m
                 JOIN queues q ON m.queue = q.id
                 JOIN queue_configurations conf ON q.id = conf.queue
@@ -741,14 +736,26 @@ impl Service {
             UPDATE messages
             SET delivered_at = unixepoch('now')
             WHERE id IN (SELECT id FROM next_messages)
-            RETURNING *, (SELECT queue_name FROM next_messages WHERE next_messages.id = messages.id) as queue
+            RETURNING
+                *,
+                (SELECT queue_name FROM next_messages WHERE next_messages.id = messages.id) as queue,
+                (CASE
+                    WHEN messages.delivered_at IS NULL AND messages.tries < (SELECT max_retries FROM queue_configurations WHERE queue = messages.queue) THEN 'pending'
+                    WHEN messages.delivered_at IS NULL AND messages.tries >= (SELECT max_retries FROM queue_configurations WHERE queue = messages.queue) THEN 'failed'
+                    ELSE 'delivered'
+                END) as status
             ",
         )
         .bind(namespace)
         .bind(queue)
         .bind(max_messages as i64)
         .fetch_all(&mut *tx)
-        .await?
+        .await
+            .map_err(|e| {
+                tracing::error!("Failed to fetch messages {e}");
+                e
+            })
+            ?
         .into_iter()
         .map(|message: Message| SqsMessage {
             message_id: message.id.to_string(),
@@ -1004,7 +1011,7 @@ impl Service {
         let namespace_id = self
             .get_namespace_id(namespace, &mut tx)
             .await?
-            .ok_or_else(|| Error::NotFound)?;
+            .ok_or_else(|| Error::namespace_not_found(namespace))?;
 
         self.check_user_access(&identity, namespace_id, &mut tx)
             .await?;
@@ -1013,7 +1020,7 @@ impl Service {
         let queue_id = self
             .get_queue_id(namespace, queue, &mut tx)
             .await?
-            .ok_or_else(|| Error::NotFound)?;
+            .ok_or_else(|| Error::queue_not_found(queue, namespace))?;
 
         // Delete the message if it exists in this queue
         let result = sqlx::query(
@@ -1028,7 +1035,7 @@ impl Service {
         .await?;
 
         if result.rows_affected() == 0 {
-            return Err(Error::NotFound);
+            return Err(Error::not_found(format!("{message_id} in queue {queue}")));
         }
 
         tx.commit().await?;
@@ -1048,7 +1055,7 @@ impl Service {
         let namespace_id = self
             .get_namespace_id(namespace, &mut tx)
             .await?
-            .ok_or_else(|| Error::NotFound)?;
+            .ok_or_else(|| Error::namespace_not_found(namespace))?;
 
         self.check_user_access(&identity, namespace_id, &mut tx)
             .await?;
@@ -1057,7 +1064,7 @@ impl Service {
         let queue_id = self
             .get_queue_id(namespace, queue, &mut tx)
             .await?
-            .ok_or_else(|| Error::NotFound)?;
+            .ok_or_else(|| Error::queue_not_found(queue, namespace))?;
 
         // Delete all messages from the queue
         sqlx::query(

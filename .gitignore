@@ -47,3 +47,6 @@ next-env.d.ts
 /creek.db*
 
 certificates
+
+# python
+**/__pycache__/

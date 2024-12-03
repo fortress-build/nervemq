@@ -5,8 +5,8 @@ pub enum Error {
     #[snafu(display("Unauthorized"))]
     Unauthorized,
 
-    #[snafu(display("Not found"))]
-    NotFound,
+    #[snafu(display("Resource not found: {resource}"))]
+    NotFound { resource: String },
 
     #[snafu(display("Internal server error"))]
     InternalServerError {
@@ -27,22 +27,16 @@ pub enum Error {
     },
 
     #[snafu(display("Identity {key_id} not found"))]
-    IdentityNotFound {
-        key_id: String,
-    },
+    IdentityNotFound { key_id: String },
 
     #[snafu(display("Payload too large"))]
     PayloadTooLarge,
 
     #[snafu(display("Missing header"))]
-    MissingHeader {
-        header: String,
-    },
+    MissingHeader { header: String },
 
-    #[snafu(display("Missing header"))]
-    InvalidHeader {
-        header: String,
-    },
+    #[snafu(display("Invalid header"))]
+    InvalidHeader { header: String },
 
     #[snafu(whatever, display("{message}"))]
     Whatever {
@@ -51,9 +45,11 @@ pub enum Error {
         source: Option<eyre::Report>,
     },
 
-    InvalidParameter {
-        parameter: String,
-    },
+    #[snafu(display("Invalid parameter: {message}"))]
+    InvalidParameter { message: String },
+
+    #[snafu(display("Missing parameter: {message}"))]
+    MissingParameter { message: String },
 }
 
 impl From<sqlx::Error> for Error {
@@ -106,6 +102,36 @@ impl Error {
     pub fn opaque() -> Self {
         Self::InternalServerError { source: None }
     }
+
+    pub fn not_found(resource: impl Into<String>) -> Self {
+        Self::NotFound {
+            resource: resource.into(),
+        }
+    }
+
+    pub fn invalid_parameter(message: impl Into<String>) -> Self {
+        Self::InvalidParameter {
+            message: message.into(),
+        }
+    }
+
+    pub fn missing_parameter(message: impl Into<String>) -> Self {
+        Self::MissingParameter {
+            message: message.into(),
+        }
+    }
+
+    pub fn queue_not_found(queue: impl Into<String>, namespace: impl Into<String>) -> Self {
+        Self::NotFound {
+            resource: format!("queue {} in namespace {}", queue.into(), namespace.into()),
+        }
+    }
+
+    pub fn namespace_not_found(namespace: impl Into<String>) -> Self {
+        Self::NotFound {
+            resource: format!("namespace {}", namespace.into()),
+        }
+    }
 }
 
 impl actix_web::ResponseError for Error {
@@ -113,9 +139,10 @@ impl actix_web::ResponseError for Error {
         match self {
             Self::Unauthorized => actix_web::http::StatusCode::UNAUTHORIZED,
             Self::IdentityNotFound { .. } => actix_web::http::StatusCode::UNAUTHORIZED,
-            Self::NotFound => actix_web::http::StatusCode::NOT_FOUND,
+            Self::NotFound { .. } => actix_web::http::StatusCode::NOT_FOUND,
 
             Self::MissingHeader { .. }
+            | Self::MissingParameter { .. }
             | Self::InvalidHeader { .. }
             | Self::InvalidParameter { .. } => actix_web::http::StatusCode::BAD_REQUEST,
             Self::PayloadTooLarge => actix_web::http::StatusCode::PAYLOAD_TOO_LARGE,

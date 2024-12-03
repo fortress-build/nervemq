@@ -24,7 +24,7 @@ pub struct Message {
 
     pub delivered_at: Option<u64>,
     pub sent_by: Option<u64>,
-    pub body: Vec<u8>,
+    pub body: String,
     pub tries: u64,
 
     pub status: MessageStatus,
