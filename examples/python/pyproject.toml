@@ -1,0 +1,17 @@
+[tool.poetry]
+name = "nervemq-example"
+version = "0.1.0"
+description = ""
+authors = ["Will Hopkins <willothyh@gmail.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.12"
+boto3 = "^1.35.73"
+types-boto3 = {extras = ["full"], version = "^1.35.73"}
+
+[tool.poetry.scripts]
+main = "nervemq_example:main"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

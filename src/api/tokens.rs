@@ -59,7 +59,7 @@ pub async fn create_token(
         .get_namespace_id(&data.namespace, service.db())
         .await
         .map_err(Error::internal)?
-        .ok_or(Error::NotFound)?;
+        .ok_or_else(|| Error::namespace_not_found(&data.namespace))?;
 
     sqlx::query(
         "
