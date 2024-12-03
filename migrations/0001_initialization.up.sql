@@ -4,7 +4,7 @@ create table if not exists users (
   hashed_pass text not null,
   role text not null check (role in ('admin', 'user')),
 
-  primary key(id)
+  primary key (id)
 );
 create unique index if not exists users_email_idx on users(email);
 
@@ -48,6 +48,7 @@ create table if not exists queue_attributes (
   v string not null,
 
   primary key (queue, k),
+  foreign key (queue) references queues(id) on delete cascade
 );
 create unique index if not exists queue_attrs_queue_key_idx on queue_attributes(queue, k);
 
@@ -57,6 +58,7 @@ create table if not exists queue_tags (
   v string not null,
 
   primary key (queue, k),
+  foreign key (queue) references queues(id) on delete cascade
 );
 create unique index if not exists queue_tags_queue_key_idx on queue_tags(queue, k);
 

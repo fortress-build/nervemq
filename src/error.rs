@@ -20,6 +20,12 @@ pub enum Error {
         source: sqlx::Error,
     },
 
+    #[snafu(display("Error running migrations"))]
+    MigrationError {
+        #[snafu(source)]
+        source: sqlx::migrate::MigrateError,
+    },
+
     #[snafu(display("Identity {key_id} not found"))]
     IdentityNotFound {
         key_id: String,
@@ -84,6 +90,12 @@ impl From<actix_identity::error::GetIdentityError> for Error {
     }
 }
 
+impl From<sqlx::migrate::MigrateError> for Error {
+    fn from(source: sqlx::migrate::MigrateError) -> Self {
+        Self::MigrationError { source }
+    }
+}
+
 impl Error {
     pub fn internal(e: impl Into<eyre::Report>) -> Self {
         Self::InternalServerError {
@@ -108,9 +120,10 @@ impl actix_web::ResponseError for Error {
             | Self::InvalidParameter { .. } => actix_web::http::StatusCode::BAD_REQUEST,
             Self::PayloadTooLarge => actix_web::http::StatusCode::PAYLOAD_TOO_LARGE,
 
-            Self::InternalServerError { .. } | Self::Sqlx { .. } | Self::Whatever { .. } => {
-                actix_web::http::StatusCode::INTERNAL_SERVER_ERROR
-            }
+            Self::MigrationError { .. }
+            | Self::InternalServerError { .. }
+            | Self::Sqlx { .. }
+            | Self::Whatever { .. } => actix_web::http::StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
 }
