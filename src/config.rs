@@ -7,6 +7,7 @@ pub mod defaults {
     pub const MAX_RETRIES: usize = 3;
     pub const ROOT_EMAIL: &str = "admin@example.com";
     pub const ROOT_PASSWORD: &str = "password";
+    pub const HOST: &str = "http://localhost:8080";
 }
 
 #[derive(Clone, Deserialize)]
@@ -14,7 +15,7 @@ pub struct Config {
     pub db_path: Option<String>,
     pub default_max_retries: Option<usize>,
 
-    pub host: Url,
+    pub host: Option<Url>,
 
     // TODO: Warn on launch if defaults are used for admin credentials
     pub root_email: Option<String>,
@@ -27,7 +28,7 @@ impl Default for Config {
         Self {
             db_path: None,
             default_max_retries: None,
-            host: Url::parse("http://localhost:8080").expect("valid URL"),
+            host: Some(Url::parse("http://localhost:8080").expect("valid URL")),
             root_email: None,
             root_password: None,
         }
@@ -43,6 +44,12 @@ impl Config {
         }
 
         Ok(config)
+    }
+
+    pub fn host(&self) -> Url {
+        self.host
+            .clone()
+            .unwrap_or(defaults::HOST.try_into().expect("valid default url"))
     }
 
     pub fn db_path(&self) -> &str {
