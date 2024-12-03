@@ -12,7 +12,10 @@ use futures_util::TryStreamExt as _;
 use pom::utf8::{seq, sym};
 use tokio_serde::{formats::SymmetricalJson, Framed};
 use tokio_stream::StreamExt;
-use tokio_util::{codec::FramedRead, io::StreamReader};
+use tokio_util::{
+    codec::{BytesCodec, FramedRead},
+    io::StreamReader,
+};
 use url::Url;
 
 use crate::{
@@ -356,35 +359,28 @@ fn queue_url(mut host: Url, queue_name: &str, namespace_name: &str) -> Result<ur
 pub async fn sqs_service(
     service: Data<crate::service::Service>,
     method: Method,
-    // payload: actix_web::web::Payload,
-    payload: actix_web::web::Bytes,
+    payload: actix_web::web::Payload,
+    // payload: actix_web::web::Bytes,
     identity: Identity,
     namespace: AuthorizedNamespace,
 ) -> Result<impl Responder, Error> {
-    // let stream = tokio_stream::once(payload.as_ref()).map(|v| Result::<_, std::io::Error>::Ok(v));
-    // // let stream = payload;
-    //
-    // let stream = StreamReader::new(stream.map_err(|e| {
-    //     tracing::error!("{e}");
-    //     std::io::Error::new(std::io::ErrorKind::Other, format!("Payload error: {e}"))
-    // }));
-    //
-    // let stream = FramedRead::new(stream, tokio_util::codec::LengthDelimitedCodec::new());
+    let stream =
+        StreamReader::new(payload.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e)));
+
+    let stream = FramedRead::new(stream, BytesCodec::new());
 
     match method {
         Method::SendMessage => {
-            // let request: types::SendMessageRequest =
-            //     Framed::<_, _, types::SendMessageRequest, _>::new(
-            //         stream,
-            //         SymmetricalJson::default(),
-            //     )
-            //     .next()
-            //     .await
-            //     .transpose()
-            //     .map_err(|e| Error::internal(e))?
-            //     .ok_or_else(|| Error::missing_parameter("missing request body"))?;
             let request: types::SendMessageRequest =
-                serde_json::from_slice(&payload).map_err(|e| Error::internal(e))?;
+                Framed::<_, _, types::SendMessageRequest, _>::new(
+                    stream,
+                    SymmetricalJson::default(),
+                )
+                .next()
+                .await
+                .transpose()
+                .map_err(|e| Error::internal(e))?
+                .ok_or_else(|| Error::missing_parameter("missing request body"))?;
 
             let mut path = request
                 .queue_url
@@ -429,18 +425,16 @@ pub async fn sqs_service(
             )))
         }
         Method::SendMessageBatch => {
-            // let request: types::SendMessageBatchRequest =
-            //     Framed::<_, _, types::SendMessageBatchRequest, _>::new(
-            //         stream,
-            //         tokio_serde::formats::SymmetricalJson::default(),
-            //     )
-            //     .next()
-            //     .await
-            //     .transpose()
-            //     .map_err(|e| Error::internal(e))?
-            //     .ok_or_else(|| Error::missing_parameter("missing request body"))?;
             let request: types::SendMessageBatchRequest =
-                serde_json::from_slice(&payload).map_err(|e| Error::internal(e))?;
+                Framed::<_, _, types::SendMessageBatchRequest, _>::new(
+                    stream,
+                    tokio_serde::formats::SymmetricalJson::default(),
+                )
+                .next()
+                .await
+                .transpose()
+                .map_err(|e| Error::internal(e))?
+                .ok_or_else(|| Error::missing_parameter("missing request body"))?;
 
             // Parse queue URL to get namespace and queue name
             let mut path = request
@@ -514,18 +508,16 @@ pub async fn sqs_service(
             Ok(actix_web::web::Json(response))
         }
         Method::ReceiveMessage => {
-            // let request: types::ReceiveMessageRequest =
-            //     Framed::<_, _, types::ReceiveMessageRequest, _>::new(
-            //         stream,
-            //         tokio_serde::formats::SymmetricalJson::default(),
-            //     )
-            //     .next()
-            //     .await
-            //     .transpose()
-            //     .map_err(|e| Error::internal(e))?
-            //     .ok_or_else(|| Error::missing_parameter("missing request body"))?;
             let request: types::ReceiveMessageRequest =
-                serde_json::from_slice(&payload).map_err(|e| Error::internal(e))?;
+                Framed::<_, _, types::ReceiveMessageRequest, _>::new(
+                    stream,
+                    tokio_serde::formats::SymmetricalJson::default(),
+                )
+                .next()
+                .await
+                .transpose()
+                .map_err(|e| Error::internal(e))?
+                .ok_or_else(|| Error::missing_parameter("missing request body"))?;
 
             // Parse queue URL to get namespace and queue name
             let mut path = request
@@ -576,18 +568,16 @@ pub async fn sqs_service(
             )))
         }
         Method::DeleteMessage => {
-            // let request: types::DeleteMessageRequest =
-            //     Framed::<_, _, types::DeleteMessageRequest, _>::new(
-            //         stream,
-            //         tokio_serde::formats::SymmetricalJson::default(),
-            //     )
-            //     .next()
-            //     .await
-            //     .transpose()
-            //     .map_err(|e| Error::internal(e))?
-            //     .ok_or_else(|| Error::missing_parameter("missing request body"))?;
             let request: types::DeleteMessageRequest =
-                serde_json::from_slice(&payload).map_err(|e| Error::internal(e))?;
+                Framed::<_, _, types::DeleteMessageRequest, _>::new(
+                    stream,
+                    tokio_serde::formats::SymmetricalJson::default(),
+                )
+                .next()
+                .await
+                .transpose()
+                .map_err(|e| Error::internal(e))?
+                .ok_or_else(|| Error::missing_parameter("missing request body"))?;
 
             let mut path = request
                 .queue_url
@@ -626,18 +616,16 @@ pub async fn sqs_service(
             )))
         }
         Method::ListQueues => {
-            // let request: types::ListQueuesRequest =
-            //     Framed::<_, _, types::ListQueuesRequest, _>::new(
-            //         stream,
-            //         tokio_serde::formats::SymmetricalJson::default(),
-            //     )
-            //     .next()
-            //     .await
-            //     .transpose()
-            //     .map_err(|e| Error::internal(e))?
-            //     .ok_or_else(|| Error::missing_parameter("missing request body"))?;
             let request: types::ListQueuesRequest =
-                serde_json::from_slice(&payload).map_err(|e| Error::internal(e))?;
+                Framed::<_, _, types::ListQueuesRequest, _>::new(
+                    stream,
+                    tokio_serde::formats::SymmetricalJson::default(),
+                )
+                .next()
+                .await
+                .transpose()
+                .map_err(|e| Error::internal(e))?
+                .ok_or_else(|| Error::missing_parameter("missing request body"))?;
 
             let namespace_id = service
                 .get_namespace_id(&namespace.0, service.db())
@@ -675,18 +663,16 @@ pub async fn sqs_service(
             )))
         }
         Method::GetQueueUrl => {
-            // let request: types::GetQueueUrlRequest =
-            //     Framed::<_, _, types::GetQueueUrlRequest, _>::new(
-            //         stream,
-            //         tokio_serde::formats::SymmetricalJson::default(),
-            //     )
-            //     .next()
-            //     .await
-            //     .transpose()
-            //     .map_err(|e| Error::internal(e))?
-            //     .ok_or_else(|| Error::missing_parameter("missing request body"))?;
             let request: types::GetQueueUrlRequest =
-                serde_json::from_slice(&payload).map_err(|e| Error::internal(e))?;
+                Framed::<_, _, types::GetQueueUrlRequest, _>::new(
+                    stream,
+                    tokio_serde::formats::SymmetricalJson::default(),
+                )
+                .next()
+                .await
+                .transpose()
+                .map_err(|e| Error::internal(e))?
+                .ok_or_else(|| Error::missing_parameter("missing request body"))?;
 
             let namespace_id = service
                 .get_namespace_id(&namespace.0, service.db())
@@ -710,18 +696,16 @@ pub async fn sqs_service(
             )))
         }
         Method::CreateQueue => {
-            // let request: types::CreateQueueRequest =
-            //     Framed::<_, _, types::GetQueueUrlRequest, _>::new(
-            //         stream,
-            //         tokio_serde::formats::SymmetricalJson::default(),
-            //     )
-            //     .next()
-            //     .await
-            //     .transpose()
-            //     .map_err(|e| Error::internal(e))?
-            //     .ok_or_else(|| Error::missing_parameter("missing request body"))?;
             let request: types::CreateQueueRequest =
-                serde_json::from_slice(&payload).map_err(|e| Error::internal(e))?;
+                Framed::<_, _, types::GetQueueUrlRequest, _>::new(
+                    stream,
+                    tokio_serde::formats::SymmetricalJson::default(),
+                )
+                .next()
+                .await
+                .transpose()
+                .map_err(|e| Error::internal(e))?
+                .ok_or_else(|| Error::missing_parameter("missing request body"))?;
 
             let namespace_id = service
                 .get_namespace_id(&namespace.0, service.db())
@@ -749,18 +733,16 @@ pub async fn sqs_service(
             )))
         }
         Method::GetQueueAttributes => {
-            // let request: types::GetQueueAttributesRequest =
-            //     Framed::<_, _, types::GetQueueUrlRequest, _>::new(
-            //         stream,
-            //         tokio_serde::formats::SymmetricalJson::default(),
-            //     )
-            //     .next()
-            //     .await
-            //     .transpose()
-            //     .map_err(|e| Error::internal(e))?
-            //     .ok_or_else(|| Error::missing_parameter("missing request body"))?;
             let request: types::GetQueueAttributesRequest =
-                serde_json::from_slice(&payload).map_err(|e| Error::internal(e))?;
+                Framed::<_, _, types::GetQueueUrlRequest, _>::new(
+                    stream,
+                    tokio_serde::formats::SymmetricalJson::default(),
+                )
+                .next()
+                .await
+                .transpose()
+                .map_err(|e| Error::internal(e))?
+                .ok_or_else(|| Error::missing_parameter("missing request body"))?;
 
             let mut path = request
                 .queue_url
@@ -799,18 +781,16 @@ pub async fn sqs_service(
             )))
         }
         Method::PurgeQueue => {
-            // let request: types::PurgeQueueRequest =
-            //     Framed::<_, _, types::GetQueueUrlRequest, _>::new(
-            //         stream,
-            //         tokio_serde::formats::SymmetricalJson::default(),
-            //     )
-            //     .next()
-            //     .await
-            //     .transpose()
-            //     .map_err(|e| Error::internal(e))?
-            //     .ok_or_else(|| Error::missing_parameter("missing request body"))?;
             let request: types::PurgeQueueRequest =
-                serde_json::from_slice(&payload).map_err(|e| Error::internal(e))?;
+                Framed::<_, _, types::GetQueueUrlRequest, _>::new(
+                    stream,
+                    tokio_serde::formats::SymmetricalJson::default(),
+                )
+                .next()
+                .await
+                .transpose()
+                .map_err(|e| Error::internal(e))?
+                .ok_or_else(|| Error::missing_parameter("missing request body"))?;
 
             // Parse queue URL to get namespace and queue name
             let mut path = request
