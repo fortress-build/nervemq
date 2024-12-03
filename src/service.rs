@@ -16,7 +16,10 @@ use tokio::task::JoinSet;
 use tokio_stream::StreamExt as _;
 
 use crate::{
-    api::auth::{Permission, Role, User},
+    api::{
+        auth::{Permission, Role, User},
+        sqs::types::SqsMessageAttribute,
+    },
     auth::crypto::hash_secret,
     config::Config,
     error::Error,
@@ -240,6 +243,8 @@ impl Service {
         &self,
         namespace: &str,
         name: &str,
+        attributes: HashMap<String, String>,
+        tags: HashMap<String, String>,
         identity: Identity,
     ) -> Result<(), Error> {
         let mut tx = self.db().begin().await?;
@@ -277,9 +282,101 @@ impl Service {
         .execute(&mut *tx)
         .await?;
 
+        for (k, v) in attributes.into_iter() {
+            sqlx::query(
+                "
+                INSERT INTO queue_attributes (queue, k, v)
+                VALUES ($1, $2, $3)
+                ",
+            )
+            .bind(queue_id as i64)
+            .bind(k)
+            .bind(v)
+            .execute(&mut *tx)
+            .await?;
+        }
+
+        for (k, v) in tags.into_iter() {
+            sqlx::query(
+                "
+                INSERT INTO queue_tags (queue, k, v)
+                VALUES ($1, $2, $3)
+                ",
+            )
+            .bind(queue_id as i64)
+            .bind(k)
+            .bind(v)
+            .execute(&mut *tx)
+            .await?;
+        }
+
         tx.commit().await?;
 
         Ok(())
+    }
+
+    pub async fn get_queue_attributes(
+        &self,
+        ns: &str,
+        queue: &str,
+        identity: Identity,
+    ) -> Result<HashMap<String, String>, Error> {
+        let mut db = self.db().acquire().await?;
+
+        let ns_id = self
+            .get_namespace_id(ns, &mut *db)
+            .await?
+            .ok_or(Error::NotFound)?;
+
+        self.check_user_access(&identity, ns_id, &mut *db).await?;
+
+        let queue_id = self
+            .get_queue_id(ns, queue, &mut *db)
+            .await?
+            .ok_or(Error::NotFound)?;
+
+        let res = sqlx::query_as(
+            "
+            SELECT k, v FROM queue_attributes WHERE queue = $1
+            ",
+        )
+        .bind(queue_id as i64)
+        .fetch_all(&mut *db)
+        .await?;
+
+        Ok(res.into_iter().collect())
+    }
+
+    pub async fn get_queue_tags(
+        &self,
+        ns: &str,
+        queue: &str,
+        identity: Identity,
+    ) -> Result<HashMap<String, String>, Error> {
+        let mut db = self.db().acquire().await?;
+
+        let ns_id = self
+            .get_namespace_id(ns, &mut *db)
+            .await?
+            .ok_or(Error::NotFound)?;
+
+        self.check_user_access(&identity, ns_id, &mut *db).await?;
+
+        let queue_id = self
+            .get_queue_id(ns, queue, &mut *db)
+            .await?
+            .ok_or(Error::NotFound)?;
+
+        let res = sqlx::query_as(
+            "
+            SELECT k, v FROM queue_tags WHERE queue = $1
+            ",
+        )
+        .bind(queue_id as i64)
+        .fetch_all(&mut *db)
+        .await?;
+
+        Ok(res.into_iter().collect())
     }
 
     pub async fn delete_queue(
@@ -427,7 +524,7 @@ impl Service {
         &self,
         queue: u64,
         message: &[u8],
-        kv: HashMap<String, String>,
+        kv: HashMap<String, SqsMessageAttribute>,
     ) -> Result<u64, Error> {
         let mut tx = self.db().begin().await?;
 
@@ -442,7 +539,7 @@ impl Service {
             sqlx::query("INSERT INTO kv_pairs (message, k, v) VALUES ($1, $2, $3)")
                 .bind(msg_id as i64)
                 .bind(k)
-                .bind(v)
+                .bind(bincode::serialize(&v).map_err(Error::internal)?)
                 .execute(&mut *tx)
                 .await?;
         }
@@ -456,7 +553,7 @@ impl Service {
         &self,
         namespace: &str,
         queue: &str,
-        messages: Vec<(Vec<u8>, HashMap<String, String>)>,
+        messages: Vec<(Vec<u8>, HashMap<String, SqsMessageAttribute>)>,
     ) -> Result<Vec<u64>, Error> {
         let mut tx = self.db().begin().await?;
 
@@ -489,7 +586,7 @@ impl Service {
                 sqlx::query("INSERT INTO kv_pairs (message, k, v) VALUES ($1, $2, $3)")
                     .bind(msg_id as i64)
                     .bind(k)
-                    .bind(v)
+                    .bind(bincode::serialize(&v).map_err(Error::internal)?)
                     .execute(&mut *tx)
                     .await?;
             }
@@ -510,7 +607,7 @@ impl Service {
         let mut tx = self.db().begin().await?;
 
         // Get the first undelivered message and mark it as delivered in one atomic operation
-        let message: Option<Message> = sqlx::query_as(
+        let mut message: Option<Message> = sqlx::query_as(
             "
             WITH next_message AS (
                 SELECT
@@ -545,6 +642,22 @@ impl Service {
         .fetch_optional(&mut *tx)
         .await?;
 
+        if let Some(message) = message.as_mut() {
+            let mut kv = sqlx::query_as::<_, (String, Vec<u8>)>(
+                "
+                SELECT k, v FROM kv_pairs WHERE message = $1
+                ",
+            )
+            .bind(message.id as i64)
+            .fetch(&mut *tx);
+
+            while let Some((k, v)) = kv.next().await.transpose()? {
+                message
+                    .kv
+                    .insert(k, bincode::deserialize(&v).map_err(Error::internal)?);
+            }
+        }
+
         tx.commit().await?;
 
         Ok(message)
@@ -559,7 +672,7 @@ impl Service {
         let mut tx = self.db().begin().await?;
 
         // Get multiple undelivered messages and mark them as delivered in one atomic operation
-        let messages: Vec<Message> = sqlx::query_as(
+        let  messages: Vec<Message> = sqlx::query_as(
             "
             WITH next_messages AS (
                 SELECT
@@ -595,15 +708,62 @@ impl Service {
         .fetch_all(&mut *tx)
         .await?;
 
+        let mut join_set = JoinSet::new();
+        for mut message in messages {
+            // Safety: We are joining all tasks before returning the messages, so the async block
+            // won't outlive the function despite the borrow checker not being able to verify that.
+            let mut tx: sqlx::Transaction<'static, Sqlite> =
+                unsafe { std::mem::transmute(tx.begin().await?) };
+
+            join_set.spawn_local(async move {
+                let mut kv = sqlx::query_as::<_, (String, Vec<u8>)>(
+                    "
+                    SELECT k, v FROM kv_pairs WHERE message = $1
+                    ",
+                )
+                .bind(message.id as i64)
+                .fetch(&mut *tx);
+
+                while let Some((k, v)) = kv.next().await.transpose()? {
+                    message
+                        .kv
+                        .insert(k, bincode::deserialize(&v).map_err(Error::internal)?);
+                }
+
+                // Drop the receiver so we can move `tx` to commit
+                drop(kv);
+
+                tx.commit().await?;
+
+                Result::<_, Error>::Ok(message)
+            });
+        }
+
+        let mut messages = Vec::new();
+        while let Some(message) = join_set
+            .join_next()
+            .await
+            .transpose()
+            .map_err(Error::internal)?
+            .transpose()?
+        {
+            messages.push(message);
+        }
+
         tx.commit().await?;
 
         Ok(messages)
     }
 
-    pub async fn peek(&self, namespace: &str, queue: &str, message_id: u64) -> Option<Message> {
-        let mut db = self.db().acquire().await.ok()?;
+    pub async fn peek(
+        &self,
+        namespace: &str,
+        queue: &str,
+        message_id: u64,
+    ) -> Result<Option<Message>, Error> {
+        let mut db = self.db().acquire().await?;
 
-        sqlx::query_as(
+        let msg = sqlx::query_as(
             "
             SELECT
                 m.*,
@@ -624,8 +784,27 @@ impl Service {
         .bind(queue)
         .bind(message_id as i64)
         .fetch_optional(&mut *db)
-        .await
-        .ok()?
+        .await?;
+
+        let mut msg: Message = match msg {
+            Some(msg) => msg,
+            None => return Ok(None),
+        };
+
+        let mut kv = sqlx::query_as::<_, (String, Vec<u8>)>(
+            "
+            SELECT k, v FROM kv_pairs WHERE message = $1
+            ",
+        )
+        .bind(msg.id as i64)
+        .fetch(&mut *db);
+
+        while let Some((k, v)) = kv.next().await.transpose()? {
+            msg.kv
+                .insert(k, bincode::deserialize(&v).map_err(Error::internal)?);
+        }
+
+        Ok(Some(msg))
     }
 
     pub async fn list_messages(&self, namespace: &str, queue: &str) -> Result<Vec<Message>, Error> {
@@ -655,7 +834,7 @@ impl Service {
             let db = self.db().clone();
             join_set.spawn_local(async move {
                 let mut conn = db.acquire().await?;
-                let mut kv_pairs = sqlx::query_as(
+                let mut kv_pairs = sqlx::query_as::<_, (String, Vec<u8>)>(
                     "
                     SELECT k, v FROM kv_pairs WHERE message = $1
                 ",
@@ -664,7 +843,9 @@ impl Service {
                 .fetch(&mut *conn);
 
                 while let Some((k, v)) = kv_pairs.next().await.transpose()? {
-                    message.kv.insert(k, v);
+                    message
+                        .kv
+                        .insert(k, bincode::deserialize(&v).map_err(Error::internal)?);
                 }
 
                 Result::<_, Error>::Ok(message)

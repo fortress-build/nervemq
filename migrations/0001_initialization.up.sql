@@ -42,6 +42,24 @@ create table if not exists queue_configurations (
 );
 create unique index if not exists queue_configs_queue_idx on queue_configurations(queue);
 
+create table if not exists queue_attributes (
+  queue integer not null,
+  k string not null,
+  v string not null,
+
+  primary key (queue, k),
+);
+create unique index if not exists queue_attrs_queue_key_idx on queue_attributes(queue, k);
+
+create table if not exists queue_tags (
+  queue integer not null,
+  k string not null,
+  v string not null,
+
+  primary key (queue, k),
+);
+create unique index if not exists queue_tags_queue_key_idx on queue_tags(queue, k);
+
 create table if not exists messages (
   id    integer not null,
   queue integer not null,
@@ -60,7 +78,7 @@ create table if not exists kv_pairs (
   id      integer not null,
   message integer not null,
   k       string  not null,
-  v       string  not null,
+  v       blob    not null,
 
   primary key (id),
   foreign key (message) references messages(id) on delete cascade

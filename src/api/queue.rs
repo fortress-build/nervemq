@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use actix_identity::Identity;
 use actix_web::{
     delete,
@@ -66,21 +68,32 @@ async fn delete_queue(
     Ok("OK")
 }
 
+#[derive(Debug, Deserialize)]
+struct CreateQueueRequest {
+    attributes: HashMap<String, String>,
+    tags: HashMap<String, String>,
+}
+
 #[post("/{ns_name}/{queue_name}")]
 async fn create_queue(
     service: web::Data<Service>,
     path: web::Path<(String, String)>,
+    data: web::Json<CreateQueueRequest>,
     identity: Identity,
 ) -> actix_web::Result<impl Responder> {
     let (namespace, name) = &*path;
+    let data = data.into_inner();
 
-    match service.create_queue(namespace, name, identity).await {
+    match service
+        .create_queue(namespace, name, data.attributes, data.tags, identity)
+        .await
+    {
         Ok(_) => {}
         Err(Error::Unauthorized) => return Err(ErrorUnauthorized("Unauthorized")),
         Err(e) => return Err(ErrorInternalServerError(e)),
     }
 
-    Ok("OK")
+    Ok(actix_web::HttpResponse::Ok())
 }
 
 #[get("/{ns_name}/{queue_name}")]
