@@ -18,7 +18,7 @@ use tokio_stream::StreamExt as _;
 use crate::{
     api::{
         auth::{Permission, Role, User},
-        sqs::types::SqsMessageAttribute,
+        sqs::types::{SqsMessage, SqsMessageAttribute},
     },
     auth::crypto::hash_secret,
     config::Config,
@@ -520,7 +520,7 @@ impl Service {
         Ok(())
     }
 
-    pub async fn send_message(
+    pub async fn sqs_send(
         &self,
         queue: u64,
         message: &[u8],
@@ -549,7 +549,7 @@ impl Service {
         Ok(msg_id)
     }
 
-    pub async fn send_batch(
+    pub async fn sqs_send_batch(
         &self,
         namespace: &str,
         queue: &str,
@@ -599,15 +599,15 @@ impl Service {
         Ok(message_ids)
     }
 
-    pub async fn recv(
+    pub async fn sqs_recv(
         &self,
         namespace: impl AsRef<str>,
         queue: impl AsRef<str>,
-    ) -> Result<Option<Message>, Error> {
+    ) -> Result<Option<SqsMessage>, Error> {
         let mut tx = self.db().begin().await?;
 
         // Get the first undelivered message and mark it as delivered in one atomic operation
-        let mut message: Option<Message> = sqlx::query_as(
+        let message: Option<Message> = sqlx::query_as(
             "
             WITH next_message AS (
                 SELECT
@@ -642,37 +642,48 @@ impl Service {
         .fetch_optional(&mut *tx)
         .await?;
 
-        if let Some(message) = message.as_mut() {
-            let mut kv = sqlx::query_as::<_, (String, Vec<u8>)>(
-                "
-                SELECT k, v FROM kv_pairs WHERE message = $1
-                ",
-            )
-            .bind(message.id as i64)
-            .fetch(&mut *tx);
+        let message = if let Some(message) = message {
+            // let mut msg_attributes = HashMap::new();
+            //
+            // let mut kv = sqlx::query_as::<_, (String, Vec<u8>)>(
+            //     "
+            //     SELECT k, v FROM kv_pairs WHERE message = $1
+            //     ",
+            // )
+            // .bind(message.id as i64)
+            // .fetch(&mut *tx);
+            //
+            // while let Some((k, v)) = kv.next().await.transpose()? {
+            //     let v: SqsMessageAttribute = bincode::deserialize(&v).map_err(Error::internal)?;
+            //     msg_attributes.insert(k, v);
+            // }
 
-            while let Some((k, v)) = kv.next().await.transpose()? {
-                message
-                    .kv
-                    .insert(k, bincode::deserialize(&v).map_err(Error::internal)?);
-            }
-        }
+            let sqs_message = SqsMessage {
+                message_id: message.id.to_string(),
+                md5_of_body: hex::encode(md5::compute(&message.body).as_slice()),
+                body: message.body,
+            };
+
+            Some(sqs_message)
+        } else {
+            None
+        };
 
         tx.commit().await?;
 
         Ok(message)
     }
 
-    pub async fn recv_batch(
+    pub async fn sqs_recv_batch(
         &self,
         namespace: &str,
         queue: &str,
         max_messages: usize,
-    ) -> Result<Vec<Message>, Error> {
+    ) -> Result<Vec<SqsMessage>, Error> {
         let mut tx = self.db().begin().await?;
 
         // Get multiple undelivered messages and mark them as delivered in one atomic operation
-        let  messages: Vec<Message> = sqlx::query_as(
+        let messages = sqlx::query_as(
             "
             WITH next_messages AS (
                 SELECT
@@ -706,64 +717,29 @@ impl Service {
         .bind(queue)
         .bind(max_messages as i64)
         .fetch_all(&mut *tx)
-        .await?;
-
-        let mut join_set = JoinSet::new();
-        for mut message in messages {
-            // Safety: We are joining all tasks before returning the messages, so the async block
-            // won't outlive the function despite the borrow checker not being able to verify that.
-            let mut tx: sqlx::Transaction<'static, Sqlite> =
-                unsafe { std::mem::transmute(tx.begin().await?) };
-
-            join_set.spawn_local(async move {
-                let mut kv = sqlx::query_as::<_, (String, Vec<u8>)>(
-                    "
-                    SELECT k, v FROM kv_pairs WHERE message = $1
-                    ",
-                )
-                .bind(message.id as i64)
-                .fetch(&mut *tx);
-
-                while let Some((k, v)) = kv.next().await.transpose()? {
-                    message
-                        .kv
-                        .insert(k, bincode::deserialize(&v).map_err(Error::internal)?);
-                }
-
-                // Drop the receiver so we can move `tx` to commit
-                drop(kv);
-
-                tx.commit().await?;
-
-                Result::<_, Error>::Ok(message)
-            });
-        }
-
-        let mut messages = Vec::new();
-        while let Some(message) = join_set
-            .join_next()
-            .await
-            .transpose()
-            .map_err(Error::internal)?
-            .transpose()?
-        {
-            messages.push(message);
-        }
+        .await?
+        .into_iter()
+        .map(|message: Message| SqsMessage {
+            message_id: message.id.to_string(),
+            md5_of_body: hex::encode(md5::compute(&message.body).as_slice()),
+            body: message.body,
+        })
+        .collect();
 
         tx.commit().await?;
 
         Ok(messages)
     }
 
-    pub async fn peek(
+    pub async fn sqs_peek(
         &self,
         namespace: &str,
         queue: &str,
         message_id: u64,
-    ) -> Result<Option<Message>, Error> {
+    ) -> Result<Option<SqsMessage>, Error> {
         let mut db = self.db().acquire().await?;
 
-        let msg = sqlx::query_as(
+        let msg: Option<Message> = sqlx::query_as(
             "
             SELECT
                 m.*,
@@ -786,23 +762,27 @@ impl Service {
         .fetch_optional(&mut *db)
         .await?;
 
-        let mut msg: Message = match msg {
-            Some(msg) => msg,
+        let msg = match msg {
+            Some(msg) => SqsMessage {
+                message_id: msg.id.to_string(),
+                md5_of_body: hex::encode(md5::compute(&msg.body).as_slice()),
+                body: msg.body,
+            },
             None => return Ok(None),
         };
 
-        let mut kv = sqlx::query_as::<_, (String, Vec<u8>)>(
-            "
-            SELECT k, v FROM kv_pairs WHERE message = $1
-            ",
-        )
-        .bind(msg.id as i64)
-        .fetch(&mut *db);
-
-        while let Some((k, v)) = kv.next().await.transpose()? {
-            msg.kv
-                .insert(k, bincode::deserialize(&v).map_err(Error::internal)?);
-        }
+        // let mut kv = sqlx::query_as::<_, (String, Vec<u8>)>(
+        //     "
+        //     SELECT k, v FROM kv_pairs WHERE message = $1
+        //     ",
+        // )
+        // .bind(msg.id as i64)
+        // .fetch(&mut *db);
+        //
+        // while let Some((k, v)) = kv.next().await.transpose()? {
+        //     msg.kv
+        //         .insert(k, bincode::deserialize(&v).map_err(Error::internal)?);
+        // }
 
         Ok(Some(msg))
     }

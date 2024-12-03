@@ -250,13 +250,13 @@ pub mod types {
     #[derive(Debug, serde::Serialize)]
     #[serde(rename_all = "PascalCase")]
     pub struct SqsMessage {
-        message_id: String,
-        receipt_handle: String,
-        md5_of_body: String,
-        body: String,
-        attributes: HashMap<String, String>,
-        md5_of_message_attributes: String,
-        message_attributes: HashMap<String, SqsMessageAttribute>,
+        pub message_id: String,
+        // pub receipt_handle: String,
+        pub md5_of_body: String,
+        pub body: Vec<u8>,
+        // pub attributes: HashMap<String, String>,
+        // pub md5_of_message_attributes: String,
+        // pub message_attributes: HashMap<String, SqsMessageAttribute>,
     }
 
     #[derive(Debug, serde::Serialize)]
@@ -379,7 +379,7 @@ pub async fn sqs_service(
 
             // FIXME: Implement delay_seconds and typed attributes
             let message_id = service
-                .send_message(queue_id, &request.message_body, request.message_attributes)
+                .sqs_send(queue_id, &request.message_body, request.message_attributes)
                 .await?;
 
             let digest = hex::encode(md5::compute(&request.message_body).as_ref());
