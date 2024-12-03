@@ -19,6 +19,8 @@ import { Spinner } from "@nextui-org/react";
 import { toast } from "sonner";
 import { useInvalidate } from "@/hooks/use-invalidate";
 import { createNamespaceSchema } from "@/schemas/create-namespace";
+import { listNamespaces } from "@/actions/api";
+import { useQuery } from "@tanstack/react-query";
 
 interface CreateNamespaceProps {
   open: boolean;
@@ -33,6 +35,12 @@ export default function CreateNamespace({
 }: CreateNamespaceProps) {
   const invalidate = useInvalidate(["namespaces"]);
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { data: namespaces = [], isLoading } = useQuery({
+    queryFn: () => listNamespaces(),
+    queryKey: ["namespaces"],
+  });
+
   const form = useForm({
     defaultValues: {
       name: "",
@@ -44,6 +52,11 @@ export default function CreateNamespace({
       onMount: createNamespaceSchema,
     },
     onSubmit: async ({ value: data, formApi }) => {
+      if (namespaces.some(namespace => namespace.name === data.name)) {
+        toast.error("This name is already taken");
+        return;
+      }
+
       await createNamespace(data)
         .then(() => {
           invalidate();

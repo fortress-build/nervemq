@@ -26,6 +26,22 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Copy as CopyIcon, Info as InfoIcon } from "lucide-react";
+import {  listNamespaces} from "@/actions/api"
+import { useQuery } from "@tanstack/react-query";
+import CreateNamespace from "./create-namespace";
+import { ChevronsUpDown, Plus, Check } from "lucide-react";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+
+
+
 // Add schema
 export const createApiKeySchema = object({
   name: string()
@@ -35,6 +51,7 @@ export const createApiKeySchema = object({
     .test("name", "name should be alphanumeric", (value: string) => {
       return isAlphaNumeric(value);
     }),
+  namespace: string().required("Namespace is required"),
 });
 
 export type CreateApiKey = InferType<typeof createApiKeySchema>;
@@ -45,6 +62,7 @@ export interface APIKey {
   secret_key: string;
   prefix: string;
   token?: string;
+  namespace: string;
 }
 
 interface CreateApiKeyProps {
@@ -52,6 +70,7 @@ interface CreateApiKeyProps {
   close: () => void;
   onSuccess?: (keyName: string) => void;
 }
+
 
 export default function CreateApiKey({
   open,
@@ -62,9 +81,25 @@ export default function CreateApiKey({
   const [apiKey, setApiKey] = useState<APIKey | null>(null);
   const invalidate = useInvalidate(["apiKeys"]);
 
+
+  const [showCreateNamespace, setShowCreateNamespace] = useState(false);
+  const [nsPopoverOpen, setNsPopoverOpen] = useState(false);
+  const handleNamespaceCreated = async (namespaceName: string) => {
+    form.setFieldValue("namespace", namespaceName);
+    await form.validateField("namespace", "change");
+    setShowCreateNamespace(false);
+  };
+
+  
+  const { data: namespaces = [], isLoading } = useQuery({
+    queryFn: () => listNamespaces(),
+    queryKey: ["namespaces"],
+  });
+  
   const form = useForm({
     defaultValues: {
       name: "",
+      namespace: "",
     },
     validatorAdapter: yupValidator(),
     validators: {
@@ -107,6 +142,7 @@ export default function CreateApiKey({
   }, [apiKey]);
 
   return (
+    <>
     <Dialog
       open={open}
       onOpenChange={(open) => {
@@ -151,6 +187,83 @@ export default function CreateApiKey({
                       "focus:border-primary focus:border transition-all",
                     )}
                   />
+                  {field.state.meta.errors ? (
+                    <span className="text-sm text-destructive">
+                      {field.state.meta.errors.join(", ")}
+                    </span>
+                  ) : null}
+                </div>
+              )}
+            </form.Field>
+
+            <form.Field name="namespace">
+              {(field) => (
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor={field.name}>Namespace</Label>
+                  <Popover open={nsPopoverOpen} onOpenChange={setNsPopoverOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        // biome-ignore lint/a11y/useSemanticElements: <explanation>
+                        role="combobox"
+                        className={cn(
+                          "w-full justify-between",
+                          !field.state.value ? "text-muted-foreground" : ""
+                        )}
+                      >
+                        {field.state.value || "Select a namespace"}
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0">
+                      <Command className="bg-background">
+                        <CommandInput placeholder="Search namespace..." />
+                        <CommandList>
+                          <CommandEmpty>
+                            {isLoading ? (
+                              <Spinner />
+                            ) : (
+                              <div className="flex flex-col items-center justify-center py-4 gap-2">
+                                <p className="text-sm text-muted-foreground">
+                                  No namespace found.
+                                </p>
+                              </div>
+                            )}
+                          </CommandEmpty>
+                          <CommandGroup>
+                            {namespaces.map((namespace) => (
+                              <CommandItem
+                                key={namespace.name}
+                                value={namespace.name}
+                                className="cursor-pointer"
+                                onSelect={(currentValue) => {
+                                  field.handleChange(currentValue);
+                                  setNsPopoverOpen(false);
+                                  form.setFieldValue("namespace", currentValue);
+                                }}
+                              >
+                                <div className="flex items-center gap-2 w-4">
+                                  {field.state.value === namespace.name ? (
+                                    <Check className="h-4 w-4" />
+                                  ) : null}
+                                </div>
+                                {namespace.name}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                          <CommandGroup>
+                            <CommandItem
+                              onSelect={() => setShowCreateNamespace(true)}
+                              className="flex items-center gap-2 cursor-pointer"
+                            >
+                              <Plus className="h-4 w-4" />
+                              Create Namespace
+                            </CommandItem>
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
                   {field.state.meta.errors ? (
                     <span className="text-sm text-destructive">
                       {field.state.meta.errors.join(", ")}
@@ -337,5 +450,12 @@ export default function CreateApiKey({
         )}
       </DialogContent>
     </Dialog>
+      <CreateNamespace
+      open={showCreateNamespace}
+      close={() => setShowCreateNamespace(false)}
+      onSuccess={handleNamespaceCreated}
+    />
+    </>
+    
   );
 }
