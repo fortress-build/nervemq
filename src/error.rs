@@ -39,7 +39,7 @@ pub enum Error {
         header: String,
     },
 
-    #[snafu(display("Missing header"))]
+    #[snafu(display("Invalid header"))]
     InvalidHeader {
         header: String,
     },

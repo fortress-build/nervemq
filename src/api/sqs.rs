@@ -3,14 +3,18 @@ use std::rc::Rc;
 use actix_identity::Identity;
 use actix_web::{
     dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Transform},
+    http::header::HeaderName,
     post,
     web::Data,
-    FromRequest, HttpMessage, Responder,
+    FromRequest, HttpMessage, Responder, Scope,
 };
 use pom::utf8::{seq, sym};
 use url::Url;
 
-use crate::{auth::credential::AuthorizedNamespace, error::Error};
+use crate::{
+    auth::{credential::AuthorizedNamespace, header::alpha},
+    error::Error,
+};
 
 const SQS_METHOD_PREFIX: &str = "AmazonSQS";
 
@@ -29,10 +33,14 @@ pub enum Method {
 
 impl Method {
     pub fn parse(method: &str) -> Result<Self, Error> {
-        let parser = seq(SQS_METHOD_PREFIX) * sym('.') * seq(method);
+        let parser = (seq(SQS_METHOD_PREFIX) * sym('.')) * alpha().repeat(1..).collect();
 
-        match parser.parse_str(method).map_err(|_| Error::InvalidHeader {
-            header: "X-Amz-Target".to_owned(),
+        match parser.parse_str(method).map_err(|e| {
+            tracing::error!("Method::parse: Invalid X-Amz-Target header: {e}");
+
+            Error::InvalidHeader {
+                header: "X-Amz-Target".to_owned(),
+            }
         })? {
             "SendMessage" => Ok(Self::SendMessage),
             "SendMessageBatch" => Ok(Self::SendMessageBatch),
@@ -43,9 +51,12 @@ impl Method {
             "CreateQueue" => Ok(Self::CreateQueue),
             "GetQueueAttributes" => Ok(Self::GetQueueAttributes),
             "PurgeQueue" => Ok(Self::PurgeQueue),
-            _ => Err(Error::InvalidHeader {
-                header: "X-Amz-Target".to_owned(),
-            }),
+            _ => {
+                tracing::error!("Method::parse: Invalid X-Amz-Target header");
+                Err(Error::InvalidHeader {
+                    header: "X-Amz-Target".to_owned(),
+                })
+            }
         }
     }
 }
@@ -68,13 +79,13 @@ pub struct SqsApi;
 
 impl<S, B> Transform<S, ServiceRequest> for SqsApi
 where
-    S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error> + 'static,
+    S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = actix_web::Error> + 'static,
     S::Future: 'static,
     B: 'static,
 {
     type Response = ServiceResponse<B>;
 
-    type Error = Error;
+    type Error = actix_web::Error;
 
     type Transform = SqsApiMiddleware<S>;
 
@@ -95,12 +106,12 @@ pub struct SqsApiMiddleware<S> {
 
 impl<S, B> Service<ServiceRequest> for SqsApiMiddleware<S>
 where
-    S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error> + 'static,
+    S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = actix_web::Error> + 'static,
     S::Future: 'static,
     B: 'static,
 {
     type Response = ServiceResponse<B>;
-    type Error = Error;
+    type Error = actix_web::Error;
     type Future =
         std::pin::Pin<Box<dyn std::future::Future<Output = Result<Self::Response, Self::Error>>>>;
 
@@ -111,11 +122,11 @@ where
         Box::pin(async move {
             let method = req
                 .headers()
-                .get("X-Amz-Target")
-                .and_then(|header| header.to_str().ok())
+                .get(HeaderName::from_static("x-amz-target"))
                 .ok_or_else(|| Error::InvalidHeader {
                     header: "X-Amz-Target".to_owned(),
                 })
+                .and_then(|header| header.to_str().map_err(|e| Error::internal(e)))
                 .and_then(Method::parse)?;
 
             req.extensions_mut().insert(method);
@@ -166,7 +177,9 @@ pub mod types {
     #[serde(rename_all = "PascalCase")]
     pub struct CreateQueueRequest {
         pub queue_name: String,
+        #[serde(default)]
         pub attributes: HashMap<String, String>,
+        #[serde(default)]
         pub tags: HashMap<String, String>,
     }
 
@@ -335,19 +348,25 @@ fn queue_url(mut host: Url, queue_name: &str, namespace_name: &str) -> Result<ur
     Ok(host)
 }
 
-#[post("/sqs")]
+#[post("")]
 pub async fn sqs_service(
     service: Data<crate::service::Service>,
     method: Method,
-    data: actix_web::web::Json<serde_json::Value>,
+    // data: actix_web::web::Json<serde_json::Map<String, serde_json::Value>>,
+    payload: actix_web::web::Bytes,
     identity: Identity,
     namespace: AuthorizedNamespace,
 ) -> Result<impl Responder, Error> {
-    let data = data.into_inner();
+    // Payload::collect
+    // let data = data.into_inner();
+    let bytes = payload;
+    // .to_bytes_limited(8192)
+    // .await
+    // .map_err(Error::internal)??;
 
     match method {
         Method::SendMessage => {
-            let request: types::SendMessageRequest = serde_json::from_value(data)?;
+            let request: types::SendMessageRequest = serde_json::from_slice(bytes.as_ref())?;
 
             let mut path = request
                 .queue_url
@@ -392,7 +411,7 @@ pub async fn sqs_service(
             )))
         }
         Method::SendMessageBatch => {
-            let request: types::SendMessageBatchRequest = serde_json::from_value(data)?;
+            let request: types::SendMessageBatchRequest = serde_json::from_slice(bytes.as_ref())?;
 
             // Parse queue URL to get namespace and queue name
             let mut path = request
@@ -466,7 +485,7 @@ pub async fn sqs_service(
             Ok(actix_web::web::Json(response))
         }
         Method::ReceiveMessage => {
-            let request: types::ReceiveMessageRequest = serde_json::from_value(data)?;
+            let request: types::ReceiveMessageRequest = serde_json::from_slice(bytes.as_ref())?;
 
             // Parse queue URL to get namespace and queue name
             let mut path = request
@@ -517,7 +536,7 @@ pub async fn sqs_service(
             )))
         }
         Method::DeleteMessage => {
-            let request: types::DeleteMessageRequest = serde_json::from_value(data)?;
+            let request: types::DeleteMessageRequest = serde_json::from_slice(bytes.as_ref())?;
 
             let mut path = request
                 .queue_url
@@ -559,7 +578,7 @@ pub async fn sqs_service(
             )))
         }
         Method::ListQueues => {
-            let request: types::ListQueuesRequest = serde_json::from_value(data)?;
+            let request: types::ListQueuesRequest = serde_json::from_slice(bytes.as_ref())?;
 
             let namespace_id = service
                 .get_namespace_id(&namespace.0, service.db())
@@ -597,7 +616,7 @@ pub async fn sqs_service(
             )))
         }
         Method::GetQueueUrl => {
-            let request: types::GetQueueUrlRequest = serde_json::from_value(data)?;
+            let request: types::GetQueueUrlRequest = serde_json::from_slice(bytes.as_ref())?;
 
             let namespace_id = service
                 .get_namespace_id(&namespace.0, service.db())
@@ -615,7 +634,8 @@ pub async fn sqs_service(
             )))
         }
         Method::CreateQueue => {
-            let request: types::CreateQueueRequest = serde_json::from_value(data)?;
+            tracing::error!("akuheflu.ahf: {:?}", bytes);
+            let request: types::CreateQueueRequest = serde_json::from_slice(bytes.as_ref())?;
 
             let namespace_id = service
                 .get_namespace_id(&namespace.0, service.db())
@@ -643,7 +663,7 @@ pub async fn sqs_service(
             )))
         }
         Method::GetQueueAttributes => {
-            let request: types::GetQueueAttributesRequest = serde_json::from_value(data)?;
+            let request: types::GetQueueAttributesRequest = serde_json::from_slice(bytes.as_ref())?;
 
             let mut path = request
                 .queue_url
@@ -682,7 +702,7 @@ pub async fn sqs_service(
             )))
         }
         Method::PurgeQueue => {
-            let request: types::PurgeQueueRequest = serde_json::from_value(data)?;
+            let request: types::PurgeQueueRequest = serde_json::from_slice(bytes.as_ref())?;
 
             // Parse queue URL to get namespace and queue name
             let mut path = request
@@ -716,4 +736,8 @@ pub async fn sqs_service(
             )))
         }
     }
+}
+
+pub fn service() -> Scope {
+    actix_web::web::scope("/sqs").service(sqs_service)
 }
