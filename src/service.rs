@@ -75,10 +75,38 @@ impl Service {
             .await
             .map_err(|e| eyre::eyre!(e))?;
 
-        Ok(Self {
+        let svc = Self {
             db: pool,
             config: Arc::new(config),
-        })
+        };
+
+        match svc
+            .create_user(
+                Email::from_str(svc.config.root_email()).map_err(Error::internal)?,
+                svc.config().root_password().to_owned().into(),
+                Some(Role::Admin),
+                vec![],
+            )
+            .await
+        {
+            Ok(_) => {
+                tracing::info!("Root user created");
+            }
+            Err(e) => match e {
+                Error::Sqlx { source } => match source {
+                    sqlx::Error::Database(db_err) => match db_err.kind() {
+                        sqlx::error::ErrorKind::UniqueViolation => {
+                            tracing::info!("Root user already exists");
+                        }
+                        _ => tracing::warn!("{db_err}"),
+                    },
+                    other => tracing::warn!("{other}"),
+                },
+                other => tracing::warn!("{other}"),
+            },
+        };
+
+        Ok(svc)
     }
 
     pub async fn get_queue_id(

@@ -1,4 +1,4 @@
-use secrecy::SecretString;
+use secrecy::{ExposeSecret, SecretString};
 use serde::Deserialize;
 use url::Url;
 
@@ -36,7 +36,13 @@ impl Default for Config {
 
 impl Config {
     pub fn load() -> eyre::Result<Self> {
-        Ok(envy::prefixed("NERVEMQ_").from_env::<Self>()?)
+        let config = envy::prefixed("NERVEMQ_").from_env::<Self>()?;
+
+        if config.root_email.is_none() {
+            tracing::warn!("No root email provided, using default - don't do this in production!");
+        }
+
+        Ok(config)
     }
 
     pub fn db_path(&self) -> &str {
@@ -55,5 +61,12 @@ impl Config {
             .as_ref()
             .map(|s| s.as_str())
             .unwrap_or(defaults::ROOT_EMAIL)
+    }
+
+    pub fn root_password(&self) -> &str {
+        self.root_password
+            .as_ref()
+            .map(|s| s.expose_secret())
+            .unwrap_or(defaults::ROOT_PASSWORD)
     }
 }

@@ -28,8 +28,8 @@ export default function LoginPage() {
       onMount: loginFormSchema,
     },
     defaultValues: {
-      email: "admin@fortress.build",
-      password: "password",
+      email: "",
+      password: "",
     },
     onSubmit: async ({ value }) => {
       "use client";
