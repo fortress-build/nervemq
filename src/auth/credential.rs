@@ -1,5 +1,26 @@
+use actix_web::{FromRequest, HttpMessage};
 use secrecy::SecretString;
 use serde::{Deserialize, Serialize};
+
+use crate::error::Error;
+
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type)]
+pub struct AuthorizedNamespace(pub String);
+
+impl FromRequest for AuthorizedNamespace {
+    type Error = Error;
+
+    type Future = std::future::Ready<Result<AuthorizedNamespace, Self::Error>>;
+
+    fn from_request(req: &actix_web::HttpRequest, _: &mut actix_web::dev::Payload) -> Self::Future {
+        std::future::ready(
+            req.extensions()
+                .get::<AuthorizedNamespace>()
+                .cloned()
+                .ok_or(Error::Unauthorized),
+        )
+    }
+}
 
 #[derive(Serialize, Deserialize)]
 pub struct ApiKeyRequest {

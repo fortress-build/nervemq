@@ -86,7 +86,7 @@ where
                 .parse_str(&auth_req)
                 .map_err(|e| ErrorInternalServerError(e))?;
 
-            let user = match auth_header {
+            let (user, authed_namespace) = match auth_header {
                 AuthHeader::NerveMqApiV1(token) => {
                     match authenticate_api_key(api.db(), token).await {
                         Ok(user) => user,
@@ -105,6 +105,8 @@ where
                 Ok(_) => {}
                 Err(e) => return Err(ErrorUnauthorized(e)),
             }
+
+            req.extensions_mut().insert(authed_namespace);
 
             svc.call(req).await
         })
