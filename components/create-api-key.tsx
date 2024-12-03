@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -95,6 +95,7 @@ export default function CreateApiKey({
     queryKey: ["namespaces"],
   });
 
+
   const form = useForm({
     defaultValues: {
       name: "",
@@ -121,6 +122,13 @@ export default function CreateApiKey({
         });
     },
   });
+
+  useEffect(() => {
+    if (namespaces.length === 1) {
+      form.setFieldValue("namespace", namespaces[0].name);
+    }
+  }, [namespaces, form]);
+
 
   const downloadKey = useCallback(() => {
     if (apiKey?.access_key && apiKey?.secret_key) {
