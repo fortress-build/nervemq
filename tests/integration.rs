@@ -31,6 +31,7 @@ async fn setup() -> TmpService {
         default_max_retries: None,
         root_email: None,
         root_password: None,
+        host: "http://localhost:8080".try_into().unwrap(),
     })
     .await
     .unwrap();
@@ -220,7 +221,7 @@ async fn test_send_message() {
         .await
         .unwrap()
         .unwrap();
-    service.send_message(queue_id, &message, kv).await.unwrap();
+    service.sqs_send(queue_id, &message, kv).await.unwrap();
 
     // Verify message exists
     let messages = service
@@ -249,7 +250,7 @@ async fn test_list_messages() {
     let message = "Hello, World!".as_bytes().to_vec();
     let kv = HashMap::new();
     service
-        .send_message(
+        .sqs_send(
             service
                 .get_queue_id(
                     "testing",
@@ -297,7 +298,7 @@ async fn test_batch_send_and_receive() {
 
     // Send batch
     let message_ids = service
-        .send_batch("testing", "test-queue", messages.clone())
+        .sqs_send_batch("testing", "test-queue", messages.clone())
         .await
         .unwrap();
 
@@ -305,7 +306,7 @@ async fn test_batch_send_and_receive() {
 
     // Receive batch with smaller size than sent
     let received = service
-        .recv_batch("testing", "test-queue", 2)
+        .sqs_recv_batch("testing", "test-queue", 2)
         .await
         .unwrap();
 
@@ -316,7 +317,7 @@ async fn test_batch_send_and_receive() {
 
     // Receive remaining message
     let received = service
-        .recv_batch("testing", "test-queue", 2)
+        .sqs_recv_batch("testing", "test-queue", 2)
         .await
         .unwrap();
 
@@ -326,7 +327,7 @@ async fn test_batch_send_and_receive() {
 
     // Verify no more messages
     let received = service
-        .recv_batch("testing", "test-queue", 10)
+        .sqs_recv_batch("testing", "test-queue", 10)
         .await
         .unwrap();
     assert!(received.is_empty());
@@ -352,7 +353,7 @@ async fn test_concurrent_batch_recv() {
         .collect();
 
     service
-        .send_batch("testing", "test-queue", messages)
+        .sqs_send_batch("testing", "test-queue", messages)
         .await
         .unwrap();
 
@@ -362,9 +363,9 @@ async fn test_concurrent_batch_recv() {
     let service3 = service.clone();
 
     let (batch1, batch2, batch3) = tokio::join!(
-        service1.recv_batch("testing", "test-queue", 4),
-        service2.recv_batch("testing", "test-queue", 4),
-        service3.recv_batch("testing", "test-queue", 4)
+        service1.sqs_recv_batch("testing", "test-queue", 4),
+        service2.sqs_recv_batch("testing", "test-queue", 4),
+        service3.sqs_recv_batch("testing", "test-queue", 4)
     );
 
     let batch1 = batch1.unwrap();
