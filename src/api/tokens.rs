@@ -14,12 +14,14 @@ use sqlx::FromRow;
 
 use crate::{
     auth::crypto::{generate_api_key, GeneratedKey},
+    error::Error,
     service::Service,
 };
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CreateTokenRequest {
     name: String,
+    namespace: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -39,7 +41,7 @@ pub async fn create_token(
     data: web::Json<CreateTokenRequest>,
     service: web::Data<Service>,
     identity: Identity,
-) -> actix_web::Result<Json<CreateTokenResponse>> {
+) -> Result<Json<CreateTokenResponse>, Error> {
     let data = data.into_inner();
 
     let GeneratedKey {
@@ -49,13 +51,19 @@ pub async fn create_token(
         validation_key,
     } = web::block(|| generate_api_key())
         .await
-        .map_err(ErrorInternalServerError)?
-        .map_err(ErrorInternalServerError)?;
+        .map_err(Error::internal)?
+        .map_err(Error::internal)?;
+
+    let namespace_id = service
+        .get_namespace_id(&data.namespace, service.db())
+        .await
+        .map_err(Error::internal)?
+        .ok_or(Error::NotFound)?;
 
     sqlx::query(
         "
-        INSERT INTO api_keys (name, user, key_id, hashed_key, validation_key)
-        VALUES ($1, (SELECT id FROM users WHERE email = $2), $3, $4, $5)
+        INSERT INTO api_keys (name, user, key_id, hashed_key, validation_key, ns)
+        VALUES ($1, (SELECT id FROM users WHERE email = $2), $3, $4, $5, $6)
         ",
     )
     .bind(&data.name)
@@ -63,6 +71,7 @@ pub async fn create_token(
     .bind(&short_token)
     .bind(long_token_hash.to_string())
     .bind(validation_key)
+    .bind(namespace_id as i64)
     .execute(service.db())
     .await
     .map_err(ErrorInternalServerError)?;

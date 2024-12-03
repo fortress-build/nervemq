@@ -5,7 +5,10 @@ use sha2::Sha256;
 
 use crate::{
     api::auth::User,
-    auth::crypto::{gen_signature_key, sha256_hex},
+    auth::{
+        credential::AuthorizedNamespace,
+        crypto::{gen_signature_key, sha256_hex},
+    },
     error::Error,
 };
 
@@ -23,7 +26,7 @@ pub struct SigV4Header<'a> {
 pub async fn authenticate_sigv4(
     req: &mut ServiceRequest,
     header: SigV4Header<'_>,
-) -> Result<User, Error> {
+) -> Result<(User, AuthorizedNamespace), Error> {
     let payload_hash = {
         let payload: actix_web::web::Payload = req
             .extract::<actix_web::web::Payload>()
@@ -87,11 +90,16 @@ pub async fn authenticate_sigv4(
         .expect("SQLite pool not found. This is a bug.")
         .db();
 
-    let Some(validation_key) =
-        sqlx::query_scalar::<_, Vec<u8>>("SELECT validation_key FROM api_keys WHERE key_id = $1")
-            .bind(&header.key_id)
-            .fetch_optional(pool)
-            .await?
+    let Some((validation_key, namespace)) = sqlx::query_as::<_, (Vec<u8>, String)>(
+        "
+            SELECT k.validation_key, ns.name FROM api_keys
+            JOIN namespaces ns ON ns.id = k.ns
+            WHERE key_id = $1
+            ",
+    )
+    .bind(&header.key_id)
+    .fetch_optional(pool)
+    .await?
     else {
         return Err(Error::IdentityNotFound {
             key_id: header.key_id.to_string(),
@@ -140,5 +148,5 @@ pub async fn authenticate_sigv4(
     .fetch_one(pool)
     .await?;
 
-    Ok(user)
+    Ok((user, AuthorizedNamespace(namespace)))
 }

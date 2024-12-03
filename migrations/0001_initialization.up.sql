@@ -110,13 +110,15 @@ create unique index if not exists user_permissions_user_namespace_idx on user_pe
 create table if not exists api_keys (
   id integer not null,
   user integer not null,
+  ns integer not null,
   name string not null,
   key_id text not null,
   hashed_key text not null,
   validation_key blob not null,
 
   primary key (id),
-  foreign key (user) references users(id) on delete cascade
+  foreign key (user) references users(id) on delete cascade,
+  foreign key (ns) references namespaces(id) on delete cascade
 );
 create unique index if not exists api_keys_user_name_idx on api_keys(user, name);
 create unique index if not exists api_keys_key_id_idx on api_keys(key_id);
