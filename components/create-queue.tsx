@@ -30,7 +30,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { toast } from "sonner";
 import { useInvalidate } from "@/hooks/use-invalidate";
 import CreateNamespace from "./create-namespace";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { createQueueSchema } from "@/schemas/create-queue";
 
 export default function CreateQueue({
@@ -80,6 +80,12 @@ export default function CreateQueue({
     await form.validateField("namespace", "change");
     setShowCreateNamespace(false);
   };
+
+  useEffect(() => {
+    if (namespaces.length === 1) {
+      form.setFieldValue("namespace", namespaces[0].name);
+    }
+  }, [namespaces, form]);
 
   return (
     <>
