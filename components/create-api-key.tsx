@@ -124,7 +124,7 @@ export default function CreateApiKey({
   });
 
   const downloadKey = useCallback(() => {
-    if (apiKey?.token) {
+    if (apiKey?.access_key && apiKey?.secret_key) {
       const content = [
         `Platform API Key: nervemq_${apiKey.access_key}_${apiKey.secret_key}`,
         `Access Key: ${apiKey.access_key}`,
