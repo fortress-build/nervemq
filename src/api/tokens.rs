@@ -27,6 +27,7 @@ pub struct CreateTokenRequest {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CreateTokenResponse {
     name: String,
+    namespace: String,
     access_key: String,
     secret_key: String,
 }
@@ -79,6 +80,7 @@ pub async fn create_token(
     // Return the plain API key (should be securely sent/stored by the user).
     Ok(web::Json(CreateTokenResponse {
         name: data.name,
+        namespace: data.namespace,
         access_key: short_token,
         secret_key: long_token.expose_secret().to_owned(),
     }))
@@ -115,6 +117,7 @@ pub async fn delete_token(
 #[derive(Debug, Serialize, Deserialize, FromRow)]
 struct ApiKey {
     name: String,
+    namespace: String,
 }
 
 pub struct IdentityWrapped(pub actix_identity::Identity);
@@ -146,8 +149,9 @@ pub async fn list_tokens(
 
     let tokens = sqlx::query_as(
         "
-        SELECT * FROM users u
+        SELECT *, ns.name as namespace FROM users u
         INNER JOIN api_keys k ON u.id = k.user
+        JOIN namespaces ns ON k.ns = ns.id
         WHERE u.email = $1
     ",
     )
