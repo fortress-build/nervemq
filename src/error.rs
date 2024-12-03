@@ -21,22 +21,32 @@ pub enum Error {
     },
 
     #[snafu(display("Identity {key_id} not found"))]
-    IdentityNotFound { key_id: String },
+    IdentityNotFound {
+        key_id: String,
+    },
 
     #[snafu(display("Payload too large"))]
     PayloadTooLarge,
 
     #[snafu(display("Missing header"))]
-    MissingHeader { header: String },
+    MissingHeader {
+        header: String,
+    },
 
     #[snafu(display("Missing header"))]
-    InvalidHeader { header: String },
+    InvalidHeader {
+        header: String,
+    },
 
     #[snafu(whatever, display("{message}"))]
     Whatever {
         message: String,
         #[snafu(source(from(eyre::Report, Some)))]
         source: Option<eyre::Report>,
+    },
+
+    InvalidParameter {
+        parameter: String,
     },
 }
 
@@ -93,9 +103,9 @@ impl actix_web::ResponseError for Error {
             Self::IdentityNotFound { .. } => actix_web::http::StatusCode::UNAUTHORIZED,
             Self::NotFound => actix_web::http::StatusCode::NOT_FOUND,
 
-            Self::MissingHeader { .. } | Self::InvalidHeader { .. } => {
-                actix_web::http::StatusCode::BAD_REQUEST
-            }
+            Self::MissingHeader { .. }
+            | Self::InvalidHeader { .. }
+            | Self::InvalidParameter { .. } => actix_web::http::StatusCode::BAD_REQUEST,
             Self::PayloadTooLarge => actix_web::http::StatusCode::PAYLOAD_TOO_LARGE,
 
             Self::InternalServerError { .. } | Self::Sqlx { .. } | Self::Whatever { .. } => {
