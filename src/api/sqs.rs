@@ -10,7 +10,7 @@ use actix_web::{
 use pom::utf8::{seq, sym};
 use url::Url;
 
-use crate::error::Error;
+use crate::{auth::credential::AuthorizedNamespace, error::Error, queue::Queue};
 
 const SQS_METHOD_PREFIX: &str = "AmazonSQS";
 
@@ -174,12 +174,149 @@ pub mod types {
         pub queue_url: Url,
     }
 
+    #[derive(Debug, serde::Deserialize)]
+    #[serde(rename_all = "PascalCase")]
+    pub struct ListQueuesRequest {
+        pub queue_name_prefix: Option<String>,
+    }
+
+    #[derive(Debug, serde::Serialize)]
+    #[serde(rename_all = "PascalCase")]
+    pub struct ListQueuesResponse {
+        pub queue_urls: Vec<Url>,
+    }
+
+    #[derive(Debug, serde::Deserialize)]
+    #[serde(rename_all = "PascalCase")]
+    pub struct DeleteMessageRequest {
+        queue_url: Url,
+        receipt_handle: String,
+    }
+
+    #[derive(Debug, serde::Serialize)]
+    #[serde(rename_all = "PascalCase")]
+    pub struct DeleteMessageResponse {}
+
+    #[derive(Debug, serde::Deserialize)]
+    #[serde(rename_all = "PascalCase")]
+    pub struct PurgeQueueRequest {
+        queue_url: Url,
+    }
+
+    #[derive(Debug, serde::Serialize)]
+    #[serde(rename_all = "PascalCase")]
+    pub struct PurgeQueueResponse {
+        success: bool,
+    }
+
+    #[derive(Debug, serde::Deserialize)]
+    #[serde(rename_all = "PascalCase")]
+    pub struct GetQueueAttributesRequest {
+        queue_url: Url,
+        attribute_names: Vec<String>,
+    }
+
+    #[derive(Debug, serde::Serialize)]
+    #[serde(rename_all = "PascalCase")]
+    pub struct GetQueueAttributesResponse {
+        attributes: HashMap<String, String>,
+    }
+
+    #[derive(Debug, serde::Deserialize)]
+    #[serde(rename_all = "PascalCase")]
+    pub struct ReceiveMessageRequest {
+        queue_url: Url,
+        attribute_names: Vec<String>,
+        message_attribute_names: Vec<String>,
+        max_number_of_messages: u64,
+        visibility_timeout: u64,
+        wait_time_seconds: u64,
+        receive_request_attempt_id: String,
+    }
+
+    #[derive(Debug, serde::Serialize, serde::Deserialize)]
+    #[serde(rename_all = "PascalCase", tag = "DataType")]
+    pub enum SqsMessageAttribute {
+        String { string_value: String },
+        Binary { binary_value: Vec<u8> },
+        Number { string_value: String },
+    }
+
+    #[derive(Debug, serde::Serialize)]
+    #[serde(rename_all = "PascalCase")]
+    pub struct SqsMessage {
+        message_id: String,
+        receipt_handle: String,
+        md5_of_body: String,
+        body: String,
+        attributes: HashMap<String, String>,
+        md5_of_message_attributes: String,
+        message_attributes: HashMap<String, SqsMessageAttribute>,
+    }
+
+    #[derive(Debug, serde::Serialize)]
+    #[serde(rename_all = "PascalCase")]
+    pub struct ReceiveMessageResponse {
+        messages: Vec<SqsMessage>,
+    }
+
+    #[derive(Debug, serde::Deserialize)]
+    #[serde(rename_all = "PascalCase")]
+    pub struct SendMessageBatchRequest {
+        queue_url: Url,
+        entries: Vec<SendMessageBatchRequestEntry>,
+    }
+
+    #[derive(Debug, serde::Deserialize)]
+    #[serde(rename_all = "PascalCase")]
+    pub struct SendMessageBatchRequestEntry {
+        id: String,
+        message_body: String,
+        delay_seconds: u64,
+        message_attributes: HashMap<String, SqsMessageAttribute>,
+        message_deduplication_id: String,
+        message_group_id: String,
+    }
+
+    #[derive(Debug, serde::Serialize)]
+    pub struct SendMessageBatchResultEntry {
+        id: String,
+        message_id: String,
+        md5_of_message_body: String,
+    }
+
+    #[derive(Debug, serde::Serialize)]
+    #[serde(rename_all = "PascalCase")]
+    pub struct SendMessageBatchResultErrorEntry {
+        id: String,
+        sender_fault: bool,
+        code: String,
+        message: String,
+    }
+
+    #[derive(Debug, serde::Serialize)]
+    #[serde(rename_all = "PascalCase", untagged)]
+    pub enum SendMessageBatchResponse {
+        Successful {
+            successful: Vec<SendMessageBatchResultEntry>,
+        },
+        Failed {
+            failed: Vec<SendMessageBatchResultErrorEntry>,
+        },
+    }
+
     #[derive(Debug, serde::Serialize)]
     #[serde(rename_all = "PascalCase", untagged)]
     pub enum SqsResponse {
         SendMessage(SendMessageResponse),
         GetQueueUrl(GetQueueUrlResponse),
         CreateQueue(CreateQueueResponse),
+        ListQueues(ListQueuesResponse),
+        DeleteMessage(DeleteMessageResponse),
+        PurgeQueue(PurgeQueueResponse),
+        GetQueueAttributes(GetQueueAttributesResponse),
+        ReceiveMessage(ReceiveMessageResponse),
+        SendMessageBatch(SendMessageBatchResponse),
     }
 }
 use types::*;
@@ -199,6 +336,7 @@ pub async fn sqs_service(
     method: Method,
     data: actix_web::web::Json<serde_json::Value>,
     identity: Identity,
+    namespace: AuthorizedNamespace,
 ) -> Result<impl Responder, Error> {
     let data = data.into_inner();
 
@@ -225,6 +363,10 @@ pub async fn sqs_service(
                 .check_user_access(&identity, ns_id, service.db())
                 .await?;
 
+            if namespace_name != namespace.0 {
+                return Err(Error::Unauthorized);
+            }
+
             let queue_id = service
                 .get_queue_id(namespace_name, queue_name, service.db())
                 .await?
@@ -246,13 +388,52 @@ pub async fn sqs_service(
         }
         Method::SendMessageBatch => todo!(),
         Method::ReceiveMessage => todo!(),
-        Method::DeleteMessage => todo!(),
-        Method::ListQueues => todo!(),
+        Method::DeleteMessage => {
+            todo!()
+        }
+        Method::ListQueues => {
+            let request: types::ListQueuesRequest = serde_json::from_value(data)?;
+
+            let namespace_id = service
+                .get_namespace_id(&namespace.0, service.db())
+                .await?
+                .ok_or_else(|| Error::NotFound)?;
+
+            service
+                .check_user_access(&identity, namespace_id, service.db())
+                .await?;
+
+            let queues = service
+                .list_queues(Some(&namespace.0), identity)
+                .await?
+                .into_iter()
+                .filter(|queue| {
+                    if let Some(prefix) = &request.queue_name_prefix {
+                        queue.name.starts_with(prefix)
+                    } else {
+                        true
+                    }
+                });
+
+            let mut urls = Vec::new();
+
+            for queue in queues {
+                urls.push(queue_url(
+                    service.config().host.clone(),
+                    &queue.name,
+                    &namespace.0,
+                )?);
+            }
+
+            Ok(actix_web::web::Json(SqsResponse::ListQueues(
+                ListQueuesResponse { queue_urls: urls },
+            )))
+        }
         Method::GetQueueUrl => {
             let request: types::GetQueueUrlRequest = serde_json::from_value(data)?;
 
             let namespace_id = service
-                .get_namespace_id(&request.queue_owner_aws_account_id, service.db())
+                .get_namespace_id(&namespace.0, service.db())
                 .await?
                 .ok_or_else(|| Error::NotFound)?;
 
@@ -263,7 +444,7 @@ pub async fn sqs_service(
             let url = queue_url(
                 service.config().host.clone(),
                 &request.queue_name,
-                &request.queue_owner_aws_account_id,
+                &namespace.0,
             )?;
 
             Ok(actix_web::web::Json(SqsResponse::GetQueueUrl(
@@ -273,9 +454,8 @@ pub async fn sqs_service(
         Method::CreateQueue => {
             let request: types::CreateQueueRequest = serde_json::from_value(data)?;
 
-            // FIXME: Get namespace from api key
             let namespace_id = service
-                .get_namespace_id(&request.queue_name, service.db())
+                .get_namespace_id(&namespace.0, service.db())
                 .await?
                 .ok_or_else(|| Error::NotFound)?;
 
@@ -283,12 +463,14 @@ pub async fn sqs_service(
                 .check_user_access(&identity, namespace_id, service.db())
                 .await?;
 
-            // service.create_queue()
+            service
+                .create_queue(&namespace.0, &request.queue_name, identity)
+                .await?;
 
             let url = queue_url(
                 service.config().host.clone(),
                 &request.queue_name,
-                &request.queue_name,
+                &namespace.0,
             )?;
 
             Ok(actix_web::web::Json(SqsResponse::CreateQueue(
