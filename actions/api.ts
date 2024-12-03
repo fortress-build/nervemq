@@ -126,6 +126,10 @@ export async function createQueue(data: CreateQueueRequest) {
   await fetch(`${SERVER_ENDPOINT}/queue/${data.namespace}/${data.name}`, {
     method: "POST",
     credentials: "include",
+    body: JSON.stringify({
+      attributes: Object.fromEntries(data.attributes ?? []),
+      tags: Object.fromEntries(data.tags ?? []),
+    }),
     next: {
       tags: ["queues"],
     },
