@@ -3,14 +3,25 @@ use std::rc::Rc;
 use actix_identity::Identity;
 use actix_web::{
     dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Transform},
+    http::header::HeaderName,
     post,
     web::Data,
-    FromRequest, HttpMessage, Responder,
+    FromRequest, HttpMessage, Responder, Scope,
 };
+use futures_util::TryStreamExt as _;
 use pom::utf8::{seq, sym};
+use tokio_serde::{formats::SymmetricalJson, Framed};
+use tokio_stream::StreamExt;
+use tokio_util::{
+    codec::{BytesCodec, FramedRead},
+    io::StreamReader,
+};
 use url::Url;
 
-use crate::{auth::credential::AuthorizedNamespace, error::Error};
+use crate::{
+    auth::{credential::AuthorizedNamespace, header::alpha},
+    error::Error,
+};
 
 const SQS_METHOD_PREFIX: &str = "AmazonSQS";
 
@@ -29,10 +40,14 @@ pub enum Method {
 
 impl Method {
     pub fn parse(method: &str) -> Result<Self, Error> {
-        let parser = seq(SQS_METHOD_PREFIX) * sym('.') * seq(method);
+        let parser = (seq(SQS_METHOD_PREFIX) * sym('.')) * alpha().repeat(1..).collect();
 
-        match parser.parse_str(method).map_err(|_| Error::InvalidHeader {
-            header: "X-Amz-Target".to_owned(),
+        match parser.parse_str(method).map_err(|e| {
+            tracing::error!("Method::parse: Invalid X-Amz-Target header: {e}");
+
+            Error::InvalidHeader {
+                header: "X-Amz-Target".to_owned(),
+            }
         })? {
             "SendMessage" => Ok(Self::SendMessage),
             "SendMessageBatch" => Ok(Self::SendMessageBatch),
@@ -43,9 +58,12 @@ impl Method {
             "CreateQueue" => Ok(Self::CreateQueue),
             "GetQueueAttributes" => Ok(Self::GetQueueAttributes),
             "PurgeQueue" => Ok(Self::PurgeQueue),
-            _ => Err(Error::InvalidHeader {
-                header: "X-Amz-Target".to_owned(),
-            }),
+            _ => {
+                tracing::error!("Method::parse: Invalid X-Amz-Target header");
+                Err(Error::InvalidHeader {
+                    header: "X-Amz-Target".to_owned(),
+                })
+            }
         }
     }
 }
@@ -68,13 +86,13 @@ pub struct SqsApi;
 
 impl<S, B> Transform<S, ServiceRequest> for SqsApi
 where
-    S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error> + 'static,
+    S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = actix_web::Error> + 'static,
     S::Future: 'static,
     B: 'static,
 {
     type Response = ServiceResponse<B>;
 
-    type Error = Error;
+    type Error = actix_web::Error;
 
     type Transform = SqsApiMiddleware<S>;
 
@@ -95,12 +113,12 @@ pub struct SqsApiMiddleware<S> {
 
 impl<S, B> Service<ServiceRequest> for SqsApiMiddleware<S>
 where
-    S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error> + 'static,
+    S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = actix_web::Error> + 'static,
     S::Future: 'static,
     B: 'static,
 {
     type Response = ServiceResponse<B>;
-    type Error = Error;
+    type Error = actix_web::Error;
     type Future =
         std::pin::Pin<Box<dyn std::future::Future<Output = Result<Self::Response, Self::Error>>>>;
 
@@ -111,11 +129,11 @@ where
         Box::pin(async move {
             let method = req
                 .headers()
-                .get("X-Amz-Target")
-                .and_then(|header| header.to_str().ok())
+                .get(HeaderName::from_static("x-amz-target"))
                 .ok_or_else(|| Error::InvalidHeader {
                     header: "X-Amz-Target".to_owned(),
                 })
+                .and_then(|header| header.to_str().map_err(|e| Error::internal(e)))
                 .and_then(Method::parse)?;
 
             req.extensions_mut().insert(method);
@@ -133,7 +151,7 @@ pub mod types {
     #[serde(rename_all = "PascalCase")]
     pub struct SendMessageRequest {
         pub queue_url: Url,
-        pub message_body: Vec<u8>,
+        pub message_body: String,
         pub delay_seconds: Option<u64>,
         pub message_attributes: HashMap<String, SqsMessageAttribute>,
         pub message_deduplication_id: Option<String>,
@@ -153,7 +171,7 @@ pub mod types {
     #[serde(rename_all = "PascalCase")]
     pub struct GetQueueUrlRequest {
         pub queue_name: String,
-        pub queue_owner_aws_account_id: String,
+        // pub queue_owner_aws_account_id: String,
     }
 
     #[derive(Debug, serde::Serialize)]
@@ -166,7 +184,9 @@ pub mod types {
     #[serde(rename_all = "PascalCase")]
     pub struct CreateQueueRequest {
         pub queue_name: String,
+        #[serde(default)]
         pub attributes: HashMap<String, String>,
+        #[serde(default)]
         pub tags: HashMap<String, String>,
     }
 
@@ -253,7 +273,7 @@ pub mod types {
         pub message_id: String,
         // pub receipt_handle: String,
         pub md5_of_body: String,
-        pub body: Vec<u8>,
+        pub body: String,
         // pub attributes: HashMap<String, String>,
         // pub md5_of_message_attributes: String,
         // pub message_attributes: HashMap<String, SqsMessageAttribute>,
@@ -335,34 +355,47 @@ fn queue_url(mut host: Url, queue_name: &str, namespace_name: &str) -> Result<ur
     Ok(host)
 }
 
-#[post("/sqs")]
+#[post("")]
 pub async fn sqs_service(
     service: Data<crate::service::Service>,
     method: Method,
-    data: actix_web::web::Json<serde_json::Value>,
+    payload: actix_web::web::Payload,
+    // payload: actix_web::web::Bytes,
     identity: Identity,
     namespace: AuthorizedNamespace,
 ) -> Result<impl Responder, Error> {
-    let data = data.into_inner();
+    let stream =
+        StreamReader::new(payload.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e)));
+
+    let stream = FramedRead::new(stream, BytesCodec::new());
 
     match method {
         Method::SendMessage => {
-            let request: types::SendMessageRequest = serde_json::from_value(data)?;
+            let request: types::SendMessageRequest =
+                Framed::<_, _, types::SendMessageRequest, _>::new(
+                    stream,
+                    SymmetricalJson::default(),
+                )
+                .next()
+                .await
+                .transpose()
+                .map_err(|e| Error::internal(e))?
+                .ok_or_else(|| Error::missing_parameter("missing request body"))?;
 
             let mut path = request
                 .queue_url
                 .path_segments()
-                .ok_or_else(|| Error::NotFound)?;
+                .ok_or_else(|| Error::missing_parameter("queue name"))?;
 
             let (queue_name, namespace_name) = path
                 .next_back()
                 .and_then(|queue_name| path.next_back().map(|ns_name| (queue_name, ns_name)))
-                .ok_or_else(|| Error::NotFound)?;
+                .ok_or_else(|| Error::missing_parameter("namespace name"))?;
 
             let ns_id = service
                 .get_namespace_id(namespace_name, service.db())
                 .await?
-                .ok_or_else(|| Error::NotFound)?;
+                .ok_or_else(|| Error::namespace_not_found(namespace_name))?;
 
             service
                 .check_user_access(&identity, ns_id, service.db())
@@ -375,7 +408,7 @@ pub async fn sqs_service(
             let queue_id = service
                 .get_queue_id(namespace_name, queue_name, service.db())
                 .await?
-                .ok_or_else(|| Error::NotFound)?;
+                .ok_or_else(|| Error::queue_not_found(queue_name, namespace_name))?;
 
             // FIXME: Implement delay_seconds
             let message_id = service
@@ -392,24 +425,33 @@ pub async fn sqs_service(
             )))
         }
         Method::SendMessageBatch => {
-            let request: types::SendMessageBatchRequest = serde_json::from_value(data)?;
+            let request: types::SendMessageBatchRequest =
+                Framed::<_, _, types::SendMessageBatchRequest, _>::new(
+                    stream,
+                    tokio_serde::formats::SymmetricalJson::default(),
+                )
+                .next()
+                .await
+                .transpose()
+                .map_err(|e| Error::internal(e))?
+                .ok_or_else(|| Error::missing_parameter("missing request body"))?;
 
             // Parse queue URL to get namespace and queue name
             let mut path = request
                 .queue_url
                 .path_segments()
-                .ok_or_else(|| Error::NotFound)?;
+                .ok_or_else(|| Error::missing_parameter("queue name"))?;
 
             let (queue_name, namespace_name) = path
                 .next_back()
                 .and_then(|queue_name| path.next_back().map(|ns_name| (queue_name, ns_name)))
-                .ok_or_else(|| Error::NotFound)?;
+                .ok_or_else(|| Error::missing_parameter("namespace name"))?;
 
             // Verify namespace access
             let ns_id = service
                 .get_namespace_id(namespace_name, service.db())
                 .await?
-                .ok_or_else(|| Error::NotFound)?;
+                .ok_or_else(|| Error::namespace_not_found(namespace_name))?;
 
             service
                 .check_user_access(&identity, ns_id, service.db())
@@ -423,7 +465,7 @@ pub async fn sqs_service(
             let queue_id = service
                 .get_queue_id(namespace_name, queue_name, service.db())
                 .await?
-                .ok_or_else(|| Error::NotFound)?;
+                .ok_or_else(|| Error::queue_not_found(queue_name, namespace_name))?;
 
             let mut successful = Vec::new();
             let mut failed = Vec::new();
@@ -431,7 +473,7 @@ pub async fn sqs_service(
             // Process each message in the batch
             for entry in request.entries {
                 let message_attributes = entry.message_attributes;
-                let message_body = entry.message_body.into_bytes();
+                let message_body = entry.message_body;
 
                 match service
                     .sqs_send(queue_id, &message_body, message_attributes)
@@ -466,24 +508,33 @@ pub async fn sqs_service(
             Ok(actix_web::web::Json(response))
         }
         Method::ReceiveMessage => {
-            let request: types::ReceiveMessageRequest = serde_json::from_value(data)?;
+            let request: types::ReceiveMessageRequest =
+                Framed::<_, _, types::ReceiveMessageRequest, _>::new(
+                    stream,
+                    tokio_serde::formats::SymmetricalJson::default(),
+                )
+                .next()
+                .await
+                .transpose()
+                .map_err(|e| Error::internal(e))?
+                .ok_or_else(|| Error::missing_parameter("missing request body"))?;
 
             // Parse queue URL to get namespace and queue name
             let mut path = request
                 .queue_url
                 .path_segments()
-                .ok_or_else(|| Error::NotFound)?;
+                .ok_or_else(|| Error::missing_parameter("queue name"))?;
 
             let (queue_name, namespace_name) = path
                 .next_back()
                 .and_then(|queue_name| path.next_back().map(|ns_name| (queue_name, ns_name)))
-                .ok_or_else(|| Error::NotFound)?;
+                .ok_or_else(|| Error::missing_parameter("namespace name"))?;
 
             // Verify namespace access
             let ns_id = service
                 .get_namespace_id(namespace_name, service.db())
                 .await?
-                .ok_or_else(|| Error::NotFound)?;
+                .ok_or_else(|| Error::namespace_not_found(namespace_name))?;
 
             service
                 .check_user_access(&identity, ns_id, service.db())
@@ -517,22 +568,31 @@ pub async fn sqs_service(
             )))
         }
         Method::DeleteMessage => {
-            let request: types::DeleteMessageRequest = serde_json::from_value(data)?;
+            let request: types::DeleteMessageRequest =
+                Framed::<_, _, types::DeleteMessageRequest, _>::new(
+                    stream,
+                    tokio_serde::formats::SymmetricalJson::default(),
+                )
+                .next()
+                .await
+                .transpose()
+                .map_err(|e| Error::internal(e))?
+                .ok_or_else(|| Error::missing_parameter("missing request body"))?;
 
             let mut path = request
                 .queue_url
                 .path_segments()
-                .ok_or_else(|| Error::NotFound)?;
+                .ok_or_else(|| Error::missing_parameter("queue name"))?;
 
             let (queue_name, namespace_name) = path
                 .next_back()
                 .and_then(|queue_name| path.next_back().map(|ns_name| (queue_name, ns_name)))
-                .ok_or_else(|| Error::NotFound)?;
+                .ok_or_else(|| Error::missing_parameter("namespace name"))?;
 
             let ns_id = service
                 .get_namespace_id(namespace_name, service.db())
                 .await?
-                .ok_or_else(|| Error::NotFound)?;
+                .ok_or_else(|| Error::namespace_not_found(namespace_name))?;
 
             service
                 .check_user_access(&identity, ns_id, service.db())
@@ -542,13 +602,10 @@ pub async fn sqs_service(
                 return Err(Error::Unauthorized);
             }
 
-            let message_id =
-                request
-                    .receipt_handle
-                    .parse::<u64>()
-                    .map_err(|_| Error::InvalidParameter {
-                        parameter: "ReceiptHandle".to_string(),
-                    })?;
+            let message_id = request
+                .receipt_handle
+                .parse::<u64>()
+                .map_err(|e| Error::invalid_parameter(format!("ReceiptHandle: {e}")))?;
 
             service
                 .delete_message(namespace_name, queue_name, message_id, identity)
@@ -559,12 +616,21 @@ pub async fn sqs_service(
             )))
         }
         Method::ListQueues => {
-            let request: types::ListQueuesRequest = serde_json::from_value(data)?;
+            let request: types::ListQueuesRequest =
+                Framed::<_, _, types::ListQueuesRequest, _>::new(
+                    stream,
+                    tokio_serde::formats::SymmetricalJson::default(),
+                )
+                .next()
+                .await
+                .transpose()
+                .map_err(|e| Error::internal(e))?
+                .ok_or_else(|| Error::missing_parameter("missing request body"))?;
 
             let namespace_id = service
                 .get_namespace_id(&namespace.0, service.db())
                 .await?
-                .ok_or_else(|| Error::NotFound)?;
+                .ok_or_else(|| Error::namespace_not_found(&namespace.0))?;
 
             service
                 .check_user_access(&identity, namespace_id, service.db())
@@ -597,16 +663,31 @@ pub async fn sqs_service(
             )))
         }
         Method::GetQueueUrl => {
-            let request: types::GetQueueUrlRequest = serde_json::from_value(data)?;
+            let request: types::GetQueueUrlRequest =
+                Framed::<_, _, types::GetQueueUrlRequest, _>::new(
+                    stream,
+                    tokio_serde::formats::SymmetricalJson::default(),
+                )
+                .next()
+                .await
+                .transpose()
+                .map_err(|e| Error::internal(e))?
+                .ok_or_else(|| Error::missing_parameter("missing request body"))?;
 
             let namespace_id = service
                 .get_namespace_id(&namespace.0, service.db())
                 .await?
-                .ok_or_else(|| Error::NotFound)?;
+                .ok_or_else(|| Error::namespace_not_found(&namespace.0))?;
 
             service
                 .check_user_access(&identity, namespace_id, service.db())
                 .await?;
+
+            // We don't need the id, but we need to ensure the queue exists
+            service
+                .get_queue_id(&namespace.0, &request.queue_name, service.db())
+                .await?
+                .ok_or_else(|| Error::queue_not_found(&request.queue_name, &namespace.0))?;
 
             let url = queue_url(service.config().host(), &request.queue_name, &namespace.0)?;
 
@@ -615,12 +696,21 @@ pub async fn sqs_service(
             )))
         }
         Method::CreateQueue => {
-            let request: types::CreateQueueRequest = serde_json::from_value(data)?;
+            let request: types::CreateQueueRequest =
+                Framed::<_, _, types::GetQueueUrlRequest, _>::new(
+                    stream,
+                    tokio_serde::formats::SymmetricalJson::default(),
+                )
+                .next()
+                .await
+                .transpose()
+                .map_err(|e| Error::internal(e))?
+                .ok_or_else(|| Error::missing_parameter("missing request body"))?;
 
             let namespace_id = service
                 .get_namespace_id(&namespace.0, service.db())
                 .await?
-                .ok_or_else(|| Error::NotFound)?;
+                .ok_or_else(|| Error::namespace_not_found(&namespace.0))?;
 
             service
                 .check_user_access(&identity, namespace_id, service.db())
@@ -643,22 +733,31 @@ pub async fn sqs_service(
             )))
         }
         Method::GetQueueAttributes => {
-            let request: types::GetQueueAttributesRequest = serde_json::from_value(data)?;
+            let request: types::GetQueueAttributesRequest =
+                Framed::<_, _, types::GetQueueUrlRequest, _>::new(
+                    stream,
+                    tokio_serde::formats::SymmetricalJson::default(),
+                )
+                .next()
+                .await
+                .transpose()
+                .map_err(|e| Error::internal(e))?
+                .ok_or_else(|| Error::missing_parameter("missing request body"))?;
 
             let mut path = request
                 .queue_url
                 .path_segments()
-                .ok_or_else(|| Error::NotFound)?;
+                .ok_or_else(|| Error::missing_parameter("queue name"))?;
 
             let (queue_name, namespace_name) = path
                 .next_back()
                 .and_then(|queue_name| path.next_back().map(|ns_name| (queue_name, ns_name)))
-                .ok_or_else(|| Error::NotFound)?;
+                .ok_or_else(|| Error::missing_parameter("namespace name"))?;
 
             let ns_id = service
                 .get_namespace_id(namespace_name, service.db())
                 .await?
-                .ok_or_else(|| Error::NotFound)?;
+                .ok_or_else(|| Error::namespace_not_found(namespace_name))?;
 
             service
                 .check_user_access(&identity, ns_id, service.db())
@@ -682,24 +781,33 @@ pub async fn sqs_service(
             )))
         }
         Method::PurgeQueue => {
-            let request: types::PurgeQueueRequest = serde_json::from_value(data)?;
+            let request: types::PurgeQueueRequest =
+                Framed::<_, _, types::GetQueueUrlRequest, _>::new(
+                    stream,
+                    tokio_serde::formats::SymmetricalJson::default(),
+                )
+                .next()
+                .await
+                .transpose()
+                .map_err(|e| Error::internal(e))?
+                .ok_or_else(|| Error::missing_parameter("missing request body"))?;
 
             // Parse queue URL to get namespace and queue name
             let mut path = request
                 .queue_url
                 .path_segments()
-                .ok_or_else(|| Error::NotFound)?;
+                .ok_or_else(|| Error::missing_parameter("queue name"))?;
 
             let (queue_name, namespace_name) = path
                 .next_back()
                 .and_then(|queue_name| path.next_back().map(|ns_name| (queue_name, ns_name)))
-                .ok_or_else(|| Error::NotFound)?;
+                .ok_or_else(|| Error::missing_parameter("namespace name"))?;
 
             // Verify namespace access
             let ns_id = service
                 .get_namespace_id(namespace_name, service.db())
                 .await?
-                .ok_or_else(|| Error::NotFound)?;
+                .ok_or_else(|| Error::namespace_not_found(namespace_name))?;
 
             service
                 .check_user_access(&identity, ns_id, service.db())
@@ -716,4 +824,8 @@ pub async fn sqs_service(
             )))
         }
     }
+}
+
+pub fn service() -> Scope {
+    actix_web::web::scope("/sqs").service(sqs_service)
 }

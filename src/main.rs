@@ -4,12 +4,13 @@ use actix_session::config::{CookieContentSecurity, PersistentSession};
 use actix_session::SessionMiddleware;
 use actix_web::cookie::time::Duration;
 use actix_web::middleware::{NormalizePath, TrailingSlash};
-use actix_web::web::{FormConfig, JsonConfig};
+use actix_web::web::{self, FormConfig, JsonConfig};
 use actix_web::{web::Data, App, HttpServer};
 
 use chrono::TimeDelta;
 use nervemq::api::auth::{self};
-use nervemq::api::{admin, data, namespace, queue, tokens};
+use nervemq::api::sqs::SqsApi;
+use nervemq::api::{admin, data, namespace, queue, sqs, tokens};
 use nervemq::auth::middleware::api_keys::ApiKeyAuth;
 use nervemq::auth::middleware::protected_route::Protected;
 use nervemq::auth::session::SqliteSessionStore;
@@ -99,15 +100,16 @@ async fn main() -> eyre::Result<()> {
         let form_cfg = FormConfig::default();
 
         App::new()
+            .wrap(ApiKeyAuth)
             .wrap(identity_middleware)
             .wrap(session_middleware)
-            .wrap(ApiKeyAuth)
             .wrap(cors)
             .wrap(TracingLogger::default())
             .wrap(NormalizePath::new(TrailingSlash::Trim))
             .service(queue::service().wrap(Protected::authenticated()))
             .service(data::service().wrap(Protected::authenticated()))
             .service(tokens::service().wrap(Protected::authenticated()))
+            .service(sqs::service().wrap(Protected::authenticated()).wrap(SqsApi))
             .service(namespace::service().wrap(Protected::admin_only()))
             .service(admin::service().wrap(Protected::admin_only()))
             .service(auth::service())

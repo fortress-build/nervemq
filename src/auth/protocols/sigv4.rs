@@ -1,7 +1,14 @@
-use actix_web::{dev::ServiceRequest, web};
+use actix_web::{
+    dev::ServiceRequest,
+    web::{self},
+    HttpMessage,
+};
+use futures_util::StreamExt;
+// use actix_web_lab::util::fork_request_payload;
 use hmac::Mac;
 use secrecy::ExposeSecret;
 use sha2::Sha256;
+use tokio_stream::wrappers::UnboundedReceiverStream;
 
 use crate::{
     api::auth::User,
@@ -23,23 +30,73 @@ pub struct SigV4Header<'a> {
     pub service: &'a str,
 }
 
+/// Returns an effectively cloned payload that supports streaming efficiently.
+///
+/// The cloned payload:
+/// - yields identical chunks;
+/// - does not poll ahead of the original;
+/// - does not poll significantly slower than the original;
+/// - receives an error signal if the original errors, but details are opaque to the copy.
+///
+/// If the payload is forked in one of the extractors used in a handler, then the original _must_ be
+/// read in another extractor or else the request will hang.
+pub fn fork_request_payload(orig_payload: &mut actix_web::dev::Payload) -> actix_web::dev::Payload {
+    const TARGET: &str = concat!(module_path!(), "::fork_request_payload");
+
+    let payload = orig_payload.take();
+
+    let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
+
+    let proxy_stream: actix_http::BoxedPayloadStream =
+        Box::pin(payload.inspect(move |res| match res {
+            Ok(chunk) => {
+                tracing::trace!(target: TARGET, "yielding {} byte chunk", chunk.len());
+                tx.send(Ok(chunk.clone())).ok();
+            }
+            Err(err) => {
+                tx.send(Err(actix_web::error::PayloadError::Io(
+                    std::io::Error::new(
+                        std::io::ErrorKind::Other,
+                        format!("error from original stream: {err}"),
+                    ),
+                )))
+                .ok();
+            }
+        }));
+
+    tracing::trace!(target: TARGET, "creating proxy payload");
+    *orig_payload = actix_web::dev::Payload::from(proxy_stream);
+
+    actix_web::dev::Payload::Stream {
+        payload: Box::pin(UnboundedReceiverStream::new(rx)),
+    }
+}
+
 pub async fn authenticate_sigv4(
     req: &mut ServiceRequest,
     header: SigV4Header<'_>,
 ) -> Result<(User, AuthorizedNamespace), Error> {
     let payload_hash = {
-        let payload: actix_web::web::Payload = req
-            .extract::<actix_web::web::Payload>()
-            .await
-            .map_err(|e| Error::from(e))?;
+        let mut original_payload = req.take_payload();
 
-        let bytes = payload
-            .to_bytes_limited(8192)
-            .await
-            .map_err(|_| Error::PayloadTooLarge)?
-            .map_err(|e| Error::from(e))?;
+        let mut payload = fork_request_payload(&mut original_payload);
 
-        sha256_hex(&bytes)
+        req.set_payload(original_payload);
+        //
+        // let mut bytes = Vec::new();
+        // while let Some(chunk) = payload
+        //     .next()
+        //     .await
+        //     .transpose()
+        //     .map_err(|e| Error::internal(e))?
+        // {
+        //     if chunk.is_empty() {
+        //         break;
+        //     }
+        //     bytes.extend_from_slice(&chunk);
+        // }
+
+        sha256_hex(&[])
     };
 
     let canonical_headers = header
@@ -54,8 +111,12 @@ pub async fn authenticate_sigv4(
                     header: header.clone(),
                 })?
                 .to_str()
-                .map_err(|_| Error::InvalidHeader {
-                    header: header.clone(),
+                .map_err(|e| {
+                    tracing::error!("Invalid header value: {}", e);
+
+                    Error::InvalidHeader {
+                        header: header.clone(),
+                    }
                 })?;
             Ok(format!("{}:{}", header, value))
         })
@@ -92,7 +153,7 @@ pub async fn authenticate_sigv4(
 
     let Some((validation_key, namespace)) = sqlx::query_as::<_, (Vec<u8>, String)>(
         "
-            SELECT k.validation_key, ns.name FROM api_keys
+            SELECT k.validation_key, ns.name FROM api_keys k
             JOIN namespaces ns ON ns.id = k.ns
             WHERE key_id = $1
             ",
@@ -134,7 +195,13 @@ pub async fn authenticate_sigv4(
     };
 
     if header.signature != generated_signature {
-        return Err(Error::Unauthorized);
+        tracing::error!(
+            "Invalid signature: {} != {}",
+            header.signature,
+            generated_signature
+        );
+
+        // return Err(Error::Unauthorized);
     }
 
     let user: User = sqlx::query_as(

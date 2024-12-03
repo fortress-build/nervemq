@@ -34,30 +34,31 @@ export default function LoginPage() {
     onSubmit: async ({ value }) => {
       "use client";
 
-      const data: AdminSession | undefined = await window
-        .fetch(`${SERVER_ENDPOINT}/auth/login`, {
+      const data: AdminSession | undefined = await fetch(
+        `${SERVER_ENDPOINT}/auth/login`,
+        {
           method: "POST",
           body: JSON.stringify(value),
           credentials: "include",
           mode: "cors",
-        })
-        .then((res) => {
-          if (!res.ok) {
-            switch (res.status) {
-              case 401: {
-                toast.error("Invalid email or password");
-                break;
-              }
-              default: {
-                toast.error("Something went wrong");
-                break;
-              }
+        },
+      ).then((res) => {
+        if (!res.ok) {
+          switch (res.status) {
+            case 401: {
+              toast.error("Invalid email or password");
+              break;
             }
-            return;
+            default: {
+              toast.error("Something went wrong");
+              break;
+            }
           }
+          return;
+        }
 
-          return res.json();
-        });
+        return res.json();
+      });
 
       if (data === undefined) {
         return;
