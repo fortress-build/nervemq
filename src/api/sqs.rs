@@ -191,8 +191,8 @@ pub mod types {
     #[derive(Debug, serde::Deserialize)]
     #[serde(rename_all = "PascalCase")]
     pub struct DeleteMessageRequest {
-        queue_url: Url,
-        receipt_handle: String,
+        pub queue_url: Url,
+        pub receipt_handle: String,
     }
 
     #[derive(Debug, serde::Serialize)]
@@ -202,38 +202,38 @@ pub mod types {
     #[derive(Debug, serde::Deserialize)]
     #[serde(rename_all = "PascalCase")]
     pub struct PurgeQueueRequest {
-        queue_url: Url,
+        pub queue_url: Url,
     }
 
     #[derive(Debug, serde::Serialize)]
     #[serde(rename_all = "PascalCase")]
     pub struct PurgeQueueResponse {
-        success: bool,
+        pub success: bool,
     }
 
     #[derive(Debug, serde::Deserialize)]
     #[serde(rename_all = "PascalCase")]
     pub struct GetQueueAttributesRequest {
-        queue_url: Url,
-        attribute_names: Vec<String>,
+        pub queue_url: Url,
+        pub attribute_names: Vec<String>,
     }
 
     #[derive(Debug, serde::Serialize)]
     #[serde(rename_all = "PascalCase")]
     pub struct GetQueueAttributesResponse {
-        attributes: HashMap<String, String>,
+        pub attributes: HashMap<String, String>,
     }
 
     #[derive(Debug, serde::Deserialize)]
     #[serde(rename_all = "PascalCase")]
     pub struct ReceiveMessageRequest {
-        queue_url: Url,
-        attribute_names: Vec<String>,
-        message_attribute_names: Vec<String>,
-        max_number_of_messages: u64,
-        visibility_timeout: u64,
-        wait_time_seconds: u64,
-        receive_request_attempt_id: String,
+        pub queue_url: Url,
+        pub attribute_names: Vec<String>,
+        pub message_attribute_names: Vec<String>,
+        pub max_number_of_messages: u64,
+        pub visibility_timeout: u64,
+        pub wait_time_seconds: u64,
+        pub receive_request_attempt_id: String,
     }
 
     #[derive(Debug, serde::Serialize, serde::Deserialize)]
@@ -262,41 +262,41 @@ pub mod types {
     #[derive(Debug, serde::Serialize)]
     #[serde(rename_all = "PascalCase")]
     pub struct ReceiveMessageResponse {
-        messages: Vec<SqsMessage>,
+        pub messages: Vec<SqsMessage>,
     }
 
     #[derive(Debug, serde::Deserialize)]
     #[serde(rename_all = "PascalCase")]
     pub struct SendMessageBatchRequest {
-        queue_url: Url,
-        entries: Vec<SendMessageBatchRequestEntry>,
+        pub queue_url: Url,
+        pub entries: Vec<SendMessageBatchRequestEntry>,
     }
 
     #[derive(Debug, serde::Deserialize)]
     #[serde(rename_all = "PascalCase")]
     pub struct SendMessageBatchRequestEntry {
-        id: String,
-        message_body: String,
-        delay_seconds: u64,
-        message_attributes: HashMap<String, SqsMessageAttribute>,
-        message_deduplication_id: String,
-        message_group_id: String,
+        pub id: String,
+        pub message_body: String,
+        pub delay_seconds: u64,
+        pub message_attributes: HashMap<String, SqsMessageAttribute>,
+        pub message_deduplication_id: String,
+        pub message_group_id: String,
     }
 
     #[derive(Debug, serde::Serialize)]
     pub struct SendMessageBatchResultEntry {
-        id: String,
-        message_id: String,
-        md5_of_message_body: String,
+        pub id: String,
+        pub message_id: String,
+        pub md5_of_message_body: String,
     }
 
     #[derive(Debug, serde::Serialize)]
     #[serde(rename_all = "PascalCase")]
     pub struct SendMessageBatchResultErrorEntry {
-        id: String,
-        sender_fault: bool,
-        code: String,
-        message: String,
+        pub id: String,
+        pub sender_fault: bool,
+        pub code: String,
+        pub message: String,
     }
 
     #[derive(Debug, serde::Serialize)]
@@ -377,7 +377,7 @@ pub async fn sqs_service(
                 .await?
                 .ok_or_else(|| Error::NotFound)?;
 
-            // FIXME: Implement delay_seconds and typed attributes
+            // FIXME: Implement delay_seconds
             let message_id = service
                 .sqs_send(queue_id, &request.message_body, request.message_attributes)
                 .await?;
@@ -391,10 +391,172 @@ pub async fn sqs_service(
                 },
             )))
         }
-        Method::SendMessageBatch => todo!(),
-        Method::ReceiveMessage => todo!(),
+        Method::SendMessageBatch => {
+            let request: types::SendMessageBatchRequest = serde_json::from_value(data)?;
+
+            // Parse queue URL to get namespace and queue name
+            let mut path = request
+                .queue_url
+                .path_segments()
+                .ok_or_else(|| Error::NotFound)?;
+
+            let (queue_name, namespace_name) = path
+                .next_back()
+                .and_then(|queue_name| path.next_back().map(|ns_name| (queue_name, ns_name)))
+                .ok_or_else(|| Error::NotFound)?;
+
+            // Verify namespace access
+            let ns_id = service
+                .get_namespace_id(namespace_name, service.db())
+                .await?
+                .ok_or_else(|| Error::NotFound)?;
+
+            service
+                .check_user_access(&identity, ns_id, service.db())
+                .await?;
+
+            if namespace_name != namespace.0 {
+                return Err(Error::Unauthorized);
+            }
+
+            // Get queue ID
+            let queue_id = service
+                .get_queue_id(namespace_name, queue_name, service.db())
+                .await?
+                .ok_or_else(|| Error::NotFound)?;
+
+            let mut successful = Vec::new();
+            let mut failed = Vec::new();
+
+            // Process each message in the batch
+            for entry in request.entries {
+                let message_attributes = entry.message_attributes;
+                let message_body = entry.message_body.into_bytes();
+
+                match service
+                    .sqs_send(queue_id, &message_body, message_attributes)
+                    .await
+                {
+                    Ok(message_id) => {
+                        let digest = hex::encode(md5::compute(&message_body).as_ref());
+                        successful.push(SendMessageBatchResultEntry {
+                            id: entry.id,
+                            message_id: message_id.to_string(),
+                            md5_of_message_body: digest,
+                        });
+                    }
+                    Err(e) => {
+                        failed.push(SendMessageBatchResultErrorEntry {
+                            id: entry.id,
+                            sender_fault: true, // Set to true for client-side errors
+                            code: "InternalError".to_string(),
+                            message: e.to_string(),
+                        });
+                    }
+                }
+            }
+
+            // Return successful or failed response based on results
+            let response = if !failed.is_empty() {
+                SqsResponse::SendMessageBatch(SendMessageBatchResponse::Failed { failed })
+            } else {
+                SqsResponse::SendMessageBatch(SendMessageBatchResponse::Successful { successful })
+            };
+
+            Ok(actix_web::web::Json(response))
+        }
+        Method::ReceiveMessage => {
+            let request: types::ReceiveMessageRequest = serde_json::from_value(data)?;
+
+            // Parse queue URL to get namespace and queue name
+            let mut path = request
+                .queue_url
+                .path_segments()
+                .ok_or_else(|| Error::NotFound)?;
+
+            let (queue_name, namespace_name) = path
+                .next_back()
+                .and_then(|queue_name| path.next_back().map(|ns_name| (queue_name, ns_name)))
+                .ok_or_else(|| Error::NotFound)?;
+
+            // Verify namespace access
+            let ns_id = service
+                .get_namespace_id(namespace_name, service.db())
+                .await?
+                .ok_or_else(|| Error::NotFound)?;
+
+            service
+                .check_user_access(&identity, ns_id, service.db())
+                .await?;
+
+            if namespace_name != namespace.0 {
+                return Err(Error::Unauthorized);
+            }
+
+            // Get messages from the queue
+            let messages = service
+                .sqs_recv_batch(
+                    namespace_name,
+                    queue_name,
+                    request.max_number_of_messages as u64,
+                    // request.visibility_timeout,
+                    // request.wait_time_seconds,
+                    // identity,
+                )
+                .await?
+                .into_iter()
+                .map(|msg| SqsMessage {
+                    message_id: msg.message_id.to_string(),
+                    md5_of_body: hex::encode(md5::compute(&msg.body).as_ref()),
+                    body: msg.body,
+                })
+                .collect();
+
+            Ok(actix_web::web::Json(SqsResponse::ReceiveMessage(
+                ReceiveMessageResponse { messages },
+            )))
+        }
         Method::DeleteMessage => {
-            todo!()
+            let request: types::DeleteMessageRequest = serde_json::from_value(data)?;
+
+            let mut path = request
+                .queue_url
+                .path_segments()
+                .ok_or_else(|| Error::NotFound)?;
+
+            let (queue_name, namespace_name) = path
+                .next_back()
+                .and_then(|queue_name| path.next_back().map(|ns_name| (queue_name, ns_name)))
+                .ok_or_else(|| Error::NotFound)?;
+
+            let ns_id = service
+                .get_namespace_id(namespace_name, service.db())
+                .await?
+                .ok_or_else(|| Error::NotFound)?;
+
+            service
+                .check_user_access(&identity, ns_id, service.db())
+                .await?;
+
+            if namespace_name != namespace.0 {
+                return Err(Error::Unauthorized);
+            }
+
+            let message_id =
+                request
+                    .receipt_handle
+                    .parse::<u64>()
+                    .map_err(|_| Error::InvalidParameter {
+                        parameter: "ReceiptHandle".to_string(),
+                    })?;
+
+            service
+                .delete_message(namespace_name, queue_name, message_id, identity)
+                .await?;
+
+            Ok(actix_web::web::Json(SqsResponse::DeleteMessage(
+                DeleteMessageResponse {},
+            )))
         }
         Method::ListQueues => {
             let request: types::ListQueuesRequest = serde_json::from_value(data)?;
@@ -488,7 +650,78 @@ pub async fn sqs_service(
                 CreateQueueResponse { queue_url: url },
             )))
         }
-        Method::GetQueueAttributes => todo!(),
-        Method::PurgeQueue => todo!(),
+        Method::GetQueueAttributes => {
+            let request: types::GetQueueAttributesRequest = serde_json::from_value(data)?;
+
+            let mut path = request
+                .queue_url
+                .path_segments()
+                .ok_or_else(|| Error::NotFound)?;
+
+            let (queue_name, namespace_name) = path
+                .next_back()
+                .and_then(|queue_name| path.next_back().map(|ns_name| (queue_name, ns_name)))
+                .ok_or_else(|| Error::NotFound)?;
+
+            let ns_id = service
+                .get_namespace_id(namespace_name, service.db())
+                .await?
+                .ok_or_else(|| Error::NotFound)?;
+
+            service
+                .check_user_access(&identity, ns_id, service.db())
+                .await?;
+
+            if namespace_name != namespace.0 {
+                return Err(Error::Unauthorized);
+            }
+
+            let attributes = service
+                .get_queue_attributes(
+                    namespace_name,
+                    queue_name,
+                    &request.attribute_names,
+                    identity,
+                )
+                .await?;
+
+            Ok(actix_web::web::Json(SqsResponse::GetQueueAttributes(
+                GetQueueAttributesResponse { attributes },
+            )))
+        }
+        Method::PurgeQueue => {
+            let request: types::PurgeQueueRequest = serde_json::from_value(data)?;
+
+            // Parse queue URL to get namespace and queue name
+            let mut path = request
+                .queue_url
+                .path_segments()
+                .ok_or_else(|| Error::NotFound)?;
+
+            let (queue_name, namespace_name) = path
+                .next_back()
+                .and_then(|queue_name| path.next_back().map(|ns_name| (queue_name, ns_name)))
+                .ok_or_else(|| Error::NotFound)?;
+
+            // Verify namespace access
+            let ns_id = service
+                .get_namespace_id(namespace_name, service.db())
+                .await?
+                .ok_or_else(|| Error::NotFound)?;
+
+            service
+                .check_user_access(&identity, ns_id, service.db())
+                .await?;
+
+            // Purge all messages from the queue
+            let success = service
+                .purge_queue(namespace_name, queue_name, identity)
+                .await
+                .is_ok();
+
+            Ok(actix_web::web::Json(SqsResponse::PurgeQueue(
+                PurgeQueueResponse { success },
+            )))
+        }
     }
 }

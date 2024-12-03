@@ -1,4 +1,7 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
 
 use actix_identity::Identity;
 use actix_web::web;
@@ -319,6 +322,7 @@ impl Service {
         &self,
         ns: &str,
         queue: &str,
+        names: &[String],
         identity: Identity,
     ) -> Result<HashMap<String, String>, Error> {
         let mut db = self.db().acquire().await?;
@@ -335,6 +339,8 @@ impl Service {
             .await?
             .ok_or(Error::NotFound)?;
 
+        let set = names.iter().collect::<HashSet<_>>();
+
         let res = sqlx::query_as(
             "
             SELECT k, v FROM queue_attributes WHERE queue = $1
@@ -344,7 +350,7 @@ impl Service {
         .fetch_all(&mut *db)
         .await?;
 
-        Ok(res.into_iter().collect())
+        Ok(res.into_iter().filter(|(k, _)| set.contains(k)).collect())
     }
 
     pub async fn get_queue_tags(
@@ -678,7 +684,7 @@ impl Service {
         &self,
         namespace: &str,
         queue: &str,
-        max_messages: usize,
+        max_messages: u64,
     ) -> Result<Vec<SqsMessage>, Error> {
         let mut tx = self.db().begin().await?;
 
@@ -958,6 +964,90 @@ impl Service {
         .collect::<HashMap<_, _>>();
 
         Ok(res)
+    }
+
+    pub async fn delete_message(
+        &self,
+        namespace: &str,
+        queue: &str,
+        message_id: u64,
+        identity: Identity,
+    ) -> Result<(), Error> {
+        let mut tx = self.db().begin().await?;
+
+        // Verify namespace exists and user has access
+        let namespace_id = self
+            .get_namespace_id(namespace, &mut tx)
+            .await?
+            .ok_or_else(|| Error::NotFound)?;
+
+        self.check_user_access(&identity, namespace_id, &mut tx)
+            .await?;
+
+        // Verify queue exists
+        let queue_id = self
+            .get_queue_id(namespace, queue, &mut tx)
+            .await?
+            .ok_or_else(|| Error::NotFound)?;
+
+        // Delete the message if it exists in this queue
+        let result = sqlx::query(
+            "
+            DELETE FROM messages
+            WHERE id = $1 AND queue = $2
+            ",
+        )
+        .bind(message_id as i64)
+        .bind(queue_id as i64)
+        .execute(&mut *tx)
+        .await?;
+
+        if result.rows_affected() == 0 {
+            return Err(Error::NotFound);
+        }
+
+        tx.commit().await?;
+
+        Ok(())
+    }
+
+    pub async fn purge_queue(
+        &self,
+        namespace: &str,
+        queue: &str,
+        identity: Identity,
+    ) -> Result<(), Error> {
+        let mut tx = self.db().begin().await?;
+
+        // Verify namespace exists and user has access
+        let namespace_id = self
+            .get_namespace_id(namespace, &mut tx)
+            .await?
+            .ok_or_else(|| Error::NotFound)?;
+
+        self.check_user_access(&identity, namespace_id, &mut tx)
+            .await?;
+
+        // Verify queue exists
+        let queue_id = self
+            .get_queue_id(namespace, queue, &mut tx)
+            .await?
+            .ok_or_else(|| Error::NotFound)?;
+
+        // Delete all messages from the queue
+        sqlx::query(
+            "
+            DELETE FROM messages
+            WHERE queue = $1
+            ",
+        )
+        .bind(queue_id as i64)
+        .execute(&mut *tx)
+        .await?;
+
+        tx.commit().await?;
+
+        Ok(())
     }
 
     pub async fn list_namespace_statistics(
