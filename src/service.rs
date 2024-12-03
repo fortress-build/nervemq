@@ -70,10 +70,7 @@ impl Service {
 
         let pool = SqlitePoolOptions::new().connect_with(opts).await?;
 
-        sqlx::migrate!("./migrations")
-            .run(&pool)
-            .await
-            .map_err(|e| eyre::eyre!(e))?;
+        sqlx::migrate!("./migrations").run(&pool).await?;
 
         let svc = Self {
             db: pool,

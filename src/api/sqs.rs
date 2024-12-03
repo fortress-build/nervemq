@@ -586,7 +586,7 @@ pub async fn sqs_service(
 
             for queue in queues {
                 urls.push(queue_url(
-                    service.config().host.clone(),
+                    service.config().host(),
                     &queue.name,
                     &namespace.0,
                 )?);
@@ -608,11 +608,7 @@ pub async fn sqs_service(
                 .check_user_access(&identity, namespace_id, service.db())
                 .await?;
 
-            let url = queue_url(
-                service.config().host.clone(),
-                &request.queue_name,
-                &namespace.0,
-            )?;
+            let url = queue_url(service.config().host(), &request.queue_name, &namespace.0)?;
 
             Ok(actix_web::web::Json(SqsResponse::GetQueueUrl(
                 GetQueueUrlResponse { queue_url: url },
@@ -640,11 +636,7 @@ pub async fn sqs_service(
                 )
                 .await?;
 
-            let url = queue_url(
-                service.config().host.clone(),
-                &request.queue_name,
-                &namespace.0,
-            )?;
+            let url = queue_url(service.config().host(), &request.queue_name, &namespace.0)?;
 
             Ok(actix_web::web::Json(SqsResponse::CreateQueue(
                 CreateQueueResponse { queue_url: url },
