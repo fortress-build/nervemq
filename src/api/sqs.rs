@@ -10,7 +10,7 @@ use actix_web::{
 use pom::utf8::{seq, sym};
 use url::Url;
 
-use crate::{auth::credential::AuthorizedNamespace, error::Error, queue::Queue};
+use crate::{auth::credential::AuthorizedNamespace, error::Error};
 
 const SQS_METHOD_PREFIX: &str = "AmazonSQS";
 
@@ -135,7 +135,7 @@ pub mod types {
         pub queue_url: Url,
         pub message_body: Vec<u8>,
         pub delay_seconds: Option<u64>,
-        pub message_attributes: HashMap<String, String>,
+        pub message_attributes: HashMap<String, SqsMessageAttribute>,
         pub message_deduplication_id: Option<String>,
         pub message_group_id: Option<String>,
     }
@@ -145,6 +145,8 @@ pub mod types {
     pub struct SendMessageResponse {
         pub message_id: u64,
         pub md5_of_message_body: String,
+        // pub md5_of_message_attributes: String,
+        // pub sequence_number: Option<String>,
     }
 
     #[derive(Debug, serde::Deserialize)]
@@ -237,21 +239,24 @@ pub mod types {
     #[derive(Debug, serde::Serialize, serde::Deserialize)]
     #[serde(rename_all = "PascalCase", tag = "DataType")]
     pub enum SqsMessageAttribute {
+        #[serde(rename_all = "PascalCase")]
         String { string_value: String },
-        Binary { binary_value: Vec<u8> },
+        #[serde(rename_all = "PascalCase")]
         Number { string_value: String },
+        #[serde(rename_all = "PascalCase")]
+        Binary { binary_value: Vec<u8> },
     }
 
     #[derive(Debug, serde::Serialize)]
     #[serde(rename_all = "PascalCase")]
     pub struct SqsMessage {
-        message_id: String,
-        receipt_handle: String,
-        md5_of_body: String,
-        body: String,
-        attributes: HashMap<String, String>,
-        md5_of_message_attributes: String,
-        message_attributes: HashMap<String, SqsMessageAttribute>,
+        pub message_id: String,
+        // pub receipt_handle: String,
+        pub md5_of_body: String,
+        pub body: Vec<u8>,
+        // pub attributes: HashMap<String, String>,
+        // pub md5_of_message_attributes: String,
+        // pub message_attributes: HashMap<String, SqsMessageAttribute>,
     }
 
     #[derive(Debug, serde::Serialize)]
@@ -374,7 +379,7 @@ pub async fn sqs_service(
 
             // FIXME: Implement delay_seconds and typed attributes
             let message_id = service
-                .send_message(queue_id, &request.message_body, request.message_attributes)
+                .sqs_send(queue_id, &request.message_body, request.message_attributes)
                 .await?;
 
             let digest = hex::encode(md5::compute(&request.message_body).as_ref());
@@ -464,7 +469,13 @@ pub async fn sqs_service(
                 .await?;
 
             service
-                .create_queue(&namespace.0, &request.queue_name, identity)
+                .create_queue(
+                    &namespace.0,
+                    &request.queue_name,
+                    request.attributes,
+                    request.tags,
+                    identity,
+                )
                 .await?;
 
             let url = queue_url(
