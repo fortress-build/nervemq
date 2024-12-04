@@ -7,8 +7,19 @@ import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
 import { listMessages } from "@/actions/api";
 import { Filter, Check } from "lucide-react";
-import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
-import { Command, CommandInput, CommandItem, CommandList, CommandEmpty, CommandGroup } from "@/components/ui/command";
+import {
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandInput,
+  CommandItem,
+  CommandList,
+  CommandEmpty,
+  CommandGroup,
+} from "@/components/ui/command";
 import React from "react";
 
 export type MessageObject = {
@@ -25,7 +36,7 @@ export type MessageObject = {
 function MessageDetails({ message }: { message: MessageObject }) {
   return (
     <div className="p-6 space-y-4 bg-gray-50">
-      <h3 className="font-semibold text-gray-700 mb-2">Message Details</h3>      
+      <h3 className="font-semibold text-gray-700 mb-2">Message Details</h3>
       {/* Message Body Section */}
       <div className="bg-white p-4 rounded-lg border border-gray-200">
         <span className="text-xs uppercase text-gray-400">Message Body</span>
@@ -35,7 +46,6 @@ function MessageDetails({ message }: { message: MessageObject }) {
       </div>
 
       {/* Existing Key-Value Pairs Section */}
-      {Object.entries(message.kv).length === 0 ? (
       {Object.entries(message.message_attributes).length === 0 ? (
         <div className="bg-white p-4 rounded-lg border border-gray-200 text-gray-500 text-sm">
           No message details available
@@ -123,12 +133,16 @@ const columns: ColumnDef<MessageObject>[] = [
                         key={status}
                         value={status}
                         onSelect={(value) => {
-                          column.setFilterValue(value === selectedStatus ? undefined : value);
+                          column.setFilterValue(
+                            value === selectedStatus ? undefined : value,
+                          );
                         }}
                       >
                         <Check
                           className={`mr-2 h-4 w-4 ${
-                            selectedStatus === status ? "opacity-100" : "opacity-0"
+                            selectedStatus === status
+                              ? "opacity-100"
+                              : "opacity-0"
                           }`}
                         />
                         {status}
@@ -157,9 +171,9 @@ export default function MessageList({
   namespace: string;
 }) {
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
-    []
+    [],
   );
-  
+
   const { data = [] } = useQuery({
     queryKey: ["queue-messages", { queue, namespace }],
     queryFn: () =>
