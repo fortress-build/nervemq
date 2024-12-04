@@ -12,6 +12,10 @@ use tokio_util::{
 use types::{
     create_queue::{CreateQueueRequest, CreateQueueResponse},
     delete_message::{DeleteMessageRequest, DeleteMessageResponse},
+    // delete_message_batch::{
+    //     DeleteMessageBatchRequest, DeleteMessageBatchResponse, DeleteMessageBatchResultError,
+    //     DeleteMessageBatchResultSuccess,
+    // },
     delete_queue::{DeleteQueueRequest, DeleteQueueResponse},
     get_queue_attributes::{GetQueueAttributesRequest, GetQueueAttributesResponse},
     get_queue_url::{GetQueueUrlRequest, GetQueueUrlResponse},
@@ -23,7 +27,7 @@ use types::{
         SendMessageBatchRequest, SendMessageBatchResponse, SendMessageBatchResultEntry,
         SendMessageBatchResultErrorEntry,
     },
-    SqsMessage, SqsResponse,
+    SqsResponse,
 };
 use url::Url;
 
@@ -232,14 +236,7 @@ async fn receive_message(
             queue_name,
             request.max_number_of_messages as u64,
         )
-        .await?
-        .into_iter()
-        .map(|msg| SqsMessage {
-            message_id: msg.message_id.to_string(),
-            md5_of_body: hex::encode(md5::compute(&msg.body).as_ref()),
-            body: msg.body,
-        })
-        .collect();
+        .await?;
 
     Ok(ReceiveMessageResponse { messages })
 }
@@ -291,6 +288,73 @@ async fn delete_message(
 
     Ok(DeleteMessageResponse {})
 }
+
+// // FIXME: Finish implementing this
+//
+// async fn delete_message_batch(
+//     service: Data<crate::service::Service>,
+//     identity: Identity,
+//     namespace: AuthorizedNamespace,
+//     mut stream: Stream<DeleteMessageBatchRequest>,
+// ) -> Result<DeleteMessageBatchResponse, Error> {
+//     let request = stream
+//         .next()
+//         .await
+//         .transpose()
+//         .map_err(|e| Error::internal(e))?
+//         .ok_or_else(|| Error::missing_parameter("missing request body"))?;
+//
+//     let mut path = request
+//         .queue_url
+//         .path_segments()
+//         .ok_or_else(|| Error::missing_parameter("queue name"))?;
+//
+//     let (queue_name, namespace_name) = path
+//         .next_back()
+//         .and_then(|queue_name| path.next_back().map(|ns_name| (queue_name, ns_name)))
+//         .ok_or_else(|| Error::missing_parameter("namespace name"))?;
+//
+//     let ns_id = service
+//         .get_namespace_id(namespace_name, service.db())
+//         .await?
+//         .ok_or_else(|| Error::namespace_not_found(namespace_name))?;
+//
+//     service
+//         .check_user_access(&identity, ns_id, service.db())
+//         .await?;
+//
+//     if namespace_name != namespace.0 {
+//         return Err(Error::Unauthorized);
+//     }
+//
+//     let message_id = request
+//         .receipt_handle
+//         .parse::<u64>()
+//         .map_err(|e| Error::invalid_parameter(format!("ReceiptHandle: {e}")))?;
+//
+//     let (successful, failed) = service
+//         .delete_message_batch(namespace_name, queue_name, message_id, identity)
+//         .await
+//         .map(|(successful, failed)| {
+//             (
+//                 successful
+//                     .into_iter()
+//                     .map(|id| DeleteMessageBatchResultSuccess { id: id.to_string() })
+//                     .collect(),
+//                 failed
+//                     .into_iter()
+//                     .map(|(id, err)| DeleteMessageBatchResultError {
+//                         id: id.to_string(),
+//                         code: "InternalError".to_string(),
+//                         message: err.to_string(),
+//                         sender_fault: true,
+//                     })
+//                     .collect(),
+//             )
+//         })?;
+//
+//     Ok(DeleteMessageBatchResponse { failed, successful })
+// }
 
 async fn list_queues(
     service: Data<crate::service::Service>,
@@ -662,6 +726,8 @@ pub async fn sqs_service(
     let stream = FramedRead::new(stream, BytesCodec::new());
 
     let res = match method {
+        Method::DeleteMessageBatch => todo!(),
+        Method::SetQueueAttributes => todo!(),
         Method::TagQueue => {
             let res = tag_queue(
                 service,

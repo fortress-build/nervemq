@@ -257,6 +257,61 @@ pub mod untag_queue {
     pub struct UntagQueueResponse {}
 }
 
+pub mod set_queue_attributes {
+    use super::*;
+
+    #[derive(Debug, serde::Deserialize)]
+    #[serde(rename_all = "PascalCase")]
+    pub struct SetQueueAttributesRequest {
+        pub queue_url: Url,
+        pub attributes: HashMap<String, String>,
+    }
+
+    #[derive(Debug, serde::Serialize)]
+    #[serde(rename_all = "PascalCase")]
+    pub struct SetQueueAttributesResponse {}
+}
+
+pub mod delete_message_batch {
+    use super::*;
+
+    #[derive(Debug, serde::Deserialize)]
+    #[serde(rename_all = "PascalCase")]
+    pub struct DeleteMessageBatchRequestEntry {
+        pub id: String,
+        pub receipt_handle: String,
+    }
+
+    #[derive(Debug, serde::Deserialize)]
+    #[serde(rename_all = "PascalCase")]
+    pub struct DeleteMessageBatchRequest {
+        pub queue_url: Url,
+        pub entries: Vec<DeleteMessageBatchRequestEntry>,
+    }
+
+    #[derive(Debug, serde::Serialize)]
+    #[serde(rename_all = "PascalCase")]
+    pub struct DeleteMessageBatchResultSuccess {
+        pub id: String,
+    }
+
+    #[derive(Debug, serde::Serialize)]
+    #[serde(rename_all = "PascalCase")]
+    pub struct DeleteMessageBatchResultError {
+        pub code: String,
+        pub id: String,
+        pub message: String,
+        pub sender_fault: bool,
+    }
+
+    #[derive(Debug, serde::Serialize)]
+    #[serde(rename_all = "PascalCase")]
+    pub struct DeleteMessageBatchResponse {
+        pub failed: Vec<DeleteMessageBatchResultError>,
+        pub successful: Vec<DeleteMessageBatchResultSuccess>,
+    }
+}
+
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "PascalCase", tag = "DataType")]
 pub enum SqsMessageAttribute {
@@ -272,8 +327,14 @@ pub enum SqsMessageAttribute {
 #[serde(rename_all = "PascalCase")]
 pub struct SqsMessage {
     pub message_id: String,
+    pub receipt_handle: String,
+
     pub md5_of_body: String,
     pub body: String,
+
+    pub attributes: HashMap<String, String>,
+
+    pub message_attributes: HashMap<String, SqsMessageAttribute>,
 }
 
 #[derive(Debug, serde::Serialize)]
