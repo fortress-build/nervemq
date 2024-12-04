@@ -82,19 +82,22 @@ pub async fn authenticate_sigv4(
         let mut payload = fork_request_payload(&mut original_payload);
 
         req.set_payload(original_payload);
-        //
-        // let mut bytes = Vec::new();
-        // while let Some(chunk) = payload
-        //     .next()
-        //     .await
-        //     .transpose()
-        //     .map_err(|e| Error::internal(e))?
-        // {
-        //     if chunk.is_empty() {
-        //         break;
-        //     }
-        //     bytes.extend_from_slice(&chunk);
-        // }
+
+        let mut bytes = Vec::new();
+        while let Some(chunk) = payload
+            .next()
+            .await
+            .transpose()
+            // temporary
+            .ok()
+            .flatten()
+        // .map_err(|e| Error::internal(e))?
+        {
+            if chunk.is_empty() {
+                break;
+            }
+            bytes.extend_from_slice(&chunk);
+        }
 
         sha256_hex(&[])
     };
