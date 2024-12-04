@@ -341,6 +341,45 @@ impl Service {
         Ok(())
     }
 
+    pub async fn set_queue_attributes(
+        &self,
+        ns: &str,
+        queue: &str,
+        attributes: HashMap<String, String>,
+        identity: Identity,
+    ) -> Result<(), Error> {
+        let mut db = self.db().acquire().await?;
+
+        let ns_id = self
+            .get_namespace_id(ns, &mut *db)
+            .await?
+            .ok_or(Error::namespace_not_found(ns))?;
+
+        self.check_user_access(&identity, ns_id, &mut *db).await?;
+
+        let queue_id = self
+            .get_queue_id(ns, queue, &mut *db)
+            .await?
+            .ok_or(Error::queue_not_found(queue, ns))?;
+
+        for (k, v) in attributes.into_iter() {
+            sqlx::query(
+                "
+                INSERT INTO queue_attributes (queue, k, v)
+                VALUES ($1, $2, $3)
+                ON CONFLICT (queue, k) DO UPDATE SET v = $3
+                ",
+            )
+            .bind(queue_id as i64)
+            .bind(k)
+            .bind(v)
+            .execute(&mut *db)
+            .await?;
+        }
+
+        Ok(())
+    }
+
     pub async fn get_queue_attributes(
         &self,
         ns: &str,
