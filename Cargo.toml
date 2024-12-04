@@ -34,7 +34,6 @@ actix-web = { version = "4.9.0", features = [
   "macros",
   "secure-cookies",
 ] }
-actix-web-lab = "0.23.0"
 anyhow = "1.0.93"
 argon2 = { version = "0.5.3", features = ["simple", "std", "zeroize"] }
 base64 = "0.22.1"
