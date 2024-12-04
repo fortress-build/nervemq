@@ -5,6 +5,7 @@ use std::{
 
 use actix_identity::Identity;
 use actix_web::web;
+use base64::Engine;
 use secrecy::SecretString;
 use serde::{Deserialize, Serialize};
 use serde_email::Email;
@@ -23,7 +24,7 @@ use crate::{
     auth::crypto::hash_secret,
     config::Config,
     error::Error,
-    message::Message,
+    message::{Message, MessageStatus},
     namespace::{Namespace, NamespaceStatistics},
     queue::{Queue, QueueStatistics},
     sqs::types::{SqsMessage, SqsMessageAttribute},
@@ -184,6 +185,22 @@ pub struct QueueConfig {
     pub queue: u64,
     pub max_retries: u64,
     pub dead_letter_queue: Option<u64>,
+}
+
+/// Represents the details of a message for display in the UI.
+#[derive(Debug, Serialize)]
+pub struct MessageDetails {
+    pub id: u64,
+    pub queue: String,
+
+    pub delivered_at: Option<u64>,
+    pub sent_by: Option<u64>,
+    pub body: String,
+    pub tries: u64,
+
+    pub status: MessageStatus,
+
+    pub message_attributes: HashMap<String, serde_json::Value>,
 }
 
 #[derive(Clone)]
@@ -1032,7 +1049,7 @@ impl Service {
             sqlx::query("INSERT INTO kv_pairs (message, k, v) VALUES ($1, $2, $3)")
                 .bind(msg_id as i64)
                 .bind(k)
-                .bind(bincode::serialize(&v).map_err(Error::internal)?)
+                .bind(serde_json::to_vec(&v).map_err(Error::internal)?)
                 .execute(&mut *tx)
                 .await?;
         }
@@ -1079,7 +1096,7 @@ impl Service {
                 sqlx::query("INSERT INTO kv_pairs (message, k, v) VALUES ($1, $2, $3)")
                     .bind(msg_id as i64)
                     .bind(k)
-                    .bind(bincode::serialize(&v).map_err(Error::internal)?)
+                    .bind(serde_json::to_vec(&v).map_err(Error::internal)?)
                     .execute(&mut *tx)
                     .await?;
             }
@@ -1147,7 +1164,7 @@ impl Service {
             .fetch(&mut *tx);
 
             while let Some((k, v)) = kv.next().await.transpose()? {
-                let v: SqsMessageAttribute = bincode::deserialize(&v).map_err(Error::internal)?;
+                let v: SqsMessageAttribute = serde_json::from_slice(&v).map_err(Error::internal)?;
                 message_attributes.insert(k, v);
             }
 
@@ -1241,7 +1258,15 @@ impl Service {
             .fetch(self.db());
 
             while let Some((k, v)) = kv.next().await.transpose()? {
-                let v: SqsMessageAttribute = bincode::deserialize(&v).map_err(Error::internal)?;
+                let Ok(v) = serde_json::from_slice::<SqsMessageAttribute>(&v) else {
+                    tracing::warn!(
+                        attribute = k,
+                        message = message.id,
+                        "Failed to deserialize message attribute",
+                    );
+
+                    continue;
+                };
                 message_attributes.insert(k, v);
             }
 
@@ -1319,7 +1344,11 @@ impl Service {
     //     Ok(Some(msg))
     // }
 
-    pub async fn list_messages(&self, namespace: &str, queue: &str) -> Result<Vec<Message>, Error> {
+    pub async fn list_messages(
+        &self,
+        namespace: &str,
+        queue: &str,
+    ) -> Result<Vec<MessageDetails>, Error> {
         let mut db = self.db().acquire().await?;
 
         let mut messages = sqlx::query_as::<_, Message>(
@@ -1343,25 +1372,73 @@ impl Service {
         .fetch(&mut *db);
 
         let mut join_set = JoinSet::new();
-        while let Some(mut message) = messages.next().await.transpose()? {
+        while let Some(message) = messages.next().await.transpose()? {
             let db = self.db().clone();
             join_set.spawn_local(async move {
                 let mut conn = db.acquire().await?;
-                let mut kv_pairs = sqlx::query_as::<_, (String, Vec<u8>)>(
+                // let mut kv_pairs = sqlx::query_as::<_, (String, Vec<u8>)>(
+                //     "
+                //     SELECT k, v FROM kv_pairs WHERE message = $1
+                // ",
+                // )
+                // .bind(message.id as i64)
+                // .fetch(&mut *conn);
+                //
+                // while let Some((k, v)) = kv_pairs.next().await.transpose()? {
+                //     message
+                //         .kv
+                //         .insert(k, bincode::deserialize(&v).map_err(Error::internal)?);
+                // }
+
+                let mut message_attributes = HashMap::new();
+                let mut kv = sqlx::query_as::<_, (String, Vec<u8>)>(
                     "
                     SELECT k, v FROM kv_pairs WHERE message = $1
-                ",
+                    ",
                 )
                 .bind(message.id as i64)
                 .fetch(&mut *conn);
 
-                while let Some((k, v)) = kv_pairs.next().await.transpose()? {
-                    message
-                        .kv
-                        .insert(k, bincode::deserialize(&v).map_err(Error::internal)?);
+                while let Some((k, v)) = kv.next().await.transpose()? {
+                    let attr = match serde_json::from_slice(&v) {
+                        Ok(attr) => attr,
+                        Err(e) => {
+                            tracing::warn!(
+                                attribute = k,
+                                message = message.id,
+                                "Failed to deserialize message attribute: {e}",
+                            );
+
+                            continue;
+                        }
+                    };
+                    let value = match attr {
+                        SqsMessageAttribute::String { string_value: s } => {
+                            serde_json::Value::String(s)
+                        }
+                        SqsMessageAttribute::Number { string_value: s } => {
+                            serde_json::Value::Number(s.parse().map_err(Error::internal)?)
+                        }
+                        SqsMessageAttribute::Binary { binary_value: b } => {
+                            serde_json::Value::String(base64::prelude::BASE64_STANDARD.encode(b))
+                        }
+                    };
+                    message_attributes.insert(k, value);
                 }
 
-                Result::<_, Error>::Ok(message)
+                let sqs_message = MessageDetails {
+                    id: message.id,
+                    queue: message.queue,
+                    status: message.status,
+                    sent_by: message.sent_by,
+                    delivered_at: message.delivered_at,
+                    tries: message.tries,
+                    body: message.body,
+
+                    message_attributes,
+                };
+
+                Result::<_, Error>::Ok(sqs_message)
             });
         }
 

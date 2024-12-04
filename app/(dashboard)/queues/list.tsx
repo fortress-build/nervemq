@@ -14,20 +14,21 @@ export type MessageObject = {
   tries: number;
   delivered_at: number;
   status: "pending" | "delivered" | "failed";
-  kv: Map<string, string>;
+
+  message_attributes: Map<string, string | number>;
 };
 
 function MessageDetails({ message }: { message: MessageObject }) {
   return (
     <div className="p-6 space-y-4 bg-gray-50">
       <h3 className="font-semibold text-gray-700 mb-2">Message Details</h3>
-      {Object.entries(message.kv).length === 0 ? (
+      {Object.entries(message.message_attributes).length === 0 ? (
         <div className="bg-white p-4 rounded-lg border border-gray-200 text-gray-500 text-sm">
           No message details available
         </div>
       ) : (
         <div className="grid gap-3">
-          {Object.entries(message.kv)?.map(([k, v], index) => (
+          {Object.entries(message.message_attributes)?.map(([k, v], index) => (
             <div
               key={`message-${index.toString()}`}
               className="bg-white p-4 rounded-lg border border-gray-200"
