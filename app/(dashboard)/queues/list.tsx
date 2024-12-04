@@ -109,6 +109,21 @@ const columns: ColumnDef<MessageObject>[] = [
   },
   {
     accessorKey: "status",
+    cell: ({ row }) => {
+      return (
+        <span
+          className={`px-3 py-1 rounded-full text-sm ${
+            row.original.status === "delivered"
+              ? "bg-green-100 text-green-800"
+              : row.original.status === "failed"
+                ? "bg-red-100 text-red-800"
+                : "bg-yellow-100 text-yellow-800"
+          }`}
+        >
+          {row.original.status}
+        </span>
+      );
+    },
     header: ({ column }) => {
       const selectedStatus = column.getFilterValue() as string;
       const statuses = ["delivered", "failed", "pending"];
