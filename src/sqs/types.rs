@@ -211,6 +211,52 @@ pub mod send_message_batch {
     }
 }
 
+pub mod list_queue_tags {
+    use super::*;
+
+    #[derive(Debug, serde::Deserialize)]
+    #[serde(rename_all = "PascalCase")]
+    pub struct ListQueueTagsRequest {
+        pub queue_url: Url,
+    }
+
+    #[derive(Debug, serde::Serialize)]
+    #[serde(rename_all = "PascalCase")]
+    pub struct ListQueueTagsResponse {
+        pub tags: HashMap<String, String>,
+    }
+}
+
+pub mod tag_queue {
+    use super::*;
+
+    #[derive(Debug, serde::Deserialize)]
+    #[serde(rename_all = "PascalCase")]
+    pub struct TagQueueRequest {
+        pub queue_url: Url,
+        pub tags: HashMap<String, String>,
+    }
+
+    #[derive(Debug, serde::Serialize)]
+    #[serde(rename_all = "PascalCase")]
+    pub struct TagQueueResponse {}
+}
+
+pub mod untag_queue {
+    use super::*;
+
+    #[derive(Debug, serde::Deserialize)]
+    #[serde(rename_all = "PascalCase")]
+    pub struct UntagQueueRequest {
+        pub queue_url: Url,
+        pub tag_keys: Vec<String>,
+    }
+
+    #[derive(Debug, serde::Serialize)]
+    #[serde(rename_all = "PascalCase")]
+    pub struct UntagQueueResponse {}
+}
+
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "PascalCase", tag = "DataType")]
 pub enum SqsMessageAttribute {
@@ -239,7 +285,11 @@ pub enum SqsResponse {
     ListQueues(list_queues::ListQueuesResponse),
     DeleteMessage(delete_message::DeleteMessageResponse),
     PurgeQueue(purge_queue::PurgeQueueResponse),
+    DeleteQueue(delete_queue::DeleteQueueResponse),
     GetQueueAttributes(get_queue_attributes::GetQueueAttributesResponse),
     ReceiveMessage(receive_message::ReceiveMessageResponse),
     SendMessageBatch(send_message_batch::SendMessageBatchResponse),
+    ListQueueTags(list_queue_tags::ListQueueTagsResponse),
+    TagQueue(tag_queue::TagQueueResponse),
+    UntagQueue(untag_queue::UntagQueueResponse),
 }

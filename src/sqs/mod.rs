@@ -12,6 +12,7 @@ use tokio_util::{
 use types::{
     create_queue::{CreateQueueRequest, CreateQueueResponse},
     delete_message::{DeleteMessageRequest, DeleteMessageResponse},
+    delete_queue::{DeleteQueueRequest, DeleteQueueResponse},
     get_queue_attributes::{GetQueueAttributesRequest, GetQueueAttributesResponse},
     get_queue_url::{GetQueueUrlRequest, GetQueueUrlResponse},
     list_queues::{ListQueuesRequest, ListQueuesResponse},
@@ -495,6 +496,156 @@ async fn purge_queue(
     Ok(PurgeQueueResponse { success })
 }
 
+async fn delete_queue(
+    service: Data<crate::service::Service>,
+    identity: Identity,
+    _namespace: AuthorizedNamespace,
+    mut stream: Stream<DeleteQueueRequest>,
+) -> Result<DeleteQueueResponse, Error> {
+    let request = stream
+        .next()
+        .await
+        .transpose()
+        .map_err(|e| Error::internal(e))?
+        .ok_or_else(|| Error::missing_parameter("missing request body"))?;
+
+    let mut path = request
+        .queue_url
+        .path_segments()
+        .ok_or_else(|| Error::missing_parameter("queue name"))?;
+
+    let (queue_name, namespace_name) = path
+        .next_back()
+        .and_then(|queue_name| path.next_back().map(|ns_name| (queue_name, ns_name)))
+        .ok_or_else(|| Error::missing_parameter("namespace name"))?;
+
+    let ns_id = service
+        .get_namespace_id(namespace_name, service.db())
+        .await?
+        .ok_or_else(|| Error::namespace_not_found(namespace_name))?;
+
+    service
+        .check_user_access(&identity, ns_id, service.db())
+        .await?;
+
+    service
+        .delete_queue(namespace_name, queue_name, identity)
+        .await?;
+
+    Ok(DeleteQueueResponse {})
+}
+
+async fn list_queue_tags(
+    service: Data<crate::service::Service>,
+    identity: Identity,
+    namespace: AuthorizedNamespace,
+    mut stream: Stream<types::list_queue_tags::ListQueueTagsRequest>,
+) -> Result<types::list_queue_tags::ListQueueTagsResponse, Error> {
+    let request = stream
+        .next()
+        .await
+        .transpose()
+        .map_err(|e| Error::internal(e))?
+        .ok_or_else(|| Error::missing_parameter("missing request body"))?;
+
+    let mut path = request
+        .queue_url
+        .path_segments()
+        .ok_or_else(|| Error::missing_parameter("queue name"))?;
+
+    let (queue_name, namespace_name) = path
+        .next_back()
+        .and_then(|queue_name| path.next_back().map(|ns_name| (queue_name, ns_name)))
+        .ok_or_else(|| Error::missing_parameter("namespace name"))?;
+
+    let ns_id = service
+        .get_namespace_id(namespace_name, service.db())
+        .await?
+        .ok_or_else(|| Error::namespace_not_found(namespace_name))?;
+
+    service
+        .check_user_access(&identity, ns_id, service.db())
+        .await?;
+
+    if namespace_name != namespace.0 {
+        return Err(Error::Unauthorized);
+    }
+
+    let tags = service
+        .get_queue_tags(namespace_name, queue_name, identity)
+        .await?;
+
+    Ok(types::list_queue_tags::ListQueueTagsResponse { tags })
+}
+
+async fn tag_queue(
+    service: Data<crate::service::Service>,
+    identity: Identity,
+    namespace: AuthorizedNamespace,
+    mut stream: Stream<types::tag_queue::TagQueueRequest>,
+) -> Result<types::tag_queue::TagQueueResponse, Error> {
+    let request = stream
+        .next()
+        .await
+        .transpose()
+        .map_err(|e| Error::internal(e))?
+        .ok_or_else(|| Error::missing_parameter("missing request body"))?;
+
+    let mut path = request
+        .queue_url
+        .path_segments()
+        .ok_or_else(|| Error::missing_parameter("queue name"))?;
+
+    let (queue_name, namespace_name) = path
+        .next_back()
+        .and_then(|queue_name| path.next_back().map(|ns_name| (queue_name, ns_name)))
+        .ok_or_else(|| Error::missing_parameter("namespace name"))?;
+
+    if namespace_name != namespace.0 {
+        return Err(Error::Unauthorized);
+    }
+
+    service
+        .tag_queue(namespace_name, queue_name, request.tags, identity)
+        .await?;
+
+    Ok(types::tag_queue::TagQueueResponse {})
+}
+
+async fn untag_queue(
+    service: Data<crate::service::Service>,
+    identity: Identity,
+    namespace: AuthorizedNamespace,
+    mut stream: Stream<types::untag_queue::UntagQueueRequest>,
+) -> Result<types::untag_queue::UntagQueueResponse, Error> {
+    let request = stream
+        .next()
+        .await
+        .transpose()
+        .map_err(|e| Error::internal(e))?
+        .ok_or_else(|| Error::missing_parameter("missing request body"))?;
+
+    let mut path = request
+        .queue_url
+        .path_segments()
+        .ok_or_else(|| Error::missing_parameter("queue name"))?;
+
+    let (queue_name, namespace_name) = path
+        .next_back()
+        .and_then(|queue_name| path.next_back().map(|ns_name| (queue_name, ns_name)))
+        .ok_or_else(|| Error::missing_parameter("namespace name"))?;
+
+    if namespace_name != namespace.0 {
+        return Err(Error::Unauthorized);
+    }
+
+    service
+        .untag_queue(namespace_name, queue_name, request.tag_keys, identity)
+        .await?;
+
+    Ok(types::untag_queue::UntagQueueResponse {})
+}
+
 #[post("")]
 pub async fn sqs_service(
     service: Data<crate::service::Service>,
@@ -511,10 +662,47 @@ pub async fn sqs_service(
     let stream = FramedRead::new(stream, BytesCodec::new());
 
     let res = match method {
-        Method::TagQueue => todo!(),
-        Method::UntagQueue => todo!(),
-        Method::ListQueueTags => todo!(),
-        Method::DeleteQueue => todo!(),
+        Method::TagQueue => {
+            let res = tag_queue(
+                service,
+                identity,
+                namespace,
+                Framed::new(stream, SymmetricalJson::default()),
+            )
+            .await?;
+            SqsResponse::TagQueue(res)
+        }
+        Method::UntagQueue => {
+            let res = untag_queue(
+                service,
+                identity,
+                namespace,
+                Framed::new(stream, SymmetricalJson::default()),
+            )
+            .await?;
+            SqsResponse::UntagQueue(res)
+        }
+        Method::ListQueueTags => {
+            let res = list_queue_tags(
+                service,
+                identity,
+                namespace,
+                Framed::new(stream, SymmetricalJson::default()),
+            )
+            .await?;
+
+            SqsResponse::ListQueueTags(res)
+        }
+        Method::DeleteQueue => {
+            let res = delete_queue(
+                service,
+                identity,
+                namespace,
+                Framed::new(stream, SymmetricalJson::default()),
+            )
+            .await?;
+            SqsResponse::DeleteQueue(res)
+        }
         Method::SendMessage => {
             let res = send_message(
                 service,

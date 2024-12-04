@@ -376,6 +376,79 @@ impl Service {
         Ok(res.into_iter().filter(|(k, _)| set.contains(k)).collect())
     }
 
+    pub async fn tag_queue(
+        &self,
+        ns: &str,
+        queue: &str,
+        tags: HashMap<String, String>,
+        identity: Identity,
+    ) -> Result<(), Error> {
+        let mut db = self.db().acquire().await?;
+        let ns_id = self
+            .get_namespace_id(ns, &mut *db)
+            .await?
+            .ok_or(Error::namespace_not_found(ns))?;
+
+        self.check_user_access(&identity, ns_id, &mut *db).await?;
+
+        let queue_id = self
+            .get_queue_id(ns, queue, &mut *db)
+            .await?
+            .ok_or(Error::queue_not_found(queue, ns))?;
+
+        for (k, v) in tags.into_iter() {
+            sqlx::query(
+                "
+                INSERT INTO queue_tags (queue, k, v)
+                VALUES ($1, $2, $3)
+                ON CONFLICT (queue, k) DO UPDATE SET v
+                ",
+            )
+            .bind(queue_id as i64)
+            .bind(k)
+            .bind(v)
+            .execute(&mut *db)
+            .await?;
+        }
+
+        Ok(())
+    }
+
+    pub async fn untag_queue(
+        &self,
+        ns: &str,
+        queue: &str,
+        tags: Vec<String>,
+        identity: Identity,
+    ) -> Result<(), Error> {
+        let mut db = self.db().acquire().await?;
+        let ns_id = self
+            .get_namespace_id(ns, &mut *db)
+            .await?
+            .ok_or(Error::namespace_not_found(ns))?;
+
+        self.check_user_access(&identity, ns_id, &mut *db).await?;
+
+        let queue_id = self
+            .get_queue_id(ns, queue, &mut *db)
+            .await?
+            .ok_or(Error::queue_not_found(queue, ns))?;
+
+        for tag in tags {
+            sqlx::query(
+                "
+                DELETE FROM queue_tags WHERE queue = $1 AND k = $2
+                ",
+            )
+            .bind(queue_id as i64)
+            .bind(tag)
+            .execute(&mut *db)
+            .await?;
+        }
+
+        Ok(())
+    }
+
     pub async fn get_queue_tags(
         &self,
         ns: &str,
