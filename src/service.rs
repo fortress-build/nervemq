@@ -19,16 +19,14 @@ use tokio::task::JoinSet;
 use tokio_stream::StreamExt as _;
 
 use crate::{
-    api::{
-        auth::{Permission, Role, User},
-        sqs::types::{SqsMessage, SqsMessageAttribute},
-    },
+    api::auth::{Permission, Role, User},
     auth::crypto::hash_secret,
     config::Config,
     error::Error,
     message::Message,
     namespace::{Namespace, NamespaceStatistics},
     queue::{Queue, QueueStatistics},
+    sqs::types::{SqsMessage, SqsMessageAttribute},
 };
 
 #[derive(Debug, Serialize, Deserialize, FromRow)]

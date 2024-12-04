@@ -6,3 +6,5 @@ pub mod message;
 pub mod namespace;
 pub mod queue;
 pub mod service;
+pub mod sqs;
+pub mod utils;
