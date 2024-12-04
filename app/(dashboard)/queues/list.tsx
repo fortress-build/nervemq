@@ -65,7 +65,7 @@ const columns: ColumnDef<MessageObject>[] = [
       return (
         <Button
           onClick={() => row.toggleExpanded()}
-          className="p-2 hover:bg-gray-100 rounded bg-transparent"
+          className="p-2 hover:bg-gray-100 rounded bg-transparent w-10"
           variant="ghost"
         >
           {row.getIsExpanded() ? (
@@ -76,7 +76,11 @@ const columns: ColumnDef<MessageObject>[] = [
         </Button>
       );
     },
+    enableResizing: false,
+    enableHiding: false,
     size: 40,
+    minSize: 40,
+    maxSize: 40,
   },
   {
     accessorKey: "id",

@@ -94,13 +94,16 @@ export function DataTable<TData, TValue>({
 
   return (
     <div className={cn("rounded-md border", className)}>
-      <Table>
+      <Table className="table-fixed w-full">
         <TableHeader>
           {table.getHeaderGroups().map((headerGroup) => (
             <TableRow key={headerGroup.id}>
               {headerGroup.headers.map((header) => {
                 return (
-                  <TableHead key={header.id}>
+                  <TableHead 
+                    key={header.id}
+                    style={{ width: header.getSize() }}
+                  >
                     {header.isPlaceholder
                       ? null
                       : flexRender(
