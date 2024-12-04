@@ -40,33 +40,50 @@ pub struct RedrivePolicy {
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct QueueAttributes {
-    delay_seconds: Option<u64>,
-    max_message_size: Option<u64>,
-    message_retention_period: Option<u64>,
-    receive_message_wait_time_seconds: Option<u64>,
-    visibility_timeout: Option<u64>,
+    pub delay_seconds: Option<u64>,
+    pub max_message_size: Option<u64>,
+    pub message_retention_period: Option<u64>,
+    pub receive_message_wait_time_seconds: Option<u64>,
+    pub visibility_timeout: Option<u64>,
 
     // TODO: RedrivePolicy, RedriveAllowPolicy
-    redrive_policy: Option<RedrivePolicy /* Must be JSON serialized to a string */>,
+    pub redrive_policy: Option<RedrivePolicy /* Must be JSON serialized to a string */>,
 
     #[serde(flatten)]
-    other: HashMap<String, String>,
+    pub other: HashMap<String, serde_json::Value>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct QueueAttributesSer {
-    delay_seconds: Option<u64>,
-    max_message_size: Option<u64>,
-    message_retention_period: Option<u64>,
-    receive_message_wait_time_seconds: Option<u64>,
-    visibility_timeout: Option<u64>,
+    pub delay_seconds: Option<u64>,
+    pub max_message_size: Option<u64>,
+    pub message_retention_period: Option<u64>,
+    pub receive_message_wait_time_seconds: Option<u64>,
+    pub visibility_timeout: Option<u64>,
 
     // TODO: RedrivePolicy, RedriveAllowPolicy
-    redrive_policy: Option<String /* Must be JSON serialized to a string */>,
+    pub redrive_policy: Option<String /* Must be JSON serialized to a string */>,
 
     #[serde(flatten)]
-    other: HashMap<String, String>,
+    pub other: HashMap<String, serde_json::Value>,
+}
+
+impl QueueAttributesSer {
+    pub fn deser(self) -> Result<QueueAttributes, Error> {
+        Ok(QueueAttributes {
+            delay_seconds: self.delay_seconds,
+            max_message_size: self.max_message_size,
+            message_retention_period: self.message_retention_period,
+            receive_message_wait_time_seconds: self.receive_message_wait_time_seconds,
+            visibility_timeout: self.visibility_timeout,
+            redrive_policy: self
+                .redrive_policy
+                .map(|rp| serde_json::from_str(&rp))
+                .transpose()?,
+            other: self.other,
+        })
+    }
 }
 
 impl QueueAttributes {
@@ -480,24 +497,110 @@ impl Service {
         &self,
         ns: &str,
         queue: &str,
-        attributes: HashMap<String, String>,
+        attributes: QueueAttributesSer,
         identity: Identity,
     ) -> Result<(), Error> {
-        let mut db = self.db().acquire().await?;
+        let mut tx = self.db().begin().await?;
 
         let ns_id = self
-            .get_namespace_id(ns, &mut *db)
+            .get_namespace_id(ns, &mut *tx)
             .await?
             .ok_or(Error::namespace_not_found(ns))?;
 
-        self.check_user_access(&identity, ns_id, &mut *db).await?;
+        self.check_user_access(&identity, ns_id, &mut *tx).await?;
 
         let queue_id = self
-            .get_queue_id(ns, queue, &mut *db)
+            .get_queue_id(ns, queue, &mut *tx)
             .await?
             .ok_or(Error::queue_not_found(queue, ns))?;
 
-        for (k, v) in attributes.into_iter() {
+        if let Some(delay_seconds) = attributes.delay_seconds {
+            sqlx::query(
+                "
+                INSERT INTO queue_attributes (queue, k, v)
+                VALUES ($1, 'delay_seconds', $2)
+                ON CONFLICT (queue, k) DO UPDATE SET v = $2
+                ",
+            )
+            .bind(queue_id as i64)
+            .bind(delay_seconds as i64)
+            .execute(&mut *tx)
+            .await?;
+        }
+
+        if let Some(max_message_size) = attributes.max_message_size {
+            sqlx::query(
+                "
+                INSERT INTO queue_attributes (queue, k, v)
+                VALUES ($1, 'max_message_size', $2)
+                ON CONFLICT (queue, k) DO UPDATE SET v = $2
+                ",
+            )
+            .bind(queue_id as i64)
+            .bind(max_message_size as i64)
+            .execute(&mut *tx)
+            .await?;
+        }
+
+        if let Some(message_retention_period) = attributes.message_retention_period {
+            sqlx::query(
+                "
+                INSERT INTO queue_attributes (queue, k, v)
+                VALUES ($1, 'message_retention_period', $2)
+                ON CONFLICT (queue, k) DO UPDATE SET v = $2
+                ",
+            )
+            .bind(queue_id as i64)
+            .bind(message_retention_period as i64)
+            .execute(&mut *tx)
+            .await?;
+        }
+
+        if let Some(receive_message_wait_time_seconds) =
+            attributes.receive_message_wait_time_seconds
+        {
+            sqlx::query(
+                "
+                INSERT INTO queue_attributes (queue, k, v)
+                VALUES ($1, 'receive_message_wait_time_seconds', $2)
+                ON CONFLICT (queue, k) DO UPDATE SET v = $2
+                ",
+            )
+            .bind(queue_id as i64)
+            .bind(receive_message_wait_time_seconds as i64)
+            .execute(&mut *tx)
+            .await?;
+        }
+
+        if let Some(visibility_timeout) = attributes.visibility_timeout {
+            sqlx::query(
+                "
+                INSERT INTO queue_attributes (queue, k, v)
+                VALUES ($1, 'visibility_timeout', $2)
+                ON CONFLICT (queue, k) DO UPDATE SET v = $2
+                ",
+            )
+            .bind(queue_id as i64)
+            .bind(visibility_timeout as i64)
+            .execute(&mut *tx)
+            .await?;
+        }
+
+        if let Some(redrive_policy) = attributes.redrive_policy {
+            sqlx::query(
+                "
+                INSERT INTO queue_attributes (queue, k, v)
+                VALUES ($1, 'redrive_policy', $2)
+                ON CONFLICT (queue, k) DO UPDATE SET v = $2
+                ",
+            )
+            .bind(queue_id as i64)
+            .bind(redrive_policy)
+            .execute(&mut *tx)
+            .await?;
+        }
+
+        for (k, v) in attributes.other.into_iter() {
             sqlx::query(
                 "
                 INSERT INTO queue_attributes (queue, k, v)
@@ -508,9 +611,11 @@ impl Service {
             .bind(queue_id as i64)
             .bind(k)
             .bind(v)
-            .execute(&mut *db)
+            .execute(&mut *tx)
             .await?;
         }
+
+        tx.commit().await?;
 
         Ok(())
     }
@@ -601,7 +706,7 @@ impl Service {
         queue: &str,
         names: &[String],
         identity: Identity,
-    ) -> Result<HashMap<String, String>, Error> {
+    ) -> Result<QueueAttributesSer, Error> {
         let mut db = self.db().acquire().await?;
 
         let ns_id = self
@@ -618,16 +723,48 @@ impl Service {
 
         let set = names.iter().collect::<HashSet<_>>();
 
-        let res = sqlx::query_as(
+        let mut res = sqlx::query_as::<_, (String, serde_json::Value)>(
             "
             SELECT k, v FROM queue_attributes WHERE queue = $1
             ",
         )
         .bind(queue_id as i64)
-        .fetch_all(&mut *db)
-        .await?;
+        .fetch(&mut *db);
 
-        Ok(res.into_iter().filter(|(k, _)| set.contains(k)).collect())
+        let mut attributes = QueueAttributesSer {
+            delay_seconds: None,
+            max_message_size: None,
+            message_retention_period: None,
+            receive_message_wait_time_seconds: None,
+            visibility_timeout: None,
+            redrive_policy: None,
+            other: Default::default(),
+        };
+        while let Some((k, v)) = res.next().await.transpose()? {
+            match &*k {
+                "delay_seconds" => attributes.delay_seconds = Some(serde_json::from_value(v)?),
+                "max_message_size" => {
+                    attributes.max_message_size = Some(serde_json::from_value(v)?)
+                }
+                "message_retention_period" => {
+                    attributes.message_retention_period = Some(serde_json::from_value(v)?)
+                }
+                "receive_message_wait_time_seconds" => {
+                    attributes.receive_message_wait_time_seconds = Some(serde_json::from_value(v)?)
+                }
+                "visibility_timeout" => {
+                    attributes.visibility_timeout = Some(serde_json::from_value(v)?)
+                }
+                "redrive_policy" => attributes.redrive_policy = Some(serde_json::from_value(v)?),
+                _ => {
+                    if set.contains(&k) {
+                        attributes.other.insert(k, v);
+                    }
+                }
+            }
+        }
+
+        Ok(attributes)
     }
 
     pub async fn tag_queue(

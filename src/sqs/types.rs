@@ -124,6 +124,8 @@ pub mod purge_queue {
 }
 
 pub mod get_queue_attributes {
+    use crate::service::QueueAttributesSer;
+
     use super::*;
 
     #[derive(Debug, serde::Deserialize)]
@@ -136,7 +138,7 @@ pub mod get_queue_attributes {
     #[derive(Debug, serde::Serialize)]
     #[serde(rename_all = "PascalCase")]
     pub struct GetQueueAttributesResponse {
-        pub attributes: HashMap<String, String>,
+        pub attributes: QueueAttributesSer,
     }
 }
 
@@ -258,13 +260,15 @@ pub mod untag_queue {
 }
 
 pub mod set_queue_attributes {
+    use crate::service::QueueAttributesSer;
+
     use super::*;
 
     #[derive(Debug, serde::Deserialize)]
     #[serde(rename_all = "PascalCase")]
     pub struct SetQueueAttributesRequest {
         pub queue_url: Url,
-        pub attributes: HashMap<String, String>,
+        pub attributes: QueueAttributesSer,
     }
 
     #[derive(Debug, serde::Serialize)]
