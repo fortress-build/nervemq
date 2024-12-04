@@ -12,10 +12,6 @@ use tokio_util::{
 use types::{
     create_queue::{CreateQueueRequest, CreateQueueResponse},
     delete_message::{DeleteMessageRequest, DeleteMessageResponse},
-    // delete_message_batch::{
-    //     DeleteMessageBatchRequest, DeleteMessageBatchResponse, DeleteMessageBatchResultError,
-    //     DeleteMessageBatchResultSuccess,
-    // },
     delete_queue::{DeleteQueueRequest, DeleteQueueResponse},
     get_queue_attributes::{GetQueueAttributesRequest, GetQueueAttributesResponse},
     get_queue_url::{GetQueueUrlRequest, GetQueueUrlResponse},
@@ -27,6 +23,7 @@ use types::{
         SendMessageBatchRequest, SendMessageBatchResponse, SendMessageBatchResultEntry,
         SendMessageBatchResultErrorEntry,
     },
+    set_queue_attributes::{SetQueueAttributesRequest, SetQueueAttributesResponse},
     SqsResponse,
 };
 use url::Url;
@@ -67,7 +64,7 @@ async fn send_message(
     identity: Identity,
     namespace: AuthorizedNamespace,
     mut stream: Stream<SendMessageRequest>,
-) -> Result<SendMessageResponse, Error> {
+) -> Result<SqsResponse, Error> {
     let request = stream
         .next()
         .await
@@ -110,10 +107,10 @@ async fn send_message(
 
     let digest = hex::encode(md5::compute(&request.message_body).as_ref());
 
-    Ok(SendMessageResponse {
+    Ok(SqsResponse::SendMessage(SendMessageResponse {
         message_id,
         md5_of_message_body: digest,
-    })
+    }))
 }
 
 async fn send_message_batch(
@@ -121,7 +118,7 @@ async fn send_message_batch(
     identity: Identity,
     namespace: AuthorizedNamespace,
     mut stream: Stream<SendMessageBatchRequest>,
-) -> Result<SendMessageBatchResponse, Error> {
+) -> Result<SqsResponse, Error> {
     let request = stream
         .next()
         .await
@@ -188,9 +185,9 @@ async fn send_message_batch(
     }
 
     Ok(if !failed.is_empty() {
-        SendMessageBatchResponse::Failed { failed }
+        SqsResponse::SendMessageBatch(SendMessageBatchResponse::Failed { failed })
     } else {
-        SendMessageBatchResponse::Successful { successful }
+        SqsResponse::SendMessageBatch(SendMessageBatchResponse::Successful { successful })
     })
 }
 
@@ -199,7 +196,7 @@ async fn receive_message(
     identity: Identity,
     namespace: AuthorizedNamespace,
     mut stream: Stream<ReceiveMessageRequest>,
-) -> Result<ReceiveMessageResponse, Error> {
+) -> Result<SqsResponse, Error> {
     let request = stream
         .next()
         .await
@@ -238,7 +235,9 @@ async fn receive_message(
         )
         .await?;
 
-    Ok(ReceiveMessageResponse { messages })
+    Ok(SqsResponse::ReceiveMessage(ReceiveMessageResponse {
+        messages,
+    }))
 }
 
 async fn delete_message(
@@ -246,7 +245,7 @@ async fn delete_message(
     identity: Identity,
     namespace: AuthorizedNamespace,
     mut stream: Stream<DeleteMessageRequest>,
-) -> Result<DeleteMessageResponse, Error> {
+) -> Result<SqsResponse, Error> {
     let request = stream
         .next()
         .await
@@ -286,7 +285,7 @@ async fn delete_message(
         .delete_message(namespace_name, queue_name, message_id, identity)
         .await?;
 
-    Ok(DeleteMessageResponse {})
+    Ok(SqsResponse::DeleteMessage(DeleteMessageResponse {}))
 }
 
 // // FIXME: Finish implementing this
@@ -361,7 +360,7 @@ async fn list_queues(
     identity: Identity,
     namespace: AuthorizedNamespace,
     mut stream: Stream<ListQueuesRequest>,
-) -> Result<ListQueuesResponse, Error> {
+) -> Result<SqsResponse, Error> {
     let request = stream
         .next()
         .await
@@ -400,7 +399,9 @@ async fn list_queues(
         )?);
     }
 
-    Ok(ListQueuesResponse { queue_urls: urls })
+    Ok(SqsResponse::ListQueues(ListQueuesResponse {
+        queue_urls: urls,
+    }))
 }
 
 async fn get_queue_url(
@@ -408,7 +409,7 @@ async fn get_queue_url(
     identity: Identity,
     namespace: AuthorizedNamespace,
     mut stream: Stream<GetQueueUrlRequest>,
-) -> Result<GetQueueUrlResponse, Error> {
+) -> Result<SqsResponse, Error> {
     let request = stream
         .next()
         .await
@@ -432,7 +433,9 @@ async fn get_queue_url(
 
     let url = queue_url(service.config().host(), &request.queue_name, &namespace.0)?;
 
-    Ok(GetQueueUrlResponse { queue_url: url })
+    Ok(SqsResponse::GetQueueUrl(GetQueueUrlResponse {
+        queue_url: url,
+    }))
 }
 
 async fn create_queue(
@@ -440,7 +443,7 @@ async fn create_queue(
     identity: Identity,
     namespace: AuthorizedNamespace,
     mut stream: Stream<CreateQueueRequest>,
-) -> Result<CreateQueueResponse, Error> {
+) -> Result<SqsResponse, Error> {
     let request = stream
         .next()
         .await
@@ -469,7 +472,54 @@ async fn create_queue(
 
     let url = queue_url(service.config().host(), &request.queue_name, &namespace.0)?;
 
-    Ok(CreateQueueResponse { queue_url: url })
+    Ok(SqsResponse::CreateQueue(CreateQueueResponse {
+        queue_url: url,
+    }))
+}
+
+async fn set_queue_attributes(
+    service: Data<crate::service::Service>,
+    identity: Identity,
+    namespace: AuthorizedNamespace,
+    mut stream: Stream<SetQueueAttributesRequest>,
+) -> Result<SqsResponse, Error> {
+    let request = stream
+        .next()
+        .await
+        .transpose()
+        .map_err(|e| Error::internal(e))?
+        .ok_or_else(|| Error::missing_parameter("missing request body"))?;
+
+    let mut path = request
+        .queue_url
+        .path_segments()
+        .ok_or_else(|| Error::missing_parameter("queue name"))?;
+
+    let (queue_name, namespace_name) = path
+        .next_back()
+        .and_then(|queue_name| path.next_back().map(|ns_name| (queue_name, ns_name)))
+        .ok_or_else(|| Error::missing_parameter("namespace name"))?;
+
+    let ns_id = service
+        .get_namespace_id(namespace_name, service.db())
+        .await?
+        .ok_or_else(|| Error::namespace_not_found(namespace_name))?;
+
+    service
+        .check_user_access(&identity, ns_id, service.db())
+        .await?;
+
+    if namespace_name != namespace.0 {
+        return Err(Error::Unauthorized);
+    }
+
+    service
+        .set_queue_attributes(namespace_name, queue_name, request.attributes, identity)
+        .await?;
+
+    Ok(SqsResponse::SetQueueAttributes(
+        SetQueueAttributesResponse {},
+    ))
 }
 
 async fn get_queue_attributes(
@@ -477,7 +527,7 @@ async fn get_queue_attributes(
     identity: Identity,
     namespace: AuthorizedNamespace,
     mut stream: Stream<GetQueueAttributesRequest>,
-) -> Result<GetQueueAttributesResponse, Error> {
+) -> Result<SqsResponse, Error> {
     let request = stream
         .next()
         .await
@@ -517,7 +567,9 @@ async fn get_queue_attributes(
         )
         .await?;
 
-    Ok(GetQueueAttributesResponse { attributes })
+    Ok(SqsResponse::GetQueueAttributes(
+        GetQueueAttributesResponse { attributes },
+    ))
 }
 
 async fn purge_queue(
@@ -525,7 +577,7 @@ async fn purge_queue(
     identity: Identity,
     _namespace: AuthorizedNamespace,
     mut stream: Stream<PurgeQueueRequest>,
-) -> Result<PurgeQueueResponse, Error> {
+) -> Result<SqsResponse, Error> {
     let request = stream
         .next()
         .await
@@ -557,7 +609,7 @@ async fn purge_queue(
         .await
         .is_ok();
 
-    Ok(PurgeQueueResponse { success })
+    Ok(SqsResponse::PurgeQueue(PurgeQueueResponse { success }))
 }
 
 async fn delete_queue(
@@ -565,7 +617,7 @@ async fn delete_queue(
     identity: Identity,
     _namespace: AuthorizedNamespace,
     mut stream: Stream<DeleteQueueRequest>,
-) -> Result<DeleteQueueResponse, Error> {
+) -> Result<SqsResponse, Error> {
     let request = stream
         .next()
         .await
@@ -596,7 +648,7 @@ async fn delete_queue(
         .delete_queue(namespace_name, queue_name, identity)
         .await?;
 
-    Ok(DeleteQueueResponse {})
+    Ok(SqsResponse::DeleteQueue(DeleteQueueResponse {}))
 }
 
 async fn list_queue_tags(
@@ -604,7 +656,7 @@ async fn list_queue_tags(
     identity: Identity,
     namespace: AuthorizedNamespace,
     mut stream: Stream<types::list_queue_tags::ListQueueTagsRequest>,
-) -> Result<types::list_queue_tags::ListQueueTagsResponse, Error> {
+) -> Result<SqsResponse, Error> {
     let request = stream
         .next()
         .await
@@ -639,7 +691,9 @@ async fn list_queue_tags(
         .get_queue_tags(namespace_name, queue_name, identity)
         .await?;
 
-    Ok(types::list_queue_tags::ListQueueTagsResponse { tags })
+    Ok(SqsResponse::ListQueueTags(
+        types::list_queue_tags::ListQueueTagsResponse { tags },
+    ))
 }
 
 async fn tag_queue(
@@ -647,7 +701,7 @@ async fn tag_queue(
     identity: Identity,
     namespace: AuthorizedNamespace,
     mut stream: Stream<types::tag_queue::TagQueueRequest>,
-) -> Result<types::tag_queue::TagQueueResponse, Error> {
+) -> Result<SqsResponse, Error> {
     let request = stream
         .next()
         .await
@@ -673,7 +727,7 @@ async fn tag_queue(
         .tag_queue(namespace_name, queue_name, request.tags, identity)
         .await?;
 
-    Ok(types::tag_queue::TagQueueResponse {})
+    Ok(SqsResponse::TagQueue(types::tag_queue::TagQueueResponse {}))
 }
 
 async fn untag_queue(
@@ -681,7 +735,7 @@ async fn untag_queue(
     identity: Identity,
     namespace: AuthorizedNamespace,
     mut stream: Stream<types::untag_queue::UntagQueueRequest>,
-) -> Result<types::untag_queue::UntagQueueResponse, Error> {
+) -> Result<SqsResponse, Error> {
     let request = stream
         .next()
         .await
@@ -707,7 +761,9 @@ async fn untag_queue(
         .untag_queue(namespace_name, queue_name, request.tag_keys, identity)
         .await?;
 
-    Ok(types::untag_queue::UntagQueueResponse {})
+    Ok(SqsResponse::UntagQueue(
+        types::untag_queue::UntagQueueResponse {},
+    ))
 }
 
 #[post("")]
@@ -727,137 +783,131 @@ pub async fn sqs_service(
 
     let res = match method {
         Method::DeleteMessageBatch => todo!(),
-        Method::SetQueueAttributes => todo!(),
-        Method::TagQueue => {
-            let res = tag_queue(
+        Method::SetQueueAttributes => {
+            set_queue_attributes(
                 service,
                 identity,
                 namespace,
                 Framed::new(stream, SymmetricalJson::default()),
             )
-            .await?;
-            SqsResponse::TagQueue(res)
+            .await?
+        }
+        Method::TagQueue => {
+            tag_queue(
+                service,
+                identity,
+                namespace,
+                Framed::new(stream, SymmetricalJson::default()),
+            )
+            .await?
         }
         Method::UntagQueue => {
-            let res = untag_queue(
+            untag_queue(
                 service,
                 identity,
                 namespace,
                 Framed::new(stream, SymmetricalJson::default()),
             )
-            .await?;
-            SqsResponse::UntagQueue(res)
+            .await?
         }
         Method::ListQueueTags => {
-            let res = list_queue_tags(
+            list_queue_tags(
                 service,
                 identity,
                 namespace,
                 Framed::new(stream, SymmetricalJson::default()),
             )
-            .await?;
-
-            SqsResponse::ListQueueTags(res)
+            .await?
         }
         Method::DeleteQueue => {
-            let res = delete_queue(
+            delete_queue(
                 service,
                 identity,
                 namespace,
                 Framed::new(stream, SymmetricalJson::default()),
             )
-            .await?;
-            SqsResponse::DeleteQueue(res)
+            .await?
         }
         Method::SendMessage => {
-            let res = send_message(
+            send_message(
                 service,
                 identity,
                 namespace,
                 Framed::new(stream, SymmetricalJson::default()),
             )
-            .await?;
-            SqsResponse::SendMessage(res)
+            .await?
         }
         Method::SendMessageBatch => {
-            let res = send_message_batch(
+            send_message_batch(
                 service,
                 identity,
                 namespace,
                 Framed::new(stream, SymmetricalJson::default()),
             )
-            .await?;
-            SqsResponse::SendMessageBatch(res)
+            .await?
         }
         Method::ReceiveMessage => {
-            let res = receive_message(
+            receive_message(
                 service,
                 identity,
                 namespace,
                 Framed::new(stream, SymmetricalJson::default()),
             )
-            .await?;
-            SqsResponse::ReceiveMessage(res)
+            .await?
         }
         Method::DeleteMessage => {
-            let res = delete_message(
+            delete_message(
                 service,
                 identity,
                 namespace,
                 Framed::new(stream, SymmetricalJson::default()),
             )
-            .await?;
-            SqsResponse::DeleteMessage(res)
+            .await?
         }
         Method::ListQueues => {
-            let res = list_queues(
+            list_queues(
                 service,
                 identity,
                 namespace,
                 Framed::new(stream, SymmetricalJson::default()),
             )
-            .await?;
-            SqsResponse::ListQueues(res)
+            .await?
         }
         Method::GetQueueUrl => {
-            let res = get_queue_url(
+            get_queue_url(
                 service,
                 identity,
                 namespace,
                 Framed::new(stream, SymmetricalJson::default()),
             )
-            .await?;
-            SqsResponse::GetQueueUrl(res)
+            .await?
         }
         Method::CreateQueue => {
-            let res = create_queue(
+            create_queue(
                 service,
                 identity,
                 namespace,
                 Framed::new(stream, SymmetricalJson::default()),
             )
-            .await?;
-            SqsResponse::CreateQueue(res)
+            .await?
         }
         Method::GetQueueAttributes => {
-            let res = get_queue_attributes(
+            get_queue_attributes(
                 service,
                 identity,
                 namespace,
                 Framed::new(stream, SymmetricalJson::default()),
             )
-            .await?;
-            SqsResponse::GetQueueAttributes(res)
+            .await?
         }
         Method::PurgeQueue => {
-            let res = purge_queue(
+            purge_queue(
                 service,
                 identity,
                 namespace,
                 Framed::new(stream, SymmetricalJson::default()),
             )
-            .await?;
-            SqsResponse::PurgeQueue(res)
+            .await?
         }
     };
 

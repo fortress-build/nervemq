@@ -353,4 +353,6 @@ pub enum SqsResponse {
     ListQueueTags(list_queue_tags::ListQueueTagsResponse),
     TagQueue(tag_queue::TagQueueResponse),
     UntagQueue(untag_queue::UntagQueueResponse),
+    SetQueueAttributes(set_queue_attributes::SetQueueAttributesResponse),
+    DeleteMessageBatch(delete_message_batch::DeleteMessageBatchResponse),
 }
