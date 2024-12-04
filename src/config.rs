@@ -4,7 +4,7 @@ use url::Url;
 
 pub mod defaults {
     pub const DB_PATH: &str = "nervemq.db";
-    pub const MAX_RETRIES: usize = 3;
+    pub const MAX_RETRIES: usize = 10;
     pub const ROOT_EMAIL: &str = "admin@example.com";
     pub const ROOT_PASSWORD: &str = "password";
     pub const HOST: &str = "http://localhost:8080";
@@ -12,15 +12,13 @@ pub mod defaults {
 
 #[derive(Clone, Deserialize)]
 pub struct Config {
-    pub db_path: Option<String>,
-    pub default_max_retries: Option<usize>,
+    db_path: Option<String>,
+    default_max_retries: Option<usize>,
 
-    pub host: Option<Url>,
+    host: Option<Url>,
 
-    // TODO: Warn on launch if defaults are used for admin credentials
-    pub root_email: Option<String>,
-    #[allow(unused)]
-    pub root_password: Option<SecretString>,
+    root_email: Option<String>,
+    root_password: Option<SecretString>,
 }
 
 impl Default for Config {
@@ -28,7 +26,7 @@ impl Default for Config {
         Self {
             db_path: None,
             default_max_retries: None,
-            host: Some(Url::parse("http://localhost:8080").expect("valid URL")),
+            host: None,
             root_email: None,
             root_password: None,
         }
