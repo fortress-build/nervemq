@@ -25,6 +25,16 @@ function MessageDetails({ message }: { message: MessageObject }) {
   return (
     <div className="p-6 space-y-4 bg-gray-50">
       <h3 className="font-semibold text-gray-700 mb-2">Message Details</h3>
+      
+      {/* Message Body Section */}
+      <div className="bg-white p-4 rounded-lg border border-gray-200">
+        <span className="text-xs uppercase text-gray-400">Message Body</span>
+        <div className="mt-1 text-sm text-gray-700 whitespace-pre-wrap">
+          {message.body}
+        </div>
+      </div>
+
+      {/* Existing Key-Value Pairs Section */}
       {Object.entries(message.kv).length === 0 ? (
         <div className="bg-white p-4 rounded-lg border border-gray-200 text-gray-500 text-sm">
           No message details available
