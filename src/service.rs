@@ -376,6 +376,79 @@ impl Service {
         Ok(res.into_iter().filter(|(k, _)| set.contains(k)).collect())
     }
 
+    pub async fn tag_queue(
+        &self,
+        ns: &str,
+        queue: &str,
+        tags: HashMap<String, String>,
+        identity: Identity,
+    ) -> Result<(), Error> {
+        let mut db = self.db().acquire().await?;
+        let ns_id = self
+            .get_namespace_id(ns, &mut *db)
+            .await?
+            .ok_or(Error::namespace_not_found(ns))?;
+
+        self.check_user_access(&identity, ns_id, &mut *db).await?;
+
+        let queue_id = self
+            .get_queue_id(ns, queue, &mut *db)
+            .await?
+            .ok_or(Error::queue_not_found(queue, ns))?;
+
+        for (k, v) in tags.into_iter() {
+            sqlx::query(
+                "
+                INSERT INTO queue_tags (queue, k, v)
+                VALUES ($1, $2, $3)
+                ON CONFLICT (queue, k) DO UPDATE SET v
+                ",
+            )
+            .bind(queue_id as i64)
+            .bind(k)
+            .bind(v)
+            .execute(&mut *db)
+            .await?;
+        }
+
+        Ok(())
+    }
+
+    pub async fn untag_queue(
+        &self,
+        ns: &str,
+        queue: &str,
+        tags: Vec<String>,
+        identity: Identity,
+    ) -> Result<(), Error> {
+        let mut db = self.db().acquire().await?;
+        let ns_id = self
+            .get_namespace_id(ns, &mut *db)
+            .await?
+            .ok_or(Error::namespace_not_found(ns))?;
+
+        self.check_user_access(&identity, ns_id, &mut *db).await?;
+
+        let queue_id = self
+            .get_queue_id(ns, queue, &mut *db)
+            .await?
+            .ok_or(Error::queue_not_found(queue, ns))?;
+
+        for tag in tags {
+            sqlx::query(
+                "
+                DELETE FROM queue_tags WHERE queue = $1 AND k = $2
+                ",
+            )
+            .bind(queue_id as i64)
+            .bind(tag)
+            .execute(&mut *db)
+            .await?;
+        }
+
+        Ok(())
+    }
+
     pub async fn get_queue_tags(
         &self,
         ns: &str,
@@ -672,25 +745,28 @@ impl Service {
         .await?;
 
         let message = if let Some(message) = message {
-            // let mut msg_attributes = HashMap::new();
-            //
-            // let mut kv = sqlx::query_as::<_, (String, Vec<u8>)>(
-            //     "
-            //     SELECT k, v FROM kv_pairs WHERE message = $1
-            //     ",
-            // )
-            // .bind(message.id as i64)
-            // .fetch(&mut *tx);
-            //
-            // while let Some((k, v)) = kv.next().await.transpose()? {
-            //     let v: SqsMessageAttribute = bincode::deserialize(&v).map_err(Error::internal)?;
-            //     msg_attributes.insert(k, v);
-            // }
+            let mut message_attributes = HashMap::new();
+
+            let mut kv = sqlx::query_as::<_, (String, Vec<u8>)>(
+                "
+                SELECT k, v FROM kv_pairs WHERE message = $1
+                ",
+            )
+            .bind(message.id as i64)
+            .fetch(&mut *tx);
+
+            while let Some((k, v)) = kv.next().await.transpose()? {
+                let v: SqsMessageAttribute = bincode::deserialize(&v).map_err(Error::internal)?;
+                message_attributes.insert(k, v);
+            }
 
             let sqs_message = SqsMessage {
                 message_id: message.id.to_string(),
                 md5_of_body: hex::encode(md5::compute(&message.body).as_slice()),
                 body: message.body,
+                message_attributes,
+                attributes: HashMap::new(),
+                receipt_handle: "TODO".to_owned(),
             };
 
             Some(sqs_message)
@@ -712,7 +788,7 @@ impl Service {
         let mut tx = self.db().begin().await?;
 
         // Get multiple undelivered messages and mark them as delivered in one atomic operation
-        let messages = sqlx::query_as(
+        let mut stream = sqlx::query_as::<_, Message>(
             "
             WITH next_messages AS (
                 SELECT
@@ -747,81 +823,110 @@ impl Service {
         .bind(namespace)
         .bind(queue)
         .bind(max_messages as i64)
-        .fetch_all(&mut *tx)
-        .await
-            .map_err(|e| {
-                tracing::error!("Failed to fetch messages {e}");
-                e
-            })
-            ?
-        .into_iter()
-        .map(|message: Message| SqsMessage {
-            message_id: message.id.to_string(),
-            md5_of_body: hex::encode(md5::compute(&message.body).as_slice()),
-            body: message.body,
-        })
-        .collect();
+        .fetch(&mut *tx);
+        // .await
+        //     .map_err(|e| {
+        //         tracing::error!("Failed to fetch messages {e}");
+        //         e
+        //     })
+        //     ?
+        // .into_iter()
+        // .map(|message: Message| SqsMessage {
+        //     message_id: message.id.to_string(),
+        //     md5_of_body: hex::encode(md5::compute(&message.body).as_slice()),
+        //     body: message.body,
+        // })
+        // .collect();
+
+        let mut messages = vec![];
+        while let Some(message) = stream.next().await.transpose()? {
+            let mut message_attributes = HashMap::new();
+            let mut kv = sqlx::query_as::<_, (String, Vec<u8>)>(
+                "
+                SELECT k, v FROM kv_pairs WHERE message = $1
+                ",
+            )
+            .bind(message.id as i64)
+            .fetch(self.db());
+
+            while let Some((k, v)) = kv.next().await.transpose()? {
+                let v: SqsMessageAttribute = bincode::deserialize(&v).map_err(Error::internal)?;
+                message_attributes.insert(k, v);
+            }
+
+            let sqs_message = SqsMessage {
+                message_id: message.id.to_string(),
+                md5_of_body: hex::encode(md5::compute(&message.body).as_slice()),
+                body: message.body,
+                message_attributes,
+                attributes: HashMap::new(),
+                receipt_handle: "TODO".to_owned(),
+            };
+            messages.push(sqs_message);
+        }
+
+        drop(stream);
 
         tx.commit().await?;
 
         Ok(messages)
     }
 
-    pub async fn sqs_peek(
-        &self,
-        namespace: &str,
-        queue: &str,
-        message_id: u64,
-    ) -> Result<Option<SqsMessage>, Error> {
-        let mut db = self.db().acquire().await?;
-
-        let msg: Option<Message> = sqlx::query_as(
-            "
-            SELECT
-                m.*,
-                q.name as queue,
-                (CASE
-                    WHEN m.delivered_at IS NULL AND m.tries < conf.max_retries THEN 'pending'
-                    WHEN m.delivered_at IS NULL AND m.tries >= conf.max_retries THEN 'failed'
-                    ELSE 'delivered'
-                END) as status
-            FROM messages m
-            JOIN queues q ON m.queue = q.id
-            JOIN queue_configurations conf ON q.id = conf.queue
-            JOIN namespaces n ON q.ns = n.id
-            WHERE n.name = $1 AND q.name = $2 AND m.id = $3
-            ",
-        )
-        .bind(namespace)
-        .bind(queue)
-        .bind(message_id as i64)
-        .fetch_optional(&mut *db)
-        .await?;
-
-        let msg = match msg {
-            Some(msg) => SqsMessage {
-                message_id: msg.id.to_string(),
-                md5_of_body: hex::encode(md5::compute(&msg.body).as_slice()),
-                body: msg.body,
-            },
-            None => return Ok(None),
-        };
-
-        // let mut kv = sqlx::query_as::<_, (String, Vec<u8>)>(
-        //     "
-        //     SELECT k, v FROM kv_pairs WHERE message = $1
-        //     ",
-        // )
-        // .bind(msg.id as i64)
-        // .fetch(&mut *db);
-        //
-        // while let Some((k, v)) = kv.next().await.transpose()? {
-        //     msg.kv
-        //         .insert(k, bincode::deserialize(&v).map_err(Error::internal)?);
-        // }
-
-        Ok(Some(msg))
-    }
+    // pub async fn sqs_peek(
+    //     &self,
+    //     namespace: &str,
+    //     queue: &str,
+    //     message_id: u64,
+    // ) -> Result<Option<SqsMessage>, Error> {
+    //     let mut db = self.db().acquire().await?;
+    //
+    //     let msg: Option<Message> = sqlx::query_as(
+    //         "
+    //         SELECT
+    //             m.*,
+    //             q.name as queue,
+    //             (CASE
+    //                 WHEN m.delivered_at IS NULL AND m.tries < conf.max_retries THEN 'pending'
+    //                 WHEN m.delivered_at IS NULL AND m.tries >= conf.max_retries THEN 'failed'
+    //                 ELSE 'delivered'
+    //             END) as status
+    //         FROM messages m
+    //         JOIN queues q ON m.queue = q.id
+    //         JOIN queue_configurations conf ON q.id = conf.queue
+    //         JOIN namespaces n ON q.ns = n.id
+    //         WHERE n.name = $1 AND q.name = $2 AND m.id = $3
+    //         ",
+    //     )
+    //     .bind(namespace)
+    //     .bind(queue)
+    //     .bind(message_id as i64)
+    //     .fetch_optional(&mut *db)
+    //     .await?;
+    //
+    //     let msg = match msg {
+    //         Some(msg) => SqsMessage {
+    //             message_id: msg.id.to_string(),
+    //             md5_of_body: hex::encode(md5::compute(&msg.body).as_slice()),
+    //             body: msg.body,
+    //         },
+    //         None => return Ok(None),
+    //     };
+    //
+    //     // let mut kv = sqlx::query_as::<_, (String, Vec<u8>)>(
+    //     //     "
+    //     //     SELECT k, v FROM kv_pairs WHERE message = $1
+    //     //     ",
+    //     // )
+    //     // .bind(msg.id as i64)
+    //     // .fetch(&mut *db);
+    //     //
+    //     // while let Some((k, v)) = kv.next().await.transpose()? {
+    //     //     msg.kv
+    //     //         .insert(k, bincode::deserialize(&v).map_err(Error::internal)?);
+    //     // }
+    //
+    //     Ok(Some(msg))
+    // }
 
     pub async fn list_messages(&self, namespace: &str, queue: &str) -> Result<Vec<Message>, Error> {
         let mut db = self.db().acquire().await?;
@@ -995,6 +1100,65 @@ impl Service {
         .collect::<HashMap<_, _>>();
 
         Ok(res)
+    }
+
+    pub async fn delete_message_batch(
+        &self,
+        namespace: &str,
+        queue: &str,
+        message_ids: Vec<u64>,
+        identity: Identity,
+    ) -> Result<
+        (
+            Vec<u64>,          // Successfully deleted message IDs
+            Vec<(u64, Error)>, // Failed message IDs
+        ),
+        Error,
+    > {
+        let mut tx = self.db().begin().await?;
+        // Verify namespace exists and user has access
+        let namespace_id = self
+            .get_namespace_id(namespace, &mut tx)
+            .await?
+            .ok_or_else(|| Error::namespace_not_found(namespace))?;
+        self.check_user_access(&identity, namespace_id, &mut tx)
+            .await?;
+        // Verify queue exists
+        let queue_id = self
+            .get_queue_id(namespace, queue, &mut tx)
+            .await?
+            .ok_or_else(|| Error::queue_not_found(queue, namespace))?;
+
+        let mut success = Vec::new();
+        let mut failure = Vec::new();
+
+        for message_id in message_ids {
+            match sqlx::query(
+                "
+                DELETE FROM messages
+                WHERE id = $1 AND queue = $2
+                ",
+            )
+            .bind(message_id as i64)
+            .bind(queue_id as i64)
+            .execute(&mut *tx)
+            .await
+            {
+                Ok(res) => {
+                    if res.rows_affected() == 0 {
+                        failure.push((
+                            message_id,
+                            Error::not_found(format!("{message_id} in queue {queue}")),
+                        ));
+                    } else {
+                        success.push(message_id);
+                    }
+                }
+                Err(err) => failure.push((message_id, err.into())),
+            };
+        }
+
+        Ok((success, failure))
     }
 
     pub async fn delete_message(
