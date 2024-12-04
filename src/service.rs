@@ -11,7 +11,7 @@ use serde_email::Email;
 use sqlx::{
     sqlite::{
         SqliteAutoVacuum, SqliteConnectOptions, SqliteJournalMode, SqliteLockingMode,
-        SqlitePoolOptions,
+        SqlitePoolOptions, SqliteRow,
     },
     Acquire, FromRow, Sqlite, SqlitePool,
 };
@@ -83,6 +83,82 @@ impl QueueAttributes {
                 .transpose()?,
             other: self.other,
         })
+    }
+}
+
+pub trait QueueAttribute {
+    type Value;
+
+    fn name(&self) -> &str;
+}
+
+pub mod queue_attributes {
+    use super::QueueAttribute;
+
+    pub struct DelaySeconds;
+
+    impl QueueAttribute for DelaySeconds {
+        type Value = u64;
+
+        fn name(&self) -> &str {
+            "delay_seconds"
+        }
+    }
+
+    pub struct MaxMessageSize;
+
+    impl QueueAttribute for MaxMessageSize {
+        type Value = u64;
+        fn name(&self) -> &str {
+            "max_message_size"
+        }
+    }
+
+    pub struct MessageRetentionPeriod;
+
+    impl QueueAttribute for MessageRetentionPeriod {
+        type Value = u64;
+        fn name(&self) -> &str {
+            "message_retention_period"
+        }
+    }
+
+    pub struct ReceiveMessageWaitTimeSeconds;
+
+    impl QueueAttribute for ReceiveMessageWaitTimeSeconds {
+        type Value = u64;
+        fn name(&self) -> &str {
+            "receive_message_wait_time_seconds"
+        }
+    }
+
+    pub struct VisibilityTimeout;
+
+    impl QueueAttribute for VisibilityTimeout {
+        type Value = u64;
+        fn name(&self) -> &str {
+            "visibility_timeout"
+        }
+    }
+
+    pub struct RedrivePolicy;
+
+    impl QueueAttribute for RedrivePolicy {
+        type Value = String;
+
+        fn name(&self) -> &str {
+            "redrive_policy"
+        }
+    }
+
+    pub struct Other(String);
+
+    impl QueueAttribute for Other {
+        type Value = String;
+
+        fn name(&self) -> &str {
+            &self.0
+        }
     }
 }
 
@@ -398,6 +474,8 @@ impl Service {
         Ok(())
     }
 
+    // TODO: Improve type safety for attributes
+
     pub async fn set_queue_attributes(
         &self,
         ns: &str,
@@ -433,6 +511,86 @@ impl Service {
             .execute(&mut *db)
             .await?;
         }
+
+        Ok(())
+    }
+
+    pub async fn get_queue_attribute<A>(
+        &self,
+        ns: &str,
+        queue: &str,
+        attribute: A,
+        identity: Identity,
+    ) -> Result<Option<A::Value>, Error>
+    where
+        A: QueueAttribute,
+        A::Value: for<'a> sqlx::FromRow<'a, SqliteRow> + std::marker::Unpin + Send,
+    {
+        let mut db = self.db().acquire().await?;
+
+        let ns_id = self
+            .get_namespace_id(ns, &mut *db)
+            .await?
+            .ok_or(Error::namespace_not_found(ns))?;
+
+        self.check_user_access(&identity, ns_id, &mut *db).await?;
+
+        let queue_id = self
+            .get_queue_id(ns, queue, &mut *db)
+            .await?
+            .ok_or(Error::queue_not_found(queue, ns))?;
+
+        let res = sqlx::query_as::<_, A::Value>(
+            "
+            SELECT k, v FROM queue_attributes WHERE queue = $1 AND k = $2
+            ",
+        )
+        .bind(queue_id as i64)
+        .bind(attribute.name())
+        .fetch_optional(&mut *db)
+        .await?;
+
+        Ok(res)
+    }
+
+    pub async fn set_queue_attribute<A>(
+        &self,
+        ns: &str,
+        queue: &str,
+        attribute: A,
+        value: A::Value,
+        identity: Identity,
+    ) -> Result<(), Error>
+    where
+        A: QueueAttribute,
+        A::Value: sqlx::Type<Sqlite> + for<'a> sqlx::Encode<'a, Sqlite> + std::marker::Unpin + Send,
+    {
+        let mut tx = self.db().begin().await?;
+
+        let ns_id = self
+            .get_namespace_id(ns, &mut *tx)
+            .await?
+            .ok_or(Error::namespace_not_found(ns))?;
+
+        self.check_user_access(&identity, ns_id, &mut *tx).await?;
+
+        let queue_id = self
+            .get_queue_id(ns, queue, &mut *tx)
+            .await?
+            .ok_or(Error::queue_not_found(queue, ns))?;
+
+        sqlx::query(
+            "
+            INSERT INTO queue_attributes (queue, k, v)
+            VALUES ($1, $2, $3)
+            ON CONFLICT (queue, k) DO UPDATE SET v = $3
+            ",
+        )
+        .bind(queue_id as i64)
+        .bind(attribute.name())
+        .bind(value)
+        .execute(&mut *tx)
+        .await?;
 
         Ok(())
     }
