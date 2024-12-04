@@ -211,6 +211,107 @@ pub mod send_message_batch {
     }
 }
 
+pub mod list_queue_tags {
+    use super::*;
+
+    #[derive(Debug, serde::Deserialize)]
+    #[serde(rename_all = "PascalCase")]
+    pub struct ListQueueTagsRequest {
+        pub queue_url: Url,
+    }
+
+    #[derive(Debug, serde::Serialize)]
+    #[serde(rename_all = "PascalCase")]
+    pub struct ListQueueTagsResponse {
+        pub tags: HashMap<String, String>,
+    }
+}
+
+pub mod tag_queue {
+    use super::*;
+
+    #[derive(Debug, serde::Deserialize)]
+    #[serde(rename_all = "PascalCase")]
+    pub struct TagQueueRequest {
+        pub queue_url: Url,
+        pub tags: HashMap<String, String>,
+    }
+
+    #[derive(Debug, serde::Serialize)]
+    #[serde(rename_all = "PascalCase")]
+    pub struct TagQueueResponse {}
+}
+
+pub mod untag_queue {
+    use super::*;
+
+    #[derive(Debug, serde::Deserialize)]
+    #[serde(rename_all = "PascalCase")]
+    pub struct UntagQueueRequest {
+        pub queue_url: Url,
+        pub tag_keys: Vec<String>,
+    }
+
+    #[derive(Debug, serde::Serialize)]
+    #[serde(rename_all = "PascalCase")]
+    pub struct UntagQueueResponse {}
+}
+
+pub mod set_queue_attributes {
+    use super::*;
+
+    #[derive(Debug, serde::Deserialize)]
+    #[serde(rename_all = "PascalCase")]
+    pub struct SetQueueAttributesRequest {
+        pub queue_url: Url,
+        pub attributes: HashMap<String, String>,
+    }
+
+    #[derive(Debug, serde::Serialize)]
+    #[serde(rename_all = "PascalCase")]
+    pub struct SetQueueAttributesResponse {}
+}
+
+pub mod delete_message_batch {
+    use super::*;
+
+    #[derive(Debug, serde::Deserialize)]
+    #[serde(rename_all = "PascalCase")]
+    pub struct DeleteMessageBatchRequestEntry {
+        pub id: String,
+        pub receipt_handle: String,
+    }
+
+    #[derive(Debug, serde::Deserialize)]
+    #[serde(rename_all = "PascalCase")]
+    pub struct DeleteMessageBatchRequest {
+        pub queue_url: Url,
+        pub entries: Vec<DeleteMessageBatchRequestEntry>,
+    }
+
+    #[derive(Debug, serde::Serialize)]
+    #[serde(rename_all = "PascalCase")]
+    pub struct DeleteMessageBatchResultSuccess {
+        pub id: String,
+    }
+
+    #[derive(Debug, serde::Serialize)]
+    #[serde(rename_all = "PascalCase")]
+    pub struct DeleteMessageBatchResultError {
+        pub code: String,
+        pub id: String,
+        pub message: String,
+        pub sender_fault: bool,
+    }
+
+    #[derive(Debug, serde::Serialize)]
+    #[serde(rename_all = "PascalCase")]
+    pub struct DeleteMessageBatchResponse {
+        pub failed: Vec<DeleteMessageBatchResultError>,
+        pub successful: Vec<DeleteMessageBatchResultSuccess>,
+    }
+}
+
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "PascalCase", tag = "DataType")]
 pub enum SqsMessageAttribute {
@@ -226,8 +327,14 @@ pub enum SqsMessageAttribute {
 #[serde(rename_all = "PascalCase")]
 pub struct SqsMessage {
     pub message_id: String,
+    pub receipt_handle: String,
+
     pub md5_of_body: String,
     pub body: String,
+
+    pub attributes: HashMap<String, String>,
+
+    pub message_attributes: HashMap<String, SqsMessageAttribute>,
 }
 
 #[derive(Debug, serde::Serialize)]
@@ -239,7 +346,11 @@ pub enum SqsResponse {
     ListQueues(list_queues::ListQueuesResponse),
     DeleteMessage(delete_message::DeleteMessageResponse),
     PurgeQueue(purge_queue::PurgeQueueResponse),
+    DeleteQueue(delete_queue::DeleteQueueResponse),
     GetQueueAttributes(get_queue_attributes::GetQueueAttributesResponse),
     ReceiveMessage(receive_message::ReceiveMessageResponse),
     SendMessageBatch(send_message_batch::SendMessageBatchResponse),
+    ListQueueTags(list_queue_tags::ListQueueTagsResponse),
+    TagQueue(tag_queue::TagQueueResponse),
+    UntagQueue(untag_queue::UntagQueueResponse),
 }
