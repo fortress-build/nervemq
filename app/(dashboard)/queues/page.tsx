@@ -111,6 +111,8 @@ export default function Queues() {
                   await deleteQueue({
                     name: queueToDelete.name,
                     namespace: queueToDelete.ns,
+                    attributes: [],
+                    tags: []
                   });
                   refetch();
                   setQueueToDelete(null);
