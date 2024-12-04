@@ -1,11 +1,15 @@
 "use client";
 
 import { DataTable } from "@/components/data-table";
-import type { ColumnDef } from "@tanstack/react-table";
+import type { ColumnDef, ColumnFiltersState } from "@tanstack/react-table";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
 import { listMessages } from "@/actions/api";
+import { Filter, Check } from "lucide-react";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { Command, CommandInput, CommandItem, CommandList, CommandEmpty, CommandGroup } from "@/components/ui/command";
+import React from "react";
 
 export type MessageObject = {
   id: number;
@@ -80,26 +84,47 @@ const columns: ColumnDef<MessageObject>[] = [
   },
   {
     accessorKey: "status",
-    header: "Status",
-    cell: ({ row }) => {
-      const delivered = row.original.delivered_at > 0;
-      const status = delivered
-        ? "delivered"
-        : row.original.tries > 3
-          ? "failed"
-          : "pending";
+    header: ({ column }) => {
+      const selectedStatus = column.getFilterValue() as string;
+      const statuses = ["delivered", "failed", "pending"];
+
       return (
-        <span
-          className={`px-2 py-1 rounded-full text-sm ${
-            status === "delivered"
-              ? "bg-green-100 text-green-800"
-              : status === "failed"
-                ? "bg-red-100 text-red-800"
-                : "bg-yellow-100 text-yellow-800"
-          }`}
-        >
-          {status}
-        </span>
+        <div className="flex items-center gap-2">
+          <span>Status</span>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="ghost" className="p-0 hover:bg-transparent">
+                <Filter className="h-4 w-4" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[200px] p-0">
+              <Command>
+                <CommandInput placeholder="Filter status..." />
+                <CommandList>
+                  <CommandEmpty>No status found</CommandEmpty>
+                  <CommandGroup>
+                    {statuses.map((status) => (
+                      <CommandItem
+                        key={status}
+                        value={status}
+                        onSelect={(value) => {
+                          column.setFilterValue(value === selectedStatus ? undefined : value);
+                        }}
+                      >
+                        <Check
+                          className={`mr-2 h-4 w-4 ${
+                            selectedStatus === status ? "opacity-100" : "opacity-0"
+                          }`}
+                        />
+                        {status}
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
+        </div>
       );
     },
   },
@@ -116,6 +141,10 @@ export default function MessageList({
   queue: string;
   namespace: string;
 }) {
+  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
+    []
+  );
+  
   const { data = [] } = useQuery({
     queryKey: ["queue-messages", { queue, namespace }],
     queryFn: () =>
@@ -132,6 +161,8 @@ export default function MessageList({
       renderSubComponent={({ row }) => (
         <MessageDetails message={row.original} />
       )}
+      columnFilters={columnFilters}
+      setColumnFilters={setColumnFilters}
     />
   );
 }
