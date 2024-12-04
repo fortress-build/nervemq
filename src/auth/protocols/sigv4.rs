@@ -1,14 +1,15 @@
+use std::pin::Pin;
+
 use actix_web::{
     dev::ServiceRequest,
     web::{self},
     HttpMessage,
 };
-use futures_util::StreamExt;
-// use actix_web_lab::util::fork_request_payload;
+use bytes::BytesMut;
+use futures_util::TryStreamExt;
 use hmac::Mac;
 use secrecy::ExposeSecret;
 use sha2::Sha256;
-use tokio_stream::wrappers::UnboundedReceiverStream;
 
 use crate::{
     api::auth::User,
@@ -30,98 +31,54 @@ pub struct SigV4Header<'a> {
     pub service: &'a str,
 }
 
-/// NOTE: This function was lifted from the `actix-web-lab` crate since I don't need anything else
-/// from the crate.
-///
-/// Returns an effectively cloned payload that supports streaming efficiently.
-///
-/// The cloned payload:
-/// - yields identical chunks;
-/// - does not poll ahead of the original;
-/// - does not poll significantly slower than the original;
-/// - receives an error signal if the original errors, but details are opaque to the copy.
-///
-/// If the payload is forked in one of the extractors used in a handler, then the original _must_ be
-/// read in another extractor or else the request will hang.
-fn fork_request_payload(orig_payload: &mut actix_web::dev::Payload) -> actix_web::dev::Payload {
-    const TARGET: &str = concat!(module_path!(), "::fork_request_payload");
-
-    let payload = orig_payload.take();
-
-    let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
-
-    let proxy_stream: actix_http::BoxedPayloadStream =
-        Box::pin(payload.inspect(move |res| match res {
-            Ok(chunk) => {
-                tracing::trace!(target: TARGET, "yielding {} byte chunk", chunk.len());
-                tx.send(Ok(chunk.clone())).ok();
-            }
-            Err(err) => {
-                tx.send(Err(actix_web::error::PayloadError::Io(
-                    std::io::Error::new(
-                        std::io::ErrorKind::Other,
-                        format!("error from original stream: {err}"),
-                    ),
-                )))
-                .ok();
-            }
-        }));
-
-    tracing::trace!(target: TARGET, "creating proxy payload");
-    *orig_payload = actix_web::dev::Payload::from(proxy_stream);
-
-    actix_web::dev::Payload::Stream {
-        payload: Box::pin(UnboundedReceiverStream::new(rx)),
-    }
-}
-
 pub async fn authenticate_sigv4(
     req: &mut ServiceRequest,
     header: SigV4Header<'_>,
 ) -> Result<(User, AuthorizedNamespace), Error> {
     let payload_hash = {
-        let mut original_payload = req.take_payload();
+        let payload = req.take_payload();
 
-        let mut payload = fork_request_payload(&mut original_payload);
-
-        req.set_payload(original_payload);
-
-        let mut bytes = Vec::new();
-        while let Some(chunk) = payload
-            .next()
+        let bytes = payload
+            .try_fold(BytesMut::new(), |mut acc, chunk| async move {
+                acc.extend_from_slice(&chunk);
+                Ok(acc)
+            })
             .await
-            .transpose()
-            // temporary
-            .ok()
-            .flatten()
-        // .map_err(|e| Error::internal(e))?
-        {
-            if chunk.is_empty() {
-                break;
-            }
-            bytes.extend_from_slice(&chunk);
-        }
+            .map_err(|e| {
+                tracing::error!("Error reading request payload: {}", e);
+                Error::internal(e)
+            })?;
 
-        sha256_hex(&[])
+        let payload = actix_web::dev::Payload::Stream {
+            payload: Box::pin(futures_util::stream::once(std::future::ready(Ok(bytes
+                .clone()
+                .freeze()))))
+                as Pin<
+                    Box<dyn futures_util::Stream<Item = Result<_, actix_web::error::PayloadError>>>,
+                >,
+        };
+
+        req.set_payload(payload);
+
+        sha256_hex(&bytes)
     };
 
     let canonical_headers = header
         .signed_headers
         .iter()
         .map(|header| {
-            let header = header.to_lowercase();
             let value = req
                 .headers()
-                .get(&header)
+                .get(*header)
                 .ok_or_else(|| Error::MissingHeader {
-                    header: header.clone(),
+                    header: header.to_string(),
                 })?
                 .to_str()
                 .map_err(|e| {
                     tracing::error!("Invalid header value: {}", e);
 
                     Error::InvalidHeader {
-                        header: header.clone(),
+                        header: header.to_string(),
                     }
                 })?;
             Ok(format!("{}:{}", header, value))
@@ -135,7 +92,7 @@ pub async fn authenticate_sigv4(
         "{}\n{}\n{}\n{}\n{}\n{}",
         req.method(),
         req.uri(),
-        "",
+        "us-west-1", // FIXME: This should be the actual region
         canonical_headers,
         signed_headers,
         payload_hash,

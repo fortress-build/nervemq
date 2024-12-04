@@ -319,12 +319,41 @@ pub mod delete_message_batch {
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "PascalCase", tag = "DataType")]
 pub enum SqsMessageAttribute {
-    #[serde(rename_all = "PascalCase")]
-    String { string_value: String },
-    #[serde(rename_all = "PascalCase")]
-    Number { string_value: String },
-    #[serde(rename_all = "PascalCase")]
-    Binary { binary_value: Vec<u8> },
+    String {
+        #[serde(rename = "StringValue")]
+        string_value: String,
+    },
+    Number {
+        #[serde(rename = "StringValue")]
+        string_value: String,
+    },
+    Binary {
+        #[serde(rename = "BinaryValue")]
+        binary_value: Vec<u8>,
+    },
+}
+
+#[test]
+fn test_sqs_message_attribute() {
+    let attr = SqsMessageAttribute::String {
+        string_value: "hello".to_string(),
+    };
+    let json = serde_json::to_string(&attr).unwrap();
+    assert_eq!(json, r#"{"DataType":"String","StringValue":"hello"}"#);
+    let attr = SqsMessageAttribute::Number {
+        string_value: "123".to_string(),
+    };
+    let json = serde_json::to_string(&attr).unwrap();
+    assert_eq!(json, r#"{"DataType":"Number","StringValue":"123"}"#);
+    let attr = SqsMessageAttribute::Binary {
+        binary_value: b"TEST".to_vec(),
+    };
+    let json = serde_json::to_string(&attr).unwrap();
+    assert_eq!(json, r#"{"DataType":"Binary","BinaryValue":[84,69,83,84]}"#);
+
+    let attr: SqsMessageAttribute =
+        serde_json::from_str(r#"{"DataType":"String","StringValue":"hello"}"#).unwrap();
+    assert!(matches!(attr, SqsMessageAttribute::String { .. }),);
 }
 
 #[derive(Debug, serde::Serialize)]
