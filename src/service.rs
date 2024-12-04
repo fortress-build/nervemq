@@ -29,6 +29,63 @@ use crate::{
     sqs::types::{SqsMessage, SqsMessageAttribute},
 };
 
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RedrivePolicy {
+    /// The field is named ARN, but for NerveMQ we use the format `namespace:queue`
+    dead_letter_target_arn: String,
+    max_receive_count: u64,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct QueueAttributes {
+    delay_seconds: Option<u64>,
+    max_message_size: Option<u64>,
+    message_retention_period: Option<u64>,
+    receive_message_wait_time_seconds: Option<u64>,
+    visibility_timeout: Option<u64>,
+
+    // TODO: RedrivePolicy, RedriveAllowPolicy
+    redrive_policy: Option<RedrivePolicy /* Must be JSON serialized to a string */>,
+
+    #[serde(flatten)]
+    other: HashMap<String, String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct QueueAttributesSer {
+    delay_seconds: Option<u64>,
+    max_message_size: Option<u64>,
+    message_retention_period: Option<u64>,
+    receive_message_wait_time_seconds: Option<u64>,
+    visibility_timeout: Option<u64>,
+
+    // TODO: RedrivePolicy, RedriveAllowPolicy
+    redrive_policy: Option<String /* Must be JSON serialized to a string */>,
+
+    #[serde(flatten)]
+    other: HashMap<String, String>,
+}
+
+impl QueueAttributes {
+    pub fn ser(self) -> Result<QueueAttributesSer, Error> {
+        Ok(QueueAttributesSer {
+            delay_seconds: self.delay_seconds,
+            max_message_size: self.max_message_size,
+            message_retention_period: self.message_retention_period,
+            receive_message_wait_time_seconds: self.receive_message_wait_time_seconds,
+            visibility_timeout: self.visibility_timeout,
+            redrive_policy: self
+                .redrive_policy
+                .map(|rp| serde_json::to_string(&rp))
+                .transpose()?,
+            other: self.other,
+        })
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, FromRow)]
 pub struct QueueConfig {
     pub queue: u64,
