@@ -30,6 +30,9 @@ pub struct SigV4Header<'a> {
     pub service: &'a str,
 }
 
+/// NOTE: This function was lifted from the `actix-web-lab` crate since I don't need anything else
+/// from the crate.
+///
 /// Returns an effectively cloned payload that supports streaming efficiently.
 ///
 /// The cloned payload:
@@ -40,7 +43,7 @@ pub struct SigV4Header<'a> {
 ///
 /// If the payload is forked in one of the extractors used in a handler, then the original _must_ be
 /// read in another extractor or else the request will hang.
-pub fn fork_request_payload(orig_payload: &mut actix_web::dev::Payload) -> actix_web::dev::Payload {
+fn fork_request_payload(orig_payload: &mut actix_web::dev::Payload) -> actix_web::dev::Payload {
     const TARGET: &str = concat!(module_path!(), "::fork_request_payload");
 
     let payload = orig_payload.take();
