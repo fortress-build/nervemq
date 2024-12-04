@@ -5,13 +5,14 @@ use std::{
 
 use actix_identity::Identity;
 use actix_web::web;
+use base64::Engine;
 use secrecy::SecretString;
 use serde::{Deserialize, Serialize};
 use serde_email::Email;
 use sqlx::{
     sqlite::{
         SqliteAutoVacuum, SqliteConnectOptions, SqliteJournalMode, SqliteLockingMode,
-        SqlitePoolOptions,
+        SqlitePoolOptions, SqliteRow,
     },
     Acquire, FromRow, Sqlite, SqlitePool,
 };
@@ -23,17 +24,183 @@ use crate::{
     auth::crypto::hash_secret,
     config::Config,
     error::Error,
-    message::Message,
+    message::{Message, MessageStatus},
     namespace::{Namespace, NamespaceStatistics},
     queue::{Queue, QueueStatistics},
     sqs::types::{SqsMessage, SqsMessageAttribute},
 };
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RedrivePolicy {
+    /// The field is named ARN, but for NerveMQ we use the format `namespace:queue`
+    dead_letter_target_arn: String,
+    max_receive_count: u64,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct QueueAttributes {
+    pub delay_seconds: Option<u64>,
+    pub max_message_size: Option<u64>,
+    pub message_retention_period: Option<u64>,
+    pub receive_message_wait_time_seconds: Option<u64>,
+    pub visibility_timeout: Option<u64>,
+
+    // TODO: RedrivePolicy, RedriveAllowPolicy
+    pub redrive_policy: Option<RedrivePolicy /* Must be JSON serialized to a string */>,
+
+    #[serde(flatten)]
+    pub other: HashMap<String, serde_json::Value>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct QueueAttributesSer {
+    pub delay_seconds: Option<u64>,
+    pub max_message_size: Option<u64>,
+    pub message_retention_period: Option<u64>,
+    pub receive_message_wait_time_seconds: Option<u64>,
+    pub visibility_timeout: Option<u64>,
+
+    // TODO: RedrivePolicy, RedriveAllowPolicy
+    pub redrive_policy: Option<String /* Must be JSON serialized to a string */>,
+
+    #[serde(flatten)]
+    pub other: HashMap<String, serde_json::Value>,
+}
+
+impl QueueAttributesSer {
+    pub fn deser(self) -> Result<QueueAttributes, Error> {
+        Ok(QueueAttributes {
+            delay_seconds: self.delay_seconds,
+            max_message_size: self.max_message_size,
+            message_retention_period: self.message_retention_period,
+            receive_message_wait_time_seconds: self.receive_message_wait_time_seconds,
+            visibility_timeout: self.visibility_timeout,
+            redrive_policy: self
+                .redrive_policy
+                .map(|rp| serde_json::from_str(&rp))
+                .transpose()?,
+            other: self.other,
+        })
+    }
+}
+
+impl QueueAttributes {
+    pub fn ser(self) -> Result<QueueAttributesSer, Error> {
+        Ok(QueueAttributesSer {
+            delay_seconds: self.delay_seconds,
+            max_message_size: self.max_message_size,
+            message_retention_period: self.message_retention_period,
+            receive_message_wait_time_seconds: self.receive_message_wait_time_seconds,
+            visibility_timeout: self.visibility_timeout,
+            redrive_policy: self
+                .redrive_policy
+                .map(|rp| serde_json::to_string(&rp))
+                .transpose()?,
+            other: self.other,
+        })
+    }
+}
+
+pub trait QueueAttribute {
+    type Value;
+
+    fn name(&self) -> &str;
+}
+
+pub mod queue_attributes {
+    use super::QueueAttribute;
+
+    pub struct DelaySeconds;
+
+    impl QueueAttribute for DelaySeconds {
+        type Value = u64;
+
+        fn name(&self) -> &str {
+            "delay_seconds"
+        }
+    }
+
+    pub struct MaxMessageSize;
+
+    impl QueueAttribute for MaxMessageSize {
+        type Value = u64;
+        fn name(&self) -> &str {
+            "max_message_size"
+        }
+    }
+
+    pub struct MessageRetentionPeriod;
+
+    impl QueueAttribute for MessageRetentionPeriod {
+        type Value = u64;
+        fn name(&self) -> &str {
+            "message_retention_period"
+        }
+    }
+
+    pub struct ReceiveMessageWaitTimeSeconds;
+
+    impl QueueAttribute for ReceiveMessageWaitTimeSeconds {
+        type Value = u64;
+        fn name(&self) -> &str {
+            "receive_message_wait_time_seconds"
+        }
+    }
+
+    pub struct VisibilityTimeout;
+
+    impl QueueAttribute for VisibilityTimeout {
+        type Value = u64;
+        fn name(&self) -> &str {
+            "visibility_timeout"
+        }
+    }
+
+    pub struct RedrivePolicy;
+
+    impl QueueAttribute for RedrivePolicy {
+        type Value = String;
+
+        fn name(&self) -> &str {
+            "redrive_policy"
+        }
+    }
+
+    pub struct Other(String);
+
+    impl QueueAttribute for Other {
+        type Value = String;
+
+        fn name(&self) -> &str {
+            &self.0
+        }
+    }
+}
 
 #[derive(Debug, Serialize, Deserialize, FromRow)]
 pub struct QueueConfig {
     pub queue: u64,
     pub max_retries: u64,
     pub dead_letter_queue: Option<u64>,
+}
+
+/// Represents the details of a message for display in the UI.
+#[derive(Debug, Serialize)]
+pub struct MessageDetails {
+    pub id: u64,
+    pub queue: String,
+
+    pub delivered_at: Option<u64>,
+    pub sent_by: Option<u64>,
+    pub body: String,
+    pub tries: u64,
+
+    pub status: MessageStatus,
+
+    pub message_attributes: HashMap<String, serde_json::Value>,
 }
 
 #[derive(Clone)]
@@ -341,13 +508,146 @@ impl Service {
         Ok(())
     }
 
+    // TODO: Improve type safety for attributes
+
     pub async fn set_queue_attributes(
         &self,
         ns: &str,
         queue: &str,
-        attributes: HashMap<String, String>,
+        attributes: QueueAttributesSer,
         identity: Identity,
     ) -> Result<(), Error> {
+        let mut tx = self.db().begin().await?;
+
+        let ns_id = self
+            .get_namespace_id(ns, &mut *tx)
+            .await?
+            .ok_or(Error::namespace_not_found(ns))?;
+
+        self.check_user_access(&identity, ns_id, &mut *tx).await?;
+
+        let queue_id = self
+            .get_queue_id(ns, queue, &mut *tx)
+            .await?
+            .ok_or(Error::queue_not_found(queue, ns))?;
+
+        if let Some(delay_seconds) = attributes.delay_seconds {
+            sqlx::query(
+                "
+                INSERT INTO queue_attributes (queue, k, v)
+                VALUES ($1, 'delay_seconds', $2)
+                ON CONFLICT (queue, k) DO UPDATE SET v = $2
+                ",
+            )
+            .bind(queue_id as i64)
+            .bind(delay_seconds as i64)
+            .execute(&mut *tx)
+            .await?;
+        }
+
+        if let Some(max_message_size) = attributes.max_message_size {
+            sqlx::query(
+                "
+                INSERT INTO queue_attributes (queue, k, v)
+                VALUES ($1, 'max_message_size', $2)
+                ON CONFLICT (queue, k) DO UPDATE SET v = $2
+                ",
+            )
+            .bind(queue_id as i64)
+            .bind(max_message_size as i64)
+            .execute(&mut *tx)
+            .await?;
+        }
+
+        if let Some(message_retention_period) = attributes.message_retention_period {
+            sqlx::query(
+                "
+                INSERT INTO queue_attributes (queue, k, v)
+                VALUES ($1, 'message_retention_period', $2)
+                ON CONFLICT (queue, k) DO UPDATE SET v = $2
+                ",
+            )
+            .bind(queue_id as i64)
+            .bind(message_retention_period as i64)
+            .execute(&mut *tx)
+            .await?;
+        }
+
+        if let Some(receive_message_wait_time_seconds) =
+            attributes.receive_message_wait_time_seconds
+        {
+            sqlx::query(
+                "
+                INSERT INTO queue_attributes (queue, k, v)
+                VALUES ($1, 'receive_message_wait_time_seconds', $2)
+                ON CONFLICT (queue, k) DO UPDATE SET v = $2
+                ",
+            )
+            .bind(queue_id as i64)
+            .bind(receive_message_wait_time_seconds as i64)
+            .execute(&mut *tx)
+            .await?;
+        }
+
+        if let Some(visibility_timeout) = attributes.visibility_timeout {
+            sqlx::query(
+                "
+                INSERT INTO queue_attributes (queue, k, v)
+                VALUES ($1, 'visibility_timeout', $2)
+                ON CONFLICT (queue, k) DO UPDATE SET v = $2
+                ",
+            )
+            .bind(queue_id as i64)
+            .bind(visibility_timeout as i64)
+            .execute(&mut *tx)
+            .await?;
+        }
+
+        if let Some(redrive_policy) = attributes.redrive_policy {
+            sqlx::query(
+                "
+                INSERT INTO queue_attributes (queue, k, v)
+                VALUES ($1, 'redrive_policy', $2)
+                ON CONFLICT (queue, k) DO UPDATE SET v = $2
+                ",
+            )
+            .bind(queue_id as i64)
+            .bind(redrive_policy)
+            .execute(&mut *tx)
+            .await?;
+        }
+
+        for (k, v) in attributes.other.into_iter() {
+            sqlx::query(
+                "
+                INSERT INTO queue_attributes (queue, k, v)
+                VALUES ($1, $2, $3)
+                ON CONFLICT (queue, k) DO UPDATE SET v = $3
+                ",
+            )
+            .bind(queue_id as i64)
+            .bind(k)
+            .bind(v)
+            .execute(&mut *tx)
+            .await?;
+        }
+
+        tx.commit().await?;
+
+        Ok(())
+    }
+
+    pub async fn get_queue_attribute<A>(
+        &self,
+        ns: &str,
+        queue: &str,
+        attribute: A,
+        identity: Identity,
+    ) -> Result<Option<A::Value>, Error>
+    where
+        A: QueueAttribute,
+        A::Value: for<'a> sqlx::FromRow<'a, SqliteRow> + std::marker::Unpin + Send,
+    {
         let mut db = self.db().acquire().await?;
 
         let ns_id = self
@@ -362,20 +662,57 @@ impl Service {
             .await?
             .ok_or(Error::queue_not_found(queue, ns))?;
 
-        for (k, v) in attributes.into_iter() {
-            sqlx::query(
-                "
-                INSERT INTO queue_attributes (queue, k, v)
-                VALUES ($1, $2, $3)
-                ON CONFLICT (queue, k) DO UPDATE SET v = $3
-                ",
-            )
-            .bind(queue_id as i64)
-            .bind(k)
-            .bind(v)
-            .execute(&mut *db)
-            .await?;
-        }
+        let res = sqlx::query_as::<_, A::Value>(
+            "
+            SELECT k, v FROM queue_attributes WHERE queue = $1 AND k = $2
+            ",
+        )
+        .bind(queue_id as i64)
+        .bind(attribute.name())
+        .fetch_optional(&mut *db)
+        .await?;
+
+        Ok(res)
+    }
+
+    pub async fn set_queue_attribute<A>(
+        &self,
+        ns: &str,
+        queue: &str,
+        attribute: A,
+        value: A::Value,
+        identity: Identity,
+    ) -> Result<(), Error>
+    where
+        A: QueueAttribute,
+        A::Value: sqlx::Type<Sqlite> + for<'a> sqlx::Encode<'a, Sqlite> + std::marker::Unpin + Send,
+    {
+        let mut tx = self.db().begin().await?;
+
+        let ns_id = self
+            .get_namespace_id(ns, &mut *tx)
+            .await?
+            .ok_or(Error::namespace_not_found(ns))?;
+
+        self.check_user_access(&identity, ns_id, &mut *tx).await?;
+
+        let queue_id = self
+            .get_queue_id(ns, queue, &mut *tx)
+            .await?
+            .ok_or(Error::queue_not_found(queue, ns))?;
+
+        sqlx::query(
+            "
+            INSERT INTO queue_attributes (queue, k, v)
+            VALUES ($1, $2, $3)
+            ON CONFLICT (queue, k) DO UPDATE SET v = $3
+            ",
+        )
+        .bind(queue_id as i64)
+        .bind(attribute.name())
+        .bind(value)
+        .execute(&mut *tx)
+        .await?;
 
         Ok(())
     }
@@ -386,7 +723,7 @@ impl Service {
         queue: &str,
         names: &[String],
         identity: Identity,
-    ) -> Result<HashMap<String, String>, Error> {
+    ) -> Result<QueueAttributesSer, Error> {
         let mut db = self.db().acquire().await?;
 
         let ns_id = self
@@ -403,16 +740,48 @@ impl Service {
 
         let set = names.iter().collect::<HashSet<_>>();
 
-        let res = sqlx::query_as(
+        let mut res = sqlx::query_as::<_, (String, serde_json::Value)>(
             "
             SELECT k, v FROM queue_attributes WHERE queue = $1
             ",
         )
         .bind(queue_id as i64)
-        .fetch_all(&mut *db)
-        .await?;
+        .fetch(&mut *db);
 
-        Ok(res.into_iter().filter(|(k, _)| set.contains(k)).collect())
+        let mut attributes = QueueAttributesSer {
+            delay_seconds: None,
+            max_message_size: None,
+            message_retention_period: None,
+            receive_message_wait_time_seconds: None,
+            visibility_timeout: None,
+            redrive_policy: None,
+            other: Default::default(),
+        };
+        while let Some((k, v)) = res.next().await.transpose()? {
+            match &*k {
+                "delay_seconds" => attributes.delay_seconds = Some(serde_json::from_value(v)?),
+                "max_message_size" => {
+                    attributes.max_message_size = Some(serde_json::from_value(v)?)
+                }
+                "message_retention_period" => {
+                    attributes.message_retention_period = Some(serde_json::from_value(v)?)
+                }
+                "receive_message_wait_time_seconds" => {
+                    attributes.receive_message_wait_time_seconds = Some(serde_json::from_value(v)?)
+                }
+                "visibility_timeout" => {
+                    attributes.visibility_timeout = Some(serde_json::from_value(v)?)
+                }
+                "redrive_policy" => attributes.redrive_policy = Some(serde_json::from_value(v)?),
+                _ => {
+                    if set.contains(&k) {
+                        attributes.other.insert(k, v);
+                    }
+                }
+            }
+        }
+
+        Ok(attributes)
     }
 
     pub async fn tag_queue(
@@ -680,7 +1049,7 @@ impl Service {
             sqlx::query("INSERT INTO kv_pairs (message, k, v) VALUES ($1, $2, $3)")
                 .bind(msg_id as i64)
                 .bind(k)
-                .bind(bincode::serialize(&v).map_err(Error::internal)?)
+                .bind(serde_json::to_vec(&v).map_err(Error::internal)?)
                 .execute(&mut *tx)
                 .await?;
         }
@@ -727,7 +1096,7 @@ impl Service {
                 sqlx::query("INSERT INTO kv_pairs (message, k, v) VALUES ($1, $2, $3)")
                     .bind(msg_id as i64)
                     .bind(k)
-                    .bind(bincode::serialize(&v).map_err(Error::internal)?)
+                    .bind(serde_json::to_vec(&v).map_err(Error::internal)?)
                     .execute(&mut *tx)
                     .await?;
             }
@@ -795,7 +1164,7 @@ impl Service {
             .fetch(&mut *tx);
 
             while let Some((k, v)) = kv.next().await.transpose()? {
-                let v: SqsMessageAttribute = bincode::deserialize(&v).map_err(Error::internal)?;
+                let v: SqsMessageAttribute = serde_json::from_slice(&v).map_err(Error::internal)?;
                 message_attributes.insert(k, v);
             }
 
@@ -889,7 +1258,15 @@ impl Service {
             .fetch(self.db());
 
             while let Some((k, v)) = kv.next().await.transpose()? {
-                let v: SqsMessageAttribute = bincode::deserialize(&v).map_err(Error::internal)?;
+                let Ok(v) = serde_json::from_slice::<SqsMessageAttribute>(&v) else {
+                    tracing::warn!(
+                        attribute = k,
+                        message = message.id,
+                        "Failed to deserialize message attribute",
+                    );
+
+                    continue;
+                };
                 message_attributes.insert(k, v);
             }
 
@@ -967,7 +1344,11 @@ impl Service {
     //     Ok(Some(msg))
     // }
 
-    pub async fn list_messages(&self, namespace: &str, queue: &str) -> Result<Vec<Message>, Error> {
+    pub async fn list_messages(
+        &self,
+        namespace: &str,
+        queue: &str,
+    ) -> Result<Vec<MessageDetails>, Error> {
         let mut db = self.db().acquire().await?;
 
         let mut messages = sqlx::query_as::<_, Message>(
@@ -991,25 +1372,73 @@ impl Service {
         .fetch(&mut *db);
 
         let mut join_set = JoinSet::new();
-        while let Some(mut message) = messages.next().await.transpose()? {
+        while let Some(message) = messages.next().await.transpose()? {
             let db = self.db().clone();
             join_set.spawn_local(async move {
                 let mut conn = db.acquire().await?;
-                let mut kv_pairs = sqlx::query_as::<_, (String, Vec<u8>)>(
+                // let mut kv_pairs = sqlx::query_as::<_, (String, Vec<u8>)>(
+                //     "
+                //     SELECT k, v FROM kv_pairs WHERE message = $1
+                // ",
+                // )
+                // .bind(message.id as i64)
+                // .fetch(&mut *conn);
+                //
+                // while let Some((k, v)) = kv_pairs.next().await.transpose()? {
+                //     message
+                //         .kv
+                //         .insert(k, bincode::deserialize(&v).map_err(Error::internal)?);
+                // }
+
+                let mut message_attributes = HashMap::new();
+                let mut kv = sqlx::query_as::<_, (String, Vec<u8>)>(
                     "
                     SELECT k, v FROM kv_pairs WHERE message = $1
-                ",
+                    ",
                 )
                 .bind(message.id as i64)
                 .fetch(&mut *conn);
 
-                while let Some((k, v)) = kv_pairs.next().await.transpose()? {
-                    message
-                        .kv
-                        .insert(k, bincode::deserialize(&v).map_err(Error::internal)?);
+                while let Some((k, v)) = kv.next().await.transpose()? {
+                    let attr = match serde_json::from_slice(&v) {
+                        Ok(attr) => attr,
+                        Err(e) => {
+                            tracing::warn!(
+                                attribute = k,
+                                message = message.id,
+                                "Failed to deserialize message attribute: {e}",
+                            );
+
+                            continue;
+                        }
+                    };
+                    let value = match attr {
+                        SqsMessageAttribute::String { string_value: s } => {
+                            serde_json::Value::String(s)
+                        }
+                        SqsMessageAttribute::Number { string_value: s } => {
+                            serde_json::Value::Number(s.parse().map_err(Error::internal)?)
+                        }
+                        SqsMessageAttribute::Binary { binary_value: b } => {
+                            serde_json::Value::String(base64::prelude::BASE64_STANDARD.encode(b))
+                        }
+                    };
+                    message_attributes.insert(k, value);
                 }
 
-                Result::<_, Error>::Ok(message)
+                let sqs_message = MessageDetails {
+                    id: message.id,
+                    queue: message.queue,
+                    status: message.status,
+                    sent_by: message.sent_by,
+                    delivered_at: message.delivered_at,
+                    tries: message.tries,
+                    body: message.body,
+
+                    message_attributes,
+                };
+
+                Result::<_, Error>::Ok(sqs_message)
             });
         }
 

@@ -100,7 +100,6 @@ mod tests {
             "AmazonSQS.InvalidMethod", // Non-existent method
             "Amazon.SendMessage",      // Wrong prefix
             "",                        // Empty string
-            "AmazonSQS.DeleteQueue",   // Unimplemented method
         ];
 
         for input in invalid_inputs {

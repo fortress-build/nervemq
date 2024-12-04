@@ -44,7 +44,7 @@ bytes = { version = "1.9.0", features = ["serde"] }
 chrono = "0.4.38"
 envy = "0.4.2"
 eyre = "0.6.12"
-futures-util = "0.3.31"
+futures-util = { version = "0.3.31", features = ["io", "tokio-io"] }
 hex = { version = "0.4.3", features = ["serde"] }
 hmac = { version = "0.12.1", features = ["std"] }
 md5 = "0.7.0"
