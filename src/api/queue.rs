@@ -11,9 +11,8 @@ use sqlx::FromRow;
 
 use crate::{
     error::Error,
-    message::Message,
     queue::Queue,
-    service::{QueueConfig, Service},
+    service::{MessageDetails, QueueConfig, Service},
 };
 
 #[derive(Serialize, Deserialize)]
@@ -116,7 +115,7 @@ async fn list_messages(
     service: web::Data<Service>,
     path: web::Path<(String, String)>,
     identity: Identity,
-) -> actix_web::Result<web::Json<Vec<Message>>> {
+) -> actix_web::Result<web::Json<Vec<MessageDetails>>> {
     let (namespace, name) = &*path;
 
     let ns_id = match service.get_namespace_id(namespace, service.db()).await {
