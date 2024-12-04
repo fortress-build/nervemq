@@ -4,18 +4,19 @@ use actix_session::config::{CookieContentSecurity, PersistentSession};
 use actix_session::SessionMiddleware;
 use actix_web::cookie::time::Duration;
 use actix_web::middleware::{NormalizePath, TrailingSlash};
-use actix_web::web::{self, FormConfig, JsonConfig};
+use actix_web::web::{FormConfig, JsonConfig};
 use actix_web::{web::Data, App, HttpServer};
 
 use chrono::TimeDelta;
 use nervemq::api::auth::{self};
-use nervemq::api::sqs::SqsApi;
-use nervemq::api::{admin, data, namespace, queue, sqs, tokens};
+use nervemq::api::{admin, data, namespace, queue, tokens};
 use nervemq::auth::middleware::api_keys::ApiKeyAuth;
 use nervemq::auth::middleware::protected_route::Protected;
 use nervemq::auth::session::SqliteSessionStore;
 use nervemq::config::Config;
 use nervemq::service::Service;
+use nervemq::sqs;
+use nervemq::sqs::service::SqsApi;
 use tracing::level_filters::LevelFilter;
 // use openssl::ssl::{SslAcceptor, SslFiletype, SslMethod};
 use tracing_actix_web::TracingLogger;
@@ -53,6 +54,8 @@ async fn main() -> eyre::Result<()> {
     let service = Service::connect_with(config).await?;
 
     let session_store = SqliteSessionStore::new(service.db().clone());
+
+    // FIXME: This should be generated on first run and stored in a file, or pulled from config
     let secret_key = actix_web::cookie::Key::generate();
 
     let data = Data::new(service);

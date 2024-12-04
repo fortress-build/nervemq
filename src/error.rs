@@ -48,6 +48,9 @@ pub enum Error {
     #[snafu(display("Invalid parameter: {message}"))]
     InvalidParameter { message: String },
 
+    #[snafu(display("Invalid request method: {message}"))]
+    InvalidMethod { message: String },
+
     #[snafu(display("Missing parameter: {message}"))]
     MissingParameter { message: String },
 }
@@ -144,6 +147,7 @@ impl actix_web::ResponseError for Error {
             Self::MissingHeader { .. }
             | Self::MissingParameter { .. }
             | Self::InvalidHeader { .. }
+            | Self::InvalidMethod { .. }
             | Self::InvalidParameter { .. } => actix_web::http::StatusCode::BAD_REQUEST,
             Self::PayloadTooLarge => actix_web::http::StatusCode::PAYLOAD_TOO_LARGE,
 
