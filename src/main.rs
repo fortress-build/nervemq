@@ -19,6 +19,7 @@ use nervemq::{
         data, namespace, queue, tokens,
     },
     auth::{
+        kms::sqlite::SqliteKeyManager,
         middleware::{api_keys::ApiKeyAuth, protected_route::Protected},
         session::SqliteSessionStore,
     },
@@ -59,7 +60,11 @@ async fn main() -> eyre::Result<()> {
 
     let config = Config::load()?;
 
-    let service = Service::connect_with(config).await?;
+    let service = Service::connect_with(config, |db| {
+        let db = db.clone();
+        async move { SqliteKeyManager::new(db).await }
+    })
+    .await?;
 
     let session_store = SqliteSessionStore::new(service.db().clone());
 
@@ -88,8 +93,6 @@ async fn main() -> eyre::Result<()> {
                 .cookie_secure(true)
                 .cookie_content_security(CookieContentSecurity::Signed)
                 .session_lifecycle(PersistentSession::default().session_ttl(session_ttl))
-                .cookie_domain(Some("localhost".to_owned()))
-                .cookie_path("/".to_owned())
                 .cookie_http_only(true)
                 .cookie_name("nervemq_session".to_owned())
                 .build();
@@ -101,7 +104,6 @@ async fn main() -> eyre::Result<()> {
             .build();
 
         let cors = Cors::default()
-            // .send_wildcard()
             .supports_credentials()
             .allow_any_origin()
             .allow_any_header()
@@ -111,12 +113,12 @@ async fn main() -> eyre::Result<()> {
         let form_cfg = FormConfig::default();
 
         App::new()
+            .wrap(TracingLogger::default())
             .wrap(ApiKeyAuth)
             .wrap(identity_middleware)
             .wrap(session_middleware)
-            .wrap(cors)
-            .wrap(TracingLogger::default())
             .wrap(NormalizePath::new(TrailingSlash::Trim))
+            .wrap(cors)
             .service(queue::service().wrap(Protected::authenticated()))
             .service(data::service().wrap(Protected::authenticated()))
             .service(tokens::service().wrap(Protected::authenticated()))

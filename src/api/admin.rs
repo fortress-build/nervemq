@@ -66,11 +66,9 @@ pub async fn delete_user(
     data: web::Json<DeleteUserRequest>,
     service: web::Data<Service>,
 ) -> actix_web::Result<impl Responder> {
-    sqlx::query("DELETE FROM users WHERE email = $1")
-        .bind(data.email.as_str())
-        .execute(service.db())
-        .await
-        .map_err(actix_web::error::ErrorInternalServerError)?;
+    service
+        .delete_user(Email::from_str(&data.email).map_err(|e| ErrorBadRequest(e))?)
+        .await?;
 
     Ok(HttpResponse::Ok())
 }
