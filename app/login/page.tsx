@@ -12,15 +12,15 @@ import {
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { useForm } from "@tanstack/react-form";
-import { yupValidator } from "@tanstack/yup-form-adapter";
-import { loginFormSchema } from "@/schemas/login-form";
-import { SERVER_ENDPOINT } from "../globals";
+import { type YupValidator, yupValidator } from "@tanstack/yup-form-adapter";
+import { loginFormSchema, type LoginRequest } from "@/schemas/login-form";
 import { type AdminSession, useGlobalState } from "@/lib/state/global";
+import { login } from "@/actions/api";
 
 export default function LoginPage() {
   const router = useRouter();
 
-  const form = useForm({
+  const form = useForm<LoginRequest, YupValidator>({
     validatorAdapter: yupValidator(),
     validators: {
       onSubmit: loginFormSchema,
@@ -34,31 +34,12 @@ export default function LoginPage() {
     onSubmit: async ({ value }) => {
       "use client";
 
-      const data: AdminSession | undefined = await fetch(
-        `${SERVER_ENDPOINT}/auth/login`,
-        {
-          method: "POST",
-          body: JSON.stringify(value),
-          credentials: "include",
-          mode: "cors",
+      const data: AdminSession | undefined = await login(value).catch(
+        (e: Error) => {
+          toast.error(e.message);
+          return undefined;
         },
-      ).then((res) => {
-        if (!res.ok) {
-          switch (res.status) {
-            case 401: {
-              toast.error("Invalid email or password");
-              break;
-            }
-            default: {
-              toast.error("Something went wrong");
-              break;
-            }
-          }
-          return;
-        }
-
-        return res.json();
-      });
+      );
 
       if (data === undefined) {
         return;

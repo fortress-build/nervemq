@@ -1,10 +1,12 @@
+use std::future::Future;
+
 use argon2::{
     password_hash::{PasswordHashString, PasswordHasher, SaltString},
     Argon2, PasswordVerifier,
 };
-use hmac::{Hmac, Mac};
+use bytes::Bytes;
 use rand::Rng;
-use secrecy::{ExposeSecret, SecretBox, SecretSlice, SecretString};
+use secrecy::{ExposeSecret, SecretBox, SecretString};
 use sha2::{Digest, Sha256};
 
 pub fn sha256_hex(data: &[u8]) -> String {
@@ -13,23 +15,23 @@ pub fn sha256_hex(data: &[u8]) -> String {
     hex::encode(hasher.finalize())
 }
 
-pub fn gen_signature_key(key: &[u8], date: &str, region: &str, service: &str) -> SecretSlice<u8> {
-    let mut key_secret = Vec::with_capacity(key.len() + 4);
-    key_secret.extend_from_slice(b"AWS4");
-    key_secret.extend_from_slice(key);
-
-    let sign = |msg: &[u8], key: &[u8]| -> Vec<u8> {
-        let mut mac =
-            hmac::Hmac::<Sha256>::new_from_slice(key).expect("HMAC can take key of any size");
-        mac.update(msg);
-        mac.finalize().into_bytes().to_vec()
-    };
-
-    let date_key = sign(&key_secret, date.as_bytes());
-    let date_region_key = sign(&date_key, region.as_bytes());
-    let date_region_service_key = sign(&date_region_key, service.as_bytes());
-    sign(&date_region_service_key, b"aws4_request").into()
-}
+// pub fn gen_signature_key(key: &[u8], date: &str, region: &str, service: &str) -> SecretSlice<u8> {
+//     let mut key_secret = Vec::with_capacity(key.len() + 4);
+//     key_secret.extend_from_slice(b"AWS4");
+//     key_secret.extend_from_slice(key);
+//
+//     let sign = |msg: &[u8], key: &[u8]| -> Vec<u8> {
+//         let mut mac =
+//             hmac::Hmac::<Sha256>::new_from_slice(key).expect("HMAC can take key of any size");
+//         mac.update(msg);
+//         mac.finalize().into_bytes().to_vec()
+//     };
+//
+//     let date_key = sign(&key_secret, date.as_bytes());
+//     let date_region_key = sign(&date_key, region.as_bytes());
+//     let date_region_service_key = sign(&date_region_key, service.as_bytes());
+//     sign(&date_region_service_key, b"aws4_request").into()
+// }
 
 pub fn hash_secret(secret: SecretString) -> eyre::Result<PasswordHashString> {
     let argon2 = Argon2::default();
@@ -57,7 +59,7 @@ pub struct GeneratedKey {
     pub validation_key: Vec<u8>,
 }
 
-fn generate_token<const N: usize>(mut rng: impl Rng) -> eyre::Result<String> {
+pub fn generate_token<const N: usize>(mut rng: impl Rng) -> eyre::Result<String> {
     let mut token = [0u8; N];
     rng.try_fill_bytes(&mut token)?;
     Ok(bs58::encode(token).into_string())
@@ -77,11 +79,12 @@ pub fn generate_api_key() -> eyre::Result<GeneratedKey> {
         .serialize();
 
     let validation_key = {
-        let mut mac = Hmac::<Sha256>::new_from_slice(salt.as_str().as_bytes())?;
-
-        mac.update(long_token.as_bytes());
-
-        mac.finalize().into_bytes().to_vec()
+        // let mac = Hmac::<Sha256>::new_from_slice(long_token.as_bytes())?;
+        //
+        // // mac.update(salt.as_ref().as_bytes());
+        //
+        // mac.finalize().into_bytes().to_vec()
+        long_token_hash.as_bytes().to_vec()
     };
 
     Ok(GeneratedKey {

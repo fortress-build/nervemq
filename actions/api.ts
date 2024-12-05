@@ -1,4 +1,3 @@
-"use client";
 import type { NamespaceStatistics } from "@/components/namespaces/table";
 import type { QueueStatistics } from "@/components/queues/table";
 import type { CreateNamespaceRequest } from "@/schemas/create-namespace";
@@ -13,8 +12,37 @@ import { SERVER_ENDPOINT } from "@/app/globals";
 import type { CreateUserRequest } from "@/schemas/create-user";
 import { toast } from "sonner";
 import type { ApiKey } from "@/components/api-keys/table";
-import type { Role } from "@/lib/state/global";
+import type { AdminSession, Role } from "@/lib/state/global";
 import type { MessageObject } from "@/app/(dashboard)/queues/list";
+import type { LoginRequest } from "@/schemas/login-form";
+
+export async function logout() {
+  await fetch(`${SERVER_ENDPOINT}/auth/logout`, {
+    method: "POST",
+    credentials: "include",
+  });
+}
+
+export async function login(data: LoginRequest): Promise<AdminSession> {
+  const res = await fetch(`${SERVER_ENDPOINT}/auth/login`, {
+    method: "POST",
+    body: JSON.stringify(data),
+    credentials: "include",
+    mode: "cors",
+  });
+  if (!res.ok) {
+    switch (res.status) {
+      case 401: {
+        throw new Error("Invalid email or password");
+      }
+      default: {
+        throw new Error("Something went wrong");
+      }
+    }
+  }
+
+  return await res.json();
+}
 
 export async function createNamespace(data: CreateNamespaceRequest) {
   await fetch(`${SERVER_ENDPOINT}/ns/${data.name}`, {

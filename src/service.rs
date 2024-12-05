@@ -21,7 +21,7 @@ use tokio_stream::StreamExt as _;
 
 use crate::{
     api::auth::{Permission, Role, User},
-    auth::crypto::hash_secret,
+    auth::{crypto::hash_secret, kms::KeyManager},
     config::Config,
     error::Error,
     message::{Message, MessageStatus},
@@ -205,6 +205,7 @@ pub struct MessageDetails {
 
 #[derive(Clone)]
 pub struct Service {
+    kms: Arc<dyn KeyManager>,
     db: SqlitePool,
     #[allow(unused)]
     config: Arc<crate::config::Config>,
@@ -215,15 +216,15 @@ impl Service {
         &self.db
     }
 
-    pub async fn connect() -> Result<Self, Error> {
-        Self::connect_with(Config::default()).await
+    pub async fn connect(kms: impl KeyManager) -> Result<Self, Error> {
+        Self::connect_with(kms, Config::default()).await
     }
 
     pub fn config(&self) -> &Config {
         &self.config
     }
 
-    pub async fn connect_with(config: Config) -> Result<Self, Error> {
+    pub async fn connect_with(kms: impl KeyManager, config: Config) -> Result<Self, Error> {
         let opts = SqliteConnectOptions::new()
             .filename(config.db_path())
             .create_if_missing(true)
@@ -238,6 +239,7 @@ impl Service {
         sqlx::migrate!("./migrations").run(&pool).await?;
 
         let svc = Self {
+            kms: Arc::new(kms),
             db: pool,
             config: Arc::new(config),
         };

@@ -1,16 +1,16 @@
 import boto3
 from types_boto3_sqs import SQSClient
 
-custom_url = 'http://localhost:8080/sqs'
+host_url = 'http://localhost:8080/sqs'
 
 
 def main():
     sqs: SQSClient = boto3.client(
         'sqs',
-        aws_access_key_id='UyTz3t56rjb',
-        aws_secret_access_key='GoLqobpKZiKyvdrGB5jmbmTizHsC12cXH',
+        aws_access_key_id='AwBFLg7mAyF',
+        aws_secret_access_key='DgyP1xy943mBrDEZxjsGTbDUdY91ZiFRw',
         region_name='us-west-1',
-        endpoint_url=custom_url,
+        endpoint_url=host_url,
     )
 
     url = None
