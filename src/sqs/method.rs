@@ -1,3 +1,20 @@
+//! SQS API method parsing and validation.
+//!
+//! This module handles the parsing and validation of AWS SQS API methods
+//! from HTTP requests. It supports the standard SQS method format:
+//! `AmazonSQS.{MethodName}` (e.g., "AmazonSQS.SendMessage").
+//!
+//! The module implements:
+//! - Method enumeration and parsing
+//! - Request extraction for Actix-web
+//! - Validation of SQS method formats
+//!
+//! # Format
+//! All valid SQS methods must:
+//! 1. Start with the prefix "AmazonSQS."
+//! 2. Be followed by a valid method name
+//! 3. Match exactly one of the supported operations
+
 use std::str::FromStr;
 
 use actix_web::{FromRequest, HttpMessage};
@@ -6,36 +23,42 @@ use strum::EnumString;
 
 use crate::{error::Error, utils::to_pom_error};
 
+/// Standard prefix for all SQS API method names.
+///
+/// All valid SQS method strings must start with this prefix followed by a dot.
+/// Example: "AmazonSQS.SendMessage"
 pub const SQS_METHOD_PREFIX: &str = "AmazonSQS";
 
+/// Represents an SQS API method.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, EnumString)]
 pub enum Method {
-    // AddPermission,
-    // CancelMessageMoveTask,
-    // ChangeMessageVisibility,
-    // ChangeMessageVisibilityBatch,
+    // AddPermission,                // TODO: Implement
+    // CancelMessageMoveTask,        // TODO: Implement
+    // ChangeMessageVisibility,      // TODO: Implement
+    // ChangeMessageVisibilityBatch, // TODO: Implement
     CreateQueue,
     DeleteMessage,
     DeleteMessageBatch,
     DeleteQueue,
     GetQueueAttributes,
     GetQueueUrl,
-    // ListDeadLetterSourceQueues,
-    // ListMessageMoveTasks,
+    // ListDeadLetterSourceQueues,   // TODO: Implement
+    // ListMessageMoveTasks,         // TODO: Implement
     ListQueues,
     ListQueueTags,
     PurgeQueue,
     ReceiveMessage,
-    // RemovePermission,
+    // RemovePermission,             // TODO: Implement
     SendMessage,
     SendMessageBatch,
     SetQueueAttributes,
-    // StartMessageMoveTask,
+    // StartMessageMoveTask,         // TODO: Implement
     TagQueue,
     UntagQueue,
 }
 
 impl Method {
+    /// Parses an SQS API method from a string.
     pub fn parse(input: &str) -> Result<Self, Error> {
         let method = pom::utf8::Parser::new(|bytes, position| {
             let (method, consumed) = std::str::from_utf8(&bytes[position..])

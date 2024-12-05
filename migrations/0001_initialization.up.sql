@@ -2,6 +2,7 @@ create table if not exists users (
   id integer not null,
   email text not null unique,
   hashed_pass text not null,
+  kms_key_id text not null,
   role text not null check (role in ('admin', 'user')),
 
   primary key (id)
@@ -134,7 +135,7 @@ create table if not exists api_keys (
   name string not null,
   key_id text not null,
   hashed_key text not null,
-  validation_key blob not null,
+  encrypted_key blob not null,
 
   primary key (id),
   foreign key (user) references users(id) on delete cascade,

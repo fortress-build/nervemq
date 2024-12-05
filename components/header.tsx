@@ -20,9 +20,9 @@ import {
   DropdownMenuTrigger,
   DropdownMenuContent,
 } from "./ui/dropdown-menu";
-import { SERVER_ENDPOINT } from "@/app/globals";
 import { Button } from "./ui/button";
 import { useSidebar } from "./ui/sidebar";
+import { logout } from "@/actions/api";
 
 export default function Header({ className }: { className?: string }) {
   const pathName = usePathname();
@@ -93,10 +93,7 @@ export default function Header({ className }: { className?: string }) {
           <DropdownMenuItem
             className="cursor-pointer"
             onClick={() => {
-              fetch(`${SERVER_ENDPOINT}/auth/logout`, {
-                method: "POST",
-                credentials: "include",
-              }).then(() => {
+              logout().then(() => {
                 router.replace("/login");
               });
             }}
