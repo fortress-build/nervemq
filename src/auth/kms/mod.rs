@@ -10,10 +10,7 @@ pub mod memory;
 
 /// Represents an in-progress key rotation operation.
 ///
-/// Contains the necessary information to complete a key rotation:
-/// - The ID of the new key
-/// - A handle to track the rotation operation
-/// - A secret used to authorize the completion of the rotation
+/// Useful for updating encryption of stored data without downtime or data loss.
 pub struct Rotation {
     key_id: String,
     new_key_id: String,
@@ -94,9 +91,6 @@ pub trait KeyManager: Send + Sync + 'static {
     fn create_key(&self) -> Pin<Box<dyn Future<Output = eyre::Result<String>>>>;
 
     /// Deletes an existing encryption key.
-    ///
-    /// # Arguments
-    /// * `key_id` - The ID of the key to delete
     ///
     /// # Warning
     /// Deleting a key will make it impossible to decrypt any data that was encrypted with it.
