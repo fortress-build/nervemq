@@ -1,7 +1,6 @@
 use std::{future::Future, pin::Pin};
 
 use aws_sdk_kms::operation::encrypt::EncryptOutput;
-use bytes::Bytes;
 
 pub struct AwsKeyManager {
     client: aws_sdk_kms::Client,
@@ -17,8 +16,8 @@ impl super::KeyManager for AwsKeyManager {
     fn encrypt(
         &self,
         key_id: &String,
-        data: Bytes,
-    ) -> Pin<Box<dyn Future<Output = eyre::Result<super::Encrypted>>>> {
+        data: Vec<u8>,
+    ) -> Pin<Box<dyn Future<Output = eyre::Result<Vec<u8>>>>> {
         let client = self.client.clone();
         let key_id = key_id.clone();
 
@@ -40,18 +39,15 @@ impl super::KeyManager for AwsKeyManager {
                 }
             };
 
-            Ok(super::Encrypted {
-                key_id,
-                data: Bytes::from(encrypted),
-            })
+            Ok(encrypted)
         })
     }
 
     fn decrypt(
         &self,
         key_id: &String,
-        data: Bytes,
-    ) -> Pin<Box<dyn Future<Output = eyre::Result<bytes::Bytes>>>> {
+        data: Vec<u8>,
+    ) -> Pin<Box<dyn Future<Output = eyre::Result<Vec<u8>>>>> {
         let client = self.client.clone();
         let key_id = key_id.clone();
         Box::pin(async move {
@@ -64,7 +60,7 @@ impl super::KeyManager for AwsKeyManager {
                 .plaintext
                 .ok_or_else(|| eyre::eyre!("No plaintext in response"))?;
 
-            Ok(Bytes::from(decrypted.into_inner()))
+            Ok(decrypted.into_inner())
         })
     }
 

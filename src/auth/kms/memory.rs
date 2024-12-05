@@ -23,8 +23,8 @@ impl KeyManager for InMemoryKeyManager {
     fn encrypt(
         &self,
         key_id: &String,
-        data: bytes::Bytes,
-    ) -> Pin<Box<dyn Future<Output = eyre::Result<super::Encrypted>>>> {
+        data: Vec<u8>,
+    ) -> Pin<Box<dyn Future<Output = eyre::Result<Vec<u8>>>>> {
         let self_clone = self.clone();
         let key_id = key_id.clone();
         Box::pin(async move {
@@ -39,7 +39,7 @@ impl KeyManager for InMemoryKeyManager {
             let encrypted = tokio::task::spawn_blocking({
                 let key_id = key_id.clone();
                 move || {
-                    let nonce = Nonce::from_slice(key_id.as_bytes());
+                    let nonce = Nonce::from_iter(key_id.bytes().cycle());
 
                     let cipher = Aes256GcmSiv::new(&key);
 
@@ -52,18 +52,15 @@ impl KeyManager for InMemoryKeyManager {
             })
             .await??;
 
-            Ok(super::Encrypted {
-                key_id: key_id.clone(),
-                data: encrypted.into(),
-            })
+            Ok(encrypted.into())
         })
     }
 
     fn decrypt(
         &self,
         key_id: &String,
-        data: bytes::Bytes,
-    ) -> Pin<Box<dyn std::future::Future<Output = eyre::Result<bytes::Bytes>>>> {
+        data: Vec<u8>,
+    ) -> Pin<Box<dyn std::future::Future<Output = eyre::Result<Vec<u8>>>>> {
         let self_clone = self.clone();
         let key_id = key_id.clone();
         Box::pin(async move {
@@ -78,7 +75,7 @@ impl KeyManager for InMemoryKeyManager {
             let decrypted = tokio::task::spawn_blocking({
                 let key_id = key_id.clone();
                 move || {
-                    let nonce = Nonce::from_slice(key_id.as_bytes());
+                    let nonce = Nonce::from_iter(key_id.bytes().cycle());
                     let cipher = Aes256GcmSiv::new(&key);
                     let decrypted = cipher
                         .decrypt(&nonce, data.as_ref())

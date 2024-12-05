@@ -8,28 +8,23 @@ use actix_web::{
     web::{self, Json},
     FromRequest, HttpRequest, HttpResponse, Responder, Scope,
 };
-use secrecy::ExposeSecret;
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 
-use crate::{
-    auth::crypto::{generate_api_key, GeneratedKey},
-    error::Error,
-    service::Service,
-};
+use crate::{error::Error, service::Service};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CreateTokenRequest {
-    name: String,
-    namespace: String,
+    pub name: String,
+    pub namespace: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CreateTokenResponse {
-    name: String,
-    namespace: String,
-    access_key: String,
-    secret_key: String,
+    pub name: String,
+    pub namespace: String,
+    pub access_key: String,
+    pub secret_key: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -43,47 +38,12 @@ pub async fn create_token(
     service: web::Data<Service>,
     identity: Identity,
 ) -> Result<Json<CreateTokenResponse>, Error> {
-    let data = data.into_inner();
+    let CreateTokenRequest { name, namespace } = data.into_inner();
 
-    let GeneratedKey {
-        short_token,
-        long_token,
-        long_token_hash,
-        validation_key,
-    } = web::block(|| generate_api_key())
+    service
+        .create_token(name, namespace, identity)
         .await
-        .map_err(Error::internal)?
-        .map_err(Error::internal)?;
-
-    let namespace_id = service
-        .get_namespace_id(&data.namespace, service.db())
-        .await
-        .map_err(Error::internal)?
-        .ok_or_else(|| Error::namespace_not_found(&data.namespace))?;
-
-    sqlx::query(
-        "
-        INSERT INTO api_keys (name, user, key_id, hashed_key, validation_key, ns)
-        VALUES ($1, (SELECT id FROM users WHERE email = $2), $3, $4, $5, $6)
-        ",
-    )
-    .bind(&data.name)
-    .bind(identity.id().map_err(ErrorUnauthorized)?)
-    .bind(&short_token)
-    .bind(long_token_hash.to_string())
-    .bind(validation_key)
-    .bind(namespace_id as i64)
-    .execute(service.db())
-    .await
-    .map_err(ErrorInternalServerError)?;
-
-    // Return the plain API key (should be securely sent/stored by the user).
-    Ok(web::Json(CreateTokenResponse {
-        name: data.name,
-        namespace: data.namespace,
-        access_key: short_token,
-        secret_key: long_token.expose_secret().to_owned(),
-    }))
+        .map(Json)
 }
 
 #[delete("")]

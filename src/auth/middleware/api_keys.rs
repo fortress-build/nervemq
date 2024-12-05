@@ -93,10 +93,15 @@ where
                         Err(e) => return Err(ErrorUnauthorized(e)),
                     }
                 }
-                AuthHeader::AWSv4(header) => match authenticate_sigv4(&mut req, header).await {
-                    Ok(user) => user,
-                    Err(e) => return Err(ErrorUnauthorized(e)),
-                },
+                AuthHeader::AWSv4(header) => {
+                    match authenticate_sigv4(api, &mut req, header).await {
+                        Ok(user) => user,
+                        Err(e) => {
+                            tracing::error!("Error authenticating AWSv4: {:?}", e);
+                            return Err(ErrorUnauthorized(e));
+                        }
+                    }
+                }
                 #[allow(unreachable_patterns)]
                 _ => return Err(ErrorUnauthorized("unimplemented")),
             };

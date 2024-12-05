@@ -3,35 +3,10 @@
 //! This module provides traits and types for managing cryptographic keys and performing
 //! encryption/decryption operations in a generic way.
 
-use bytes::Bytes;
 use std::{future::Future, pin::Pin};
 
 pub mod aws;
 pub mod memory;
-
-/// Represents encrypted data along with the ID of the key used to encrypt it.
-///
-/// This type is used to keep track of which key was used for encryption,
-/// making it possible to decrypt the data later using the correct key.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct Encrypted {
-    key_id: String,
-    data: Bytes,
-}
-
-impl Encrypted {
-    pub fn new(key_id: String, data: Bytes) -> Self {
-        Self { key_id, data }
-    }
-
-    pub fn key_id(&self) -> &str {
-        &self.key_id
-    }
-
-    pub fn data(&self) -> &Bytes {
-        &self.data
-    }
-}
 
 /// Represents an in-progress key rotation operation.
 ///
@@ -95,8 +70,8 @@ pub trait KeyManager: Send + Sync + 'static {
     fn encrypt(
         &self,
         key_id: &String,
-        data: Bytes,
-    ) -> Pin<Box<dyn Future<Output = eyre::Result<Encrypted>>>>;
+        data: Vec<u8>,
+    ) -> Pin<Box<dyn Future<Output = eyre::Result<Vec<u8>>>>>;
 
     /// Decrypts the provided data using the specified key.
     ///
@@ -109,8 +84,8 @@ pub trait KeyManager: Send + Sync + 'static {
     fn decrypt(
         &self,
         key_id: &String,
-        data: Bytes,
-    ) -> Pin<Box<dyn Future<Output = eyre::Result<Bytes>>>>;
+        data: Vec<u8>,
+    ) -> Pin<Box<dyn Future<Output = eyre::Result<Vec<u8>>>>>;
 
     /// Creates a new encryption key.
     ///

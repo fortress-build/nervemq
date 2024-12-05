@@ -1,12 +1,9 @@
-use std::future::Future;
-
 use argon2::{
     password_hash::{PasswordHashString, PasswordHasher, SaltString},
     Argon2, PasswordVerifier,
 };
-use bytes::Bytes;
 use rand::Rng;
-use secrecy::{ExposeSecret, SecretBox, SecretString};
+use secrecy::{ExposeSecret, SecretString};
 use sha2::{Digest, Sha256};
 
 pub fn sha256_hex(data: &[u8]) -> String {
@@ -14,24 +11,6 @@ pub fn sha256_hex(data: &[u8]) -> String {
     hasher.update(data);
     hex::encode(hasher.finalize())
 }
-
-// pub fn gen_signature_key(key: &[u8], date: &str, region: &str, service: &str) -> SecretSlice<u8> {
-//     let mut key_secret = Vec::with_capacity(key.len() + 4);
-//     key_secret.extend_from_slice(b"AWS4");
-//     key_secret.extend_from_slice(key);
-//
-//     let sign = |msg: &[u8], key: &[u8]| -> Vec<u8> {
-//         let mut mac =
-//             hmac::Hmac::<Sha256>::new_from_slice(key).expect("HMAC can take key of any size");
-//         mac.update(msg);
-//         mac.finalize().into_bytes().to_vec()
-//     };
-//
-//     let date_key = sign(&key_secret, date.as_bytes());
-//     let date_region_key = sign(&date_key, region.as_bytes());
-//     let date_region_service_key = sign(&date_region_key, service.as_bytes());
-//     sign(&date_region_service_key, b"aws4_request").into()
-// }
 
 pub fn hash_secret(secret: SecretString) -> eyre::Result<PasswordHashString> {
     let argon2 = Argon2::default();
@@ -52,11 +31,9 @@ pub struct GeneratedKey {
     /// The identifier part of the API key
     pub short_token: String,
     /// The secret part of the API key
-    pub long_token: SecretString,
+    pub long_token: String,
     /// The hashed secret part of the API key
     pub long_token_hash: PasswordHashString,
-    /// The validation key derived from the secret key before hashing
-    pub validation_key: Vec<u8>,
 }
 
 pub fn generate_token<const N: usize>(mut rng: impl Rng) -> eyre::Result<String> {
@@ -78,19 +55,9 @@ pub fn generate_api_key() -> eyre::Result<GeneratedKey> {
         .hash_password(long_token.as_bytes(), salt.as_salt())?
         .serialize();
 
-    let validation_key = {
-        // let mac = Hmac::<Sha256>::new_from_slice(long_token.as_bytes())?;
-        //
-        // // mac.update(salt.as_ref().as_bytes());
-        //
-        // mac.finalize().into_bytes().to_vec()
-        long_token_hash.as_bytes().to_vec()
-    };
-
     Ok(GeneratedKey {
         short_token,
-        long_token: SecretBox::new(long_token.into()),
+        long_token,
         long_token_hash,
-        validation_key,
     })
 }

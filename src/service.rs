@@ -4,7 +4,7 @@ use std::{
 };
 
 use actix_identity::Identity;
-use actix_web::web;
+use actix_web::{error::ErrorUnauthorized, web};
 use base64::Engine;
 use secrecy::SecretString;
 use serde::{Deserialize, Serialize};
@@ -20,8 +20,14 @@ use tokio::task::JoinSet;
 use tokio_stream::StreamExt as _;
 
 use crate::{
-    api::auth::{Permission, Role, User},
-    auth::{crypto::hash_secret, kms::KeyManager},
+    api::{
+        auth::{Permission, Role, User},
+        tokens::CreateTokenResponse,
+    },
+    auth::{
+        crypto::{generate_api_key, hash_secret, GeneratedKey},
+        kms::KeyManager,
+    },
     config::Config,
     error::Error,
     message::{Message, MessageStatus},
@@ -273,6 +279,28 @@ impl Service {
         Ok(svc)
     }
 
+    pub async fn delete_user(&self, email: Email) -> Result<(), Error> {
+        let mut tx = self.db().begin().await?;
+
+        let key_id = sqlx::query_scalar(
+            "
+            DELETE FROM users
+            WHERE email = $1
+            RETURNING kms_key_id
+            ",
+        )
+        .bind(email.as_str())
+        .fetch_one(&mut *tx)
+        .await
+        .map_err(actix_web::error::ErrorInternalServerError)?;
+
+        self.kms.delete_key(&key_id).await?;
+
+        tx.commit().await?;
+
+        Ok(())
+    }
+
     pub async fn get_queue_id(
         &self,
         namespace: &str,
@@ -510,7 +538,9 @@ impl Service {
         Ok(())
     }
 
-    // TODO: Improve type safety for attributes
+    pub fn kms(&self) -> &dyn KeyManager {
+        self.kms.as_ref()
+    }
 
     pub async fn set_queue_attributes(
         &self,
@@ -988,6 +1018,80 @@ impl Service {
         Ok(queues)
     }
 
+    pub async fn get_key_id(&self, user_email: String) -> Result<String, Error> {
+        let key_id = sqlx::query_scalar(
+            "
+            SELECT kms_key_id FROM users
+            WHERE email = $1
+            ",
+        )
+        .bind(user_email.as_str())
+        .fetch_one(self.db())
+        .await?;
+
+        Ok(key_id)
+    }
+
+    pub async fn create_token(
+        &self,
+        name: String,
+        namespace: String,
+        identity: Identity,
+    ) -> Result<CreateTokenResponse, Error> {
+        let GeneratedKey {
+            short_token,
+            long_token,
+            long_token_hash,
+        } = web::block(|| generate_api_key())
+            .await
+            .map_err(Error::internal)?
+            .map_err(Error::internal)?;
+
+        let mut tx = self.db().begin().await?;
+
+        let namespace_id = self
+            .get_namespace_id(&namespace, &mut *tx)
+            .await
+            .map_err(Error::internal)?
+            .ok_or_else(|| Error::namespace_not_found(&namespace))?;
+
+        self.check_user_access(&identity, namespace_id, &mut *tx)
+            .await?;
+
+        let key_id = self.get_key_id(identity.id()?).await?;
+
+        let encrypted_key = self
+            .kms
+            .encrypt(&key_id, long_token.as_bytes().to_vec())
+            .await?;
+
+        sqlx::query(
+            "
+            INSERT INTO api_keys (name, user, key_id, hashed_key, encrypted_key, ns)
+            VALUES ($1, (SELECT id FROM users WHERE email = $2), $3, $4, $5, $6)
+            ",
+        )
+        .bind(&name)
+        .bind(identity.id().map_err(ErrorUnauthorized)?)
+        .bind(&short_token)
+        .bind(long_token_hash.to_string())
+        .bind(encrypted_key)
+        .bind(namespace_id as i64)
+        .execute(&mut *tx)
+        .await
+        .map_err(Error::internal)?;
+
+        tx.commit().await?;
+
+        // Return the plain API key (should be securely sent/stored by the user).
+        Ok(CreateTokenResponse {
+            name,
+            namespace,
+            access_key: short_token,
+            secret_key: long_token,
+        })
+    }
+
     pub async fn create_user(
         &self,
         email: Email,
@@ -1001,16 +1105,19 @@ impl Service {
 
         let mut tx = self.db().begin().await?;
 
+        let key_id = self.kms.create_key().await?;
+
         let user_id: u64 = sqlx::query_scalar(
             "
-            INSERT INTO users (email, hashed_pass, role)
-            VALUES ($1, $2, $3)
+            INSERT INTO users (email, hashed_pass, role, kms_key_id)
+            VALUES ($1, $2, $3, $4)
             RETURNING id
         ",
         )
         .bind(email.as_str())
         .bind(hashed_password.to_string())
         .bind(role.unwrap_or(Role::User))
+        .bind(key_id)
         .fetch_one(&mut *tx.acquire().await?)
         .await?;
 

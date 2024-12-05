@@ -7,8 +7,8 @@ host_url = 'http://localhost:8080/sqs'
 def main():
     sqs: SQSClient = boto3.client(
         'sqs',
-        aws_access_key_id='AwBFLg7mAyF',
-        aws_secret_access_key='DgyP1xy943mBrDEZxjsGTbDUdY91ZiFRw',
+        aws_access_key_id='VnKEebbsowT',
+        aws_secret_access_key='G6qWstdqLeeNUhQcCn2LJHwAtrJ7wytCT',
         region_name='us-west-1',
         endpoint_url=host_url,
     )
