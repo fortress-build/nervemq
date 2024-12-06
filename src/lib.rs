@@ -25,17 +25,20 @@ use tracing::level_filters::LevelFilter;
 use tracing_actix_web::TracingLogger;
 use tracing_subscriber::{util::SubscriberInitExt, EnvFilter, FmtSubscriber};
 
-pub mod api;
-pub mod auth;
+mod api;
+mod auth;
 pub mod config;
 pub mod error;
 pub mod kms;
-pub mod message;
-pub mod namespace;
-pub mod queue;
-pub mod service;
-pub mod sqs;
-pub mod utils;
+mod message;
+mod namespace;
+mod queue;
+mod service;
+mod sqs;
+mod utils;
+
+pub use sqs::method::*;
+pub use sqs::types;
 
 /// Returns a builder for the main application.
 #[bon::builder(finish_fn = start)]

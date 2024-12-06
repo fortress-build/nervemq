@@ -1,12 +1,10 @@
-use std::future::{ready, Ready};
-
 use actix_identity::Identity;
 use actix_web::{
     delete,
     error::{ErrorInternalServerError, ErrorNotFound, ErrorUnauthorized},
     get, post,
     web::{self, Json},
-    FromRequest, HttpRequest, HttpResponse, Responder, Scope,
+    HttpResponse, Responder, Scope,
 };
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
@@ -78,21 +76,6 @@ pub async fn delete_token(
 struct ApiKey {
     name: String,
     namespace: String,
-}
-
-pub struct IdentityWrapped(pub actix_identity::Identity);
-
-impl FromRequest for IdentityWrapped {
-    type Error = <Identity as FromRequest>::Error;
-    type Future = Ready<Result<IdentityWrapped, Self::Error>>;
-
-    fn from_request(req: &HttpRequest, pl: &mut actix_web::dev::Payload) -> Self::Future {
-        if let Ok(identity) = Identity::from_request(req, pl).into_inner() {
-            return ready(Ok(IdentityWrapped(identity)));
-        }
-
-        ready(Err(ErrorUnauthorized("no identity found")))
-    }
 }
 
 #[get("")]
