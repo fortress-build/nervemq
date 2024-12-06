@@ -19,11 +19,11 @@ use nervemq::{
         data, namespace, queue, tokens,
     },
     auth::{
-        kms::sqlite::SqliteKeyManager,
         middleware::{api_keys::ApiKeyAuth, protected_route::Protected},
         session::SqliteSessionStore,
     },
     config::Config,
+    kms::sqlite::SqliteKeyManager,
     service::Service,
     sqs::{self, service::SqsApi},
 };
