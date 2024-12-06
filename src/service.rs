@@ -80,7 +80,7 @@ use serde_email::Email;
 use sqlx::{
     sqlite::{
         SqliteAutoVacuum, SqliteConnectOptions, SqliteJournalMode, SqliteLockingMode,
-        SqlitePoolOptions, SqliteRow,
+        SqlitePoolOptions,
     },
     Acquire, FromRow, Sqlite, SqlitePool,
 };
@@ -192,6 +192,7 @@ impl QueueAttributes {
 ///
 /// Used to define queue attribute names and types for extraction from
 /// the database.
+#[allow(unused)]
 pub trait QueueAttribute {
     type Value;
 
@@ -199,7 +200,8 @@ pub trait QueueAttribute {
     fn name(&self) -> &str;
 }
 
-pub mod queue_attributes {
+#[allow(unused)]
+pub(crate) mod queue_attributes {
     use super::QueueAttribute;
 
     /// Represents the delay_seconds queue attribute.
@@ -337,6 +339,7 @@ impl Service {
     /// Creates a new Service instance with default configuration and in-memory key management.
     ///
     /// Mostly useful for tests and debugging.
+    #[allow(unused)]
     pub async fn connect() -> Result<Self, Error> {
         Self::connect_with()
             .config(Config::default())
@@ -1354,6 +1357,7 @@ impl Service {
     /// * `namespace` - Namespace containing the queue
     /// * `queue` - Queue name
     /// * `messages` - Vector of (message body, attributes) pairs
+    #[allow(unused)]
     pub async fn sqs_send_batch(
         &self,
         namespace: &str,
@@ -1409,6 +1413,7 @@ impl Service {
     /// # Arguments
     /// * `namespace` - Namespace containing the queue
     /// * `queue` - Queue name
+    #[allow(unused)]
     pub async fn sqs_recv(
         &self,
         namespace: impl AsRef<str>,
@@ -1854,6 +1859,7 @@ impl Service {
     ///
     /// # Returns
     /// Tuple of (successfully deleted IDs, failed deletions with errors)
+    #[allow(unused)]
     pub async fn delete_message_batch(
         &self,
         namespace: &str,
