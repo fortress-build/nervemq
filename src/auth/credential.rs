@@ -51,14 +51,4 @@ impl ApiKey {
             long_token,
         }
     }
-
-    /// Returns the short token.
-    pub fn short_token(&self) -> &str {
-        &self.short_token
-    }
-
-    /// Returns the long token.
-    pub fn long_token(&self) -> &SecretString {
-        &self.long_token
-    }
 }

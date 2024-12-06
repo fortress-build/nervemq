@@ -17,7 +17,10 @@ use super::{
 /// Represents supported authentication schemes.
 pub enum AuthScheme {
     NerveMqApiV1,
-    AWSv4 { algorithm: String },
+    AWSv4 {
+        #[allow(unused)]
+        algorithm: String,
+    },
 }
 
 #[derive(Debug)]
@@ -73,11 +76,6 @@ pub fn prefixed_token<'a>() -> Parser<'a, (&'a str, &'a str, &'a str)> {
 /// Parser for whitespace characters (space, tab, newline, carriage return).
 pub fn whitespace<'a>() -> Parser<'a, char> {
     one_of(" \r\n\t")
-}
-
-/// Parser for any character that is not whitespace.
-pub fn non_whitespace<'a>() -> Parser<'a, char> {
-    none_of(" \r\n\t")
 }
 
 /// Parser for alphabetic characters (a-z, A-Z).
