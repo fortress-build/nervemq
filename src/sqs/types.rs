@@ -53,7 +53,8 @@ pub mod send_message {
     pub struct SendMessageResponse {
         pub message_id: u64,
         pub md5_of_message_body: String,
-        // pub md5_of_message_attributes: String,
+        pub md5_of_message_attributes: String,
+        pub md5_of_message_system_attributes: String,
         // pub sequence_number: Option<String>,
     }
 }
@@ -283,10 +284,10 @@ pub mod send_message_batch {
     pub struct SendMessageBatchRequestEntry {
         pub id: String,
         pub message_body: String,
-        pub delay_seconds: u64,
+        pub delay_seconds: Option<u64>,
         pub message_attributes: HashMap<String, SqsMessageAttribute>,
-        pub message_deduplication_id: String,
-        pub message_group_id: String,
+        pub message_deduplication_id: Option<String>,
+        pub message_group_id: Option<String>,
     }
 
     #[derive(Debug, serde::Serialize)]
@@ -298,6 +299,8 @@ pub mod send_message_batch {
         pub id: String,
         pub message_id: String,
         pub md5_of_message_body: String,
+        pub md5_of_message_attributes: String,
+        pub md5_of_message_system_attributes: String,
     }
 
     #[derive(Debug, serde::Serialize)]
@@ -310,21 +313,17 @@ pub mod send_message_batch {
         pub id: String,
         pub sender_fault: bool,
         pub code: String,
-        pub message: String,
+        pub message: Option<String>,
     }
 
     #[derive(Debug, serde::Serialize)]
-    #[serde(rename_all = "PascalCase", untagged)]
+    #[serde(rename_all = "PascalCase")]
     /// Response for a batch message send operation.
     ///
     /// Contains lists of successful and failed messages.
-    pub enum SendMessageBatchResponse {
-        Successful {
-            successful: Vec<SendMessageBatchResultEntry>,
-        },
-        Failed {
-            failed: Vec<SendMessageBatchResultErrorEntry>,
-        },
+    pub struct SendMessageBatchResponse {
+        pub successful: Vec<SendMessageBatchResultEntry>,
+        pub failed: Vec<SendMessageBatchResultErrorEntry>,
     }
 }
 

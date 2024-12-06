@@ -68,6 +68,7 @@ create table if not exists messages (
   queue integer not null,
   body  blob    not null,
   delivered_at  integer,
+  -- deliver_after integer not null,
   sent_by       integer,
   tries integer not null default 0,
 
