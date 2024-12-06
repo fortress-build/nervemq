@@ -24,22 +24,19 @@ import { Input } from "@/components/ui/input";
 import type { SortingState } from "@tanstack/react-table";
 
 export default function AdminPanel() {
+  // Authentication check
   const isAdmin = useIsAdmin();
-
   if (!isAdmin) {
     redirect("/");
   }
 
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [userToDelete, setUserToDelete] = useState<string | undefined>(
-    undefined,
-  );
-  const [userToModify, setUserToModify] = useState<UserStatistics | undefined>(
-    undefined,
-  );
-  const [searchQuery, setSearchQuery] = useState("");
-  const [sorting, setSorting] = useState<SortingState>([]);
+  const [isCreateOpen, setIsCreateOpen] = useState(false);        // Controls Create User modal
+  const [userToDelete, setUserToDelete] = useState<string | undefined>(undefined);  // Controls Delete User dialog
+  const [userToModify, setUserToModify] = useState<UserStatistics | undefined>(undefined);  // Controls Modify User modal
+  const [searchQuery, setSearchQuery] = useState("");             // Search input state
+  const [sorting, setSorting] = useState<SortingState>([]);       // Table sorting state
 
+  // Fetch and filter users data
   const {
     data = [],
     isLoading,
@@ -53,6 +50,7 @@ export default function AdminPanel() {
       ),
   });
 
+  // User management handlers
   const confirmDeleteUser = async (email: string) => {
     try {
       await deleteUser({ email });
@@ -85,6 +83,7 @@ export default function AdminPanel() {
 
   return (
     <div className="h-full flex flex-col gap-4">
+      {/* Search Bar */}
       <div className="flex w-full max-w-sm items-center space-x-2">
         <Input
           type="text"
@@ -94,6 +93,7 @@ export default function AdminPanel() {
         />
       </div>
 
+      {/* Users Data Table */}
       <DataTable
         className="w-full"
         columns={columns}
@@ -104,10 +104,12 @@ export default function AdminPanel() {
         setSorting={setSorting}
       />
 
+      {/* Add New User Button */}
       <div className="flex justify-end">
         <Button onClick={() => setIsCreateOpen(true)}>Add New User</Button>
       </div>
 
+      {/* Modals and Dialogs */}
       <CreateUser
         open={isCreateOpen}
         close={() => setIsCreateOpen(false)}

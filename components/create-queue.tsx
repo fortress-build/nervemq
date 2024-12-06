@@ -33,6 +33,7 @@ import CreateNamespace from "./create-namespace";
 import { useState, useEffect } from "react";
 import { createQueueSchema } from "@/schemas/create-queue";
 
+// Modal component for creating a new queue with namespace selection
 export default function CreateQueue({
   open,
   close,
@@ -50,6 +51,7 @@ export default function CreateQueue({
 
   const invalidate = useInvalidate(["queues"]);
 
+  // Form configuration with name and namespace fields
   const form = useForm({
     defaultValues: {
       name: "",
@@ -61,7 +63,11 @@ export default function CreateQueue({
       onMount: createQueueSchema,
     },
     onSubmit: async ({ value: data, formApi }) => {
-      await createQueue(data)
+      await createQueue({
+        ...data,
+        attributes: [],
+        tags: []
+      })
         .then(() => {
           invalidate();
         })
@@ -75,18 +81,21 @@ export default function CreateQueue({
     },
   });
 
+  // Handle namespace selection and creation
   const handleNamespaceCreated = async (namespaceName: string) => {
     form.setFieldValue("namespace", namespaceName);
     await form.validateField("namespace", "change");
     setShowCreateNamespace(false);
   };
 
+  // Auto-select namespace if only one exists
   useEffect(() => {
     if (namespaces.length === 1) {
       form.setFieldValue("namespace", namespaces[0].name);
     }
   }, [namespaces, form]);
 
+  // Render dialog with form fields and namespace selector
   return (
     <>
       <Dialog
@@ -146,8 +155,6 @@ export default function CreateQueue({
                     <PopoverTrigger asChild>
                       <Button
                         variant="outline"
-                        // biome-ignore lint/a11y/useSemanticElements: <explanation>
-                        role="combobox"
                         className={cn(
                           "w-full justify-between",
                           field.state.value ? "" : "text-muted-foreground",

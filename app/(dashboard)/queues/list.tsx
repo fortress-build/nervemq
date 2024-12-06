@@ -22,6 +22,9 @@ import {
 } from "@/components/ui/command";
 import React from "react";
 
+// Message queue management interface component
+// Displays messages in a filterable table with expandable rows
+
 export type MessageObject = {
   id: number;
   queue: string;

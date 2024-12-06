@@ -24,12 +24,14 @@ import { KeyToDeleteContext } from "@/lib/contexts/key-to-delete";
 import { Input } from "@/components/ui/input";
 import type { SortingState } from "@tanstack/react-table";
 
+// State management for API key operations
 export default function ApiKeys() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [keyToDelete, setKeyToDelete] = useState<string | undefined>(undefined);
   const [searchQuery, setSearchQuery] = useState("");
   const [sorting, setSorting] = useState<SortingState>([]);
 
+  // Fetch and filter API keys
   const {
     data = [],
     isLoading,
@@ -41,10 +43,12 @@ export default function ApiKeys() {
     },
   });
 
+  // Filter data based on search query
   const filteredData = data.filter((apiKey) =>
     apiKey.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  // Handle API key deletion
   const handleDeleteKey = async (data: DeleteTokenRequest) => {
     try {
       await deleteAPIKey(data);
@@ -58,6 +62,7 @@ export default function ApiKeys() {
 
   return (
     <div className="h-full flex flex-col gap-4">
+      {/* Search input */}
       <div className="flex w-full max-w-sm items-center space-x-2">
         <Input
           type="text"
@@ -67,6 +72,7 @@ export default function ApiKeys() {
         />
       </div>
 
+      {/* Main content with data table and delete dialog */}
       <KeyToDeleteContext.Provider
         value={{
           key: keyToDelete,

@@ -28,6 +28,9 @@ interface CreateNamespaceProps {
   onSuccess?: (namespaceName: string) => void;
 }
 
+// Modal component for creating new namespaces
+// Handles form validation, duplicate checking, and submission
+// Uses TanStack Form with Yup validation
 export default function CreateNamespace({
   open,
   close,
@@ -35,8 +38,7 @@ export default function CreateNamespace({
 }: CreateNamespaceProps) {
   const invalidate = useInvalidate(["namespaces"]);
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { data: namespaces = [], isLoading } = useQuery({
+  const { data: namespaces = []} = useQuery({
     queryFn: () => listNamespaces(),
     queryKey: ["namespaces"],
   });

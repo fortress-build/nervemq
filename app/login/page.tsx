@@ -17,9 +17,11 @@ import { loginFormSchema, type LoginRequest } from "@/schemas/login-form";
 import { type AdminSession, useGlobalState } from "@/lib/state/global";
 import { login } from "@/actions/api";
 
+// Login page component with form validation using TanStack Form and Yup
 export default function LoginPage() {
   const router = useRouter();
 
+  // Initialize form with validation schema and submission handler
   const form = useForm<LoginRequest, YupValidator>({
     validatorAdapter: yupValidator(),
     validators: {
@@ -52,6 +54,7 @@ export default function LoginPage() {
   });
 
   return (
+    // Centered login card with responsive layout
     <div className="min-h-screen w-full flex items-center justify-center">
       <Card className="w-96">
         <CardHeader>

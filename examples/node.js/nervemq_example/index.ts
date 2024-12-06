@@ -11,19 +11,18 @@ async function main() {
             secretAccessKey: "38zBir4Vvn2SKAx6VpPAvdNY4LzBaBGBQ"
         }
     });
-
-    // biome-ignore lint/suspicious/noImplicitAnyLet: <explanation>
-    let url;
+    let url: string;
     try {
         const res = await sqs.send(new GetQueueUrlCommand({
             QueueName: 'bruh'
         }));
+        if (!res.QueueUrl) throw new Error('Queue URL is undefined');
         url = res.QueueUrl;
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    } catch (error) {
+    } catch {
         const res = await sqs.send(new CreateQueueCommand({
             QueueName: 'bruh'
         }));
+        if (!res.QueueUrl) throw new Error('Queue URL is undefined');
         url = res.QueueUrl;
     }
 

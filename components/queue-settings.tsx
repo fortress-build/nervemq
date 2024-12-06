@@ -40,6 +40,8 @@ import {
 } from "./ui/command";
 import { Spinner } from "@nextui-org/react";
 
+// Dialog component for managing queue configuration settings
+// Handles max retries and dead letter queue assignment
 export function QueueSettings({ queue }: { queue?: QueueStatistics }) {
   const [open, setOpen] = useState(false);
   const [dlqPopoverOpen, setDlqPopoverOpen] = useState(false);
@@ -68,6 +70,7 @@ export function QueueSettings({ queue }: { queue?: QueueStatistics }) {
     },
   });
 
+  // Form configuration with validation using Yup
   const form = useForm<QueueConfig, YupValidator>({
     defaultValues: {
       maxRetries: settings?.maxRetries ?? 0,
@@ -90,6 +93,7 @@ export function QueueSettings({ queue }: { queue?: QueueStatistics }) {
     },
   });
 
+  // Fetch available queues for DLQ selection
   const { data: availableQueues = [], isLoading: queuesLoading } = useQuery({
     queryFn: () => listQueues(),
     queryKey: ["queues"],
@@ -99,6 +103,7 @@ export function QueueSettings({ queue }: { queue?: QueueStatistics }) {
       ),
   });
 
+  // Render settings dialog with form fields
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>

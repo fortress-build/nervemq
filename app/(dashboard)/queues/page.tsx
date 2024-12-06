@@ -1,3 +1,4 @@
+// Queue management dashboard page
 "use client";
 
 import { listQueues } from "@/actions/api";
@@ -21,6 +22,7 @@ import {
 import type { SortingState, ColumnFiltersState } from "@tanstack/react-table";
 import { Input } from "@/components/ui/input";
 
+// Queue type definition
 export type Queue = {
   id: string;
   ns: string;
@@ -28,6 +30,7 @@ export type Queue = {
 };
 
 export default function Queues() {
+  // State management for modal controls and table settings
   const [isOpen, setIsOpen] = useState(false);
   const router = useRouter();
   const [queueToDelete, setQueueToDelete] = useState<{
@@ -38,6 +41,7 @@ export default function Queues() {
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [searchQuery, setSearchQuery] = useState("");
 
+  // Fetch and filter queues
   const {
     data = [],
     isLoading,
@@ -51,6 +55,7 @@ export default function Queues() {
       ),
   });
 
+  // Handle queue deletion trigger
   const handleDeleteQueue = async (
     name: string,
     ns: string,

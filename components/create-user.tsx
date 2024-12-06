@@ -41,6 +41,7 @@ import {
 } from "./ui/select";
 import type { Role } from "@/lib/state/global";
 
+// Interface for user data structure
 export interface UserStatistics {
   email: string;
   role: Role;
@@ -48,6 +49,7 @@ export interface UserStatistics {
   lastLogin?: string;
 }
 
+// Modal component for creating new users with namespace access
 export default function CreateUser({
   open,
   close,
@@ -220,8 +222,6 @@ export default function CreateUser({
                     <PopoverTrigger asChild>
                       <Button
                         variant="outline"
-                        // biome-ignore lint/a11y/useSemanticElements: <explanation>
-                        role="combobox"
                         className={cn(
                           "w-full justify-between",
                           field.state.value?.size > 0

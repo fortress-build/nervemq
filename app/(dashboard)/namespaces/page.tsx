@@ -18,9 +18,13 @@ import { deleteNamespace } from "@/actions/api";
 import { Input } from "@/components/ui/input";
 import type { SortingState } from "@tanstack/react-table";
 
+// Component for managing namespace CRUD operations
 export default function Namespaces() {
+  // State management for modals and search
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  
+  // Fetch namespaces data with react-query
   const {
     data = [],
     isLoading,
@@ -29,9 +33,9 @@ export default function Namespaces() {
     queryKey: ["namespaces", searchQuery],
     queryFn: () => listNamespaces(),
   });
-  const [namespaceToDelete, setNamespaceToDelete] = useState<string | null>(
-    null,
-  );
+
+  // State for deletion flow and table sorting
+  const [namespaceToDelete, setNamespaceToDelete] = useState<string | null>(null);
   const [sorting, setSorting] = useState<SortingState>([]);
 
   const handleDeleteNamespace = async (name: string, e: React.MouseEvent) => {
@@ -45,6 +49,7 @@ export default function Namespaces() {
 
   return (
     <div className="h-full flex flex-col gap-4">
+      {/* Search input */}
       <div className="flex w-full max-w-sm items-center space-x-2">
         <Input
           type="text"
@@ -53,6 +58,8 @@ export default function Namespaces() {
           onChange={(e) => setSearchQuery(e.target.value)}
         />
       </div>
+
+      {/* Namespaces data table */}
       <DataTable
         className="w-full"
         columns={columns}
@@ -62,10 +69,14 @@ export default function Namespaces() {
         sorting={sorting}
         setSorting={setSorting}
       />
+
+      {/* Create namespace modal */}
       <div className="flex justify-end">
         <Button onClick={() => setIsOpen(true)}>Create Namespace</Button>
       </div>
       <CreateNamespace open={isOpen} close={() => setIsOpen(false)} />
+
+      {/* Delete confirmation dialog */}
       <Dialog
         open={!!namespaceToDelete}
         onOpenChange={(open) => !open && setNamespaceToDelete(null)}

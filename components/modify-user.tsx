@@ -47,6 +47,7 @@ import {
 } from "./ui/select";
 import { Role, useSession } from "@/lib/state/global";
 
+// Component for modifying user roles and namespace access
 export default function ModifyUser({
   open,
   close,
@@ -83,6 +84,7 @@ export default function ModifyUser({
 
   const invalidate = useInvalidate(["users", "user-namespaces"]);
 
+  // Form configuration for handling user modifications
   const form = useForm({
     defaultValues: {
       email: user?.email ?? "",
@@ -119,6 +121,7 @@ export default function ModifyUser({
     },
   });
 
+  // Handle namespace creation and form updates
   const handleNamespaceCreated = async (namespaceName: string) => {
     form.setFieldValue("namespaces", (set) => {
       set.add(namespaceName);
