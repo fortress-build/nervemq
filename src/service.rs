@@ -327,6 +327,7 @@ pub struct Service {
     config: Arc<crate::config::Config>,
 }
 
+#[bon::bon]
 impl Service {
     /// Returns a reference to the underlying SQLite connection pool.
     pub fn db(&self) -> &SqlitePool {
@@ -337,10 +338,11 @@ impl Service {
     ///
     /// Mostly useful for tests and debugging.
     pub async fn connect() -> Result<Self, Error> {
-        Self::connect_with(Config::default(), |_| async move {
-            Ok(InMemoryKeyManager::new())
-        })
-        .await
+        Self::connect_with()
+            .config(Config::default())
+            .kms_factory(|_| async move { Ok(InMemoryKeyManager::new()) })
+            .call()
+            .await
     }
 
     /// Returns a reference to the service configuration.
@@ -353,9 +355,10 @@ impl Service {
     /// # Arguments
     /// * `config` - Custom service configuration
     /// * `kms_factory` - Factory function to create a key management service
+    #[builder]
     pub async fn connect_with<K, F, R>(config: Config, kms_factory: F) -> Result<Self, Error>
     where
-        F: Fn(&SqlitePool) -> R,
+        F: FnOnce(SqlitePool) -> R,
         R: Future<Output = Result<K, Error>>,
         K: KeyManager,
     {
@@ -372,7 +375,7 @@ impl Service {
 
         sqlx::migrate!("./migrations").run(&pool).await?;
 
-        let kms = kms_factory(&pool).await?;
+        let kms = kms_factory(pool.clone()).await?;
 
         let svc = Self {
             kms: Arc::new(kms),
