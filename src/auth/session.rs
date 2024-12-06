@@ -1,3 +1,17 @@
+//! SQLite-based session storage implementation for Actix-web.
+//!
+//! This module provides a persistent session storage backend using SQLite. It implements
+//! the `SessionStore` trait from actix-session and stores session data in two tables:
+//! - sessions: Stores session metadata (id, key, TTL)
+//! - session_state: Stores key-value pairs for each session
+//!
+//! The implementation supports all standard session operations including:
+//! - Creating new sessions
+//! - Loading existing sessions
+//! - Updating session data
+//! - Managing session TTL
+//! - Deleting sessions
+
 use actix_session::storage::{
     LoadError, SaveError, SessionKey, SessionState, SessionStore, UpdateError,
 };
@@ -6,17 +20,26 @@ use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
 use tokio_stream::StreamExt;
 
+/// SQLite-based implementation of the session store.
+///
+/// Provides persistent storage of session data using SQLite as the backend.
+/// Each instance maintains a connection pool to the database.
 #[derive(Clone)]
 pub struct SqliteSessionStore {
     db: SqlitePool,
 }
 
 impl SqliteSessionStore {
+    /// Creates a new SQLite session store with the provided database connection pool.
     pub fn new(db: SqlitePool) -> Self {
         Self { db }
     }
 }
 
+/// Represents a session in the database.
+///
+/// Contains the session's unique identifier, key for lookup,
+/// and the associated state data.
 #[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
 pub struct Session {
     id: u64,
@@ -26,6 +49,10 @@ pub struct Session {
     state: SessionState,
 }
 
+/// Represents a single key-value entry in a session's state.
+///
+/// Maps to the session_state table in SQLite, where each row
+/// contains a reference to its parent session and a key-value pair.
 #[derive(Serialize, Deserialize, sqlx::FromRow)]
 struct SessionStateEntry {
     session: u64,
@@ -33,7 +60,19 @@ struct SessionStateEntry {
     v: serde_json::Value,
 }
 
+/// Implementation of the `SessionStore` trait for SQLite-based storage.
+///
+/// Provides all required session management operations including:
+/// - Loading sessions by key
+/// - Saving new sessions
+/// - Updating existing sessions
+/// - Managing session TTL
+/// - Deleting sessions
 impl SessionStore for SqliteSessionStore {
+    /// Loads a session from the database by its key.
+    ///
+    /// Returns the session state if found, or None if the session doesn't exist.
+    /// Also loads all associated key-value pairs from the session_state table.
     fn load(
         &self,
         session_key: &actix_session::storage::SessionKey,
@@ -78,6 +117,10 @@ impl SessionStore for SqliteSessionStore {
         })
     }
 
+    /// Saves a new session to the database.
+    ///
+    /// Creates a new session with a randomly generated key and stores all
+    /// provided state data. Returns the new session key on success.
     fn save(
         &self,
         session_state: SessionState,
@@ -132,6 +175,10 @@ impl SessionStore for SqliteSessionStore {
         })
     }
 
+    /// Updates an existing session with new state data.
+    ///
+    /// Modifies both the session's TTL and its state data. Removes any
+    /// key-value pairs that are no longer present in the new state.
     fn update(
         &self,
         session_key: actix_session::storage::SessionKey,
@@ -205,6 +252,10 @@ impl SessionStore for SqliteSessionStore {
         })
     }
 
+    /// Updates only the TTL (time-to-live) of an existing session.
+    ///
+    /// This is used to extend or shorten a session's lifetime without
+    /// modifying its state data.
     fn update_ttl(
         &self,
         session_key: &actix_session::storage::SessionKey,
@@ -231,6 +282,10 @@ impl SessionStore for SqliteSessionStore {
         })
     }
 
+    /// Deletes a session and all its associated state data.
+    ///
+    /// Removes the session and relies on foreign key cascading to
+    /// clean up related session_state entries.
     fn delete(
         &self,
         session_key: &actix_session::storage::SessionKey,

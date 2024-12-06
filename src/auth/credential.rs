@@ -4,6 +4,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::Error;
 
+/// Namespace authorized for the request.
+///
+/// Included in request-local extension data once authorized.
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type)]
 pub struct AuthorizedNamespace(pub String);
 
@@ -22,13 +25,16 @@ impl FromRequest for AuthorizedNamespace {
     }
 }
 
+/// Request to create a new API key.
 #[derive(Serialize, Deserialize)]
 pub struct ApiKeyRequest {
     api_key: String,
 }
 
+/// Prefix for API keys for identification.
 pub const API_KEY_PREFIX: &str = "nervemq";
 
+/// Request to delete an API key.
 #[derive(Debug)]
 pub struct ApiKey {
     /// For AWS Sigv4, this is the access key ID
@@ -38,6 +44,7 @@ pub struct ApiKey {
 }
 
 impl ApiKey {
+    /// Creates a new API key with the specified short and long tokens.
     pub fn new(short_token: String, long_token: SecretString) -> Self {
         Self {
             short_token,
@@ -45,10 +52,12 @@ impl ApiKey {
         }
     }
 
+    /// Returns the short token.
     pub fn short_token(&self) -> &str {
         &self.short_token
     }
 
+    /// Returns the long token.
     pub fn long_token(&self) -> &SecretString {
         &self.long_token
     }

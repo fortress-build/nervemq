@@ -1,5 +1,13 @@
+//! Error handling for the application.
+//!
+//! This module provides a centralized error type that encompasses all possible
+//! error cases in the application, from API validation to database operations.
+//! It uses the `snafu` crate for error handling patterns.
+
 use snafu::Snafu;
 
+/// The main error enum that represents all possible errors in the application.
+/// Each variant includes context-specific information and appropriate error messages.
 #[derive(Debug, Snafu)]
 pub enum Error {
     #[snafu(display("Unauthorized"))]
@@ -95,17 +103,21 @@ impl From<sqlx::migrate::MigrateError> for Error {
     }
 }
 
+/// Convenience methods for creating common error types
 impl Error {
+    /// Creates a new internal server error with a source error
     pub fn internal(e: impl Into<eyre::Report>) -> Self {
         Self::InternalServerError {
             source: Some(e.into()),
         }
     }
 
+    /// Creates an internal server error without exposing the underlying error
     pub fn opaque() -> Self {
         Self::InternalServerError { source: None }
     }
 
+    /// Creates a not found error for a generic resource
     pub fn not_found(resource: impl Into<String>) -> Self {
         Self::NotFound {
             resource: resource.into(),
@@ -124,12 +136,14 @@ impl Error {
         }
     }
 
+    /// Creates a not found error specifically for queues within a namespace
     pub fn queue_not_found(queue: impl Into<String>, namespace: impl Into<String>) -> Self {
         Self::NotFound {
             resource: format!("queue {} in namespace {}", queue.into(), namespace.into()),
         }
     }
 
+    /// Creates a not found error specifically for namespaces
     pub fn namespace_not_found(namespace: impl Into<String>) -> Self {
         Self::NotFound {
             resource: format!("namespace {}", namespace.into()),
@@ -137,6 +151,8 @@ impl Error {
     }
 }
 
+/// Maps internal errors to HTTP status codes for API responses.
+/// This implementation ensures consistent error handling across the API.
 impl actix_web::ResponseError for Error {
     fn status_code(&self) -> actix_web::http::StatusCode {
         match self {

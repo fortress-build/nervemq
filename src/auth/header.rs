@@ -1,3 +1,11 @@
+//! Authentication header parsing module.
+//!
+//! This module provides parsers for authentication headers supporting two schemes:
+//! - NerveMqApiV1: Custom API key-based authentication
+//! - AWS SigV4: AWS-style request signing authentication
+//!
+//! The parsing is implemented using the `pom` parser combinator library.
+
 use pom::utf8::{end, list, none_of, one_of, seq, sym, Parser};
 use secrecy::SecretString;
 
@@ -6,18 +14,27 @@ use super::{
     protocols::sigv4::SigV4Header,
 };
 
+/// Represents supported authentication schemes.
 pub enum AuthScheme {
     NerveMqApiV1,
     AWSv4 { algorithm: String },
 }
 
 #[derive(Debug)]
+/// Parsed authentication header containing credentials and metadata.
+///
+/// The lifetime parameter 'a refers to the borrowed string data from the original header.
 pub enum AuthHeader<'a> {
+    /// NerveMQ API key authentication credentials
+    /// AWS Signature Version 4 authentication credentials and metadata
     NerveMqApiV1(ApiKey),
     AWSv4(SigV4Header<'a>),
 }
 
 #[allow(unused)]
+/// Parser for authentication scheme identifiers.
+///
+/// Recognizes either "NerveMqApiV1" or AWS-style algorithm strings (e.g., "AWS4-HMAC-SHA256").
 pub fn auth_scheme<'a>() -> Parser<'a, AuthScheme> {
     let api = seq("NerveMqApiV1")
         .map(|_| AuthScheme::NerveMqApiV1)
@@ -31,12 +48,19 @@ pub fn auth_scheme<'a>() -> Parser<'a, AuthScheme> {
     (api | sqs_algo).name("auth scheme")
 }
 
+/// Parser for basic tokens consisting of alphanumeric characters.
+///
+/// Used as a building block for more complex token patterns.
 pub fn token<'a>() -> Parser<'a, &'a str> {
     one_of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890")
         .repeat(1..)
         .collect()
 }
 
+/// Parser for tokens in the format "prefix_short_long".
+///
+/// Returns a tuple of (prefix, short token, long token).
+/// Used primarily for NerveMQ API key parsing.
 pub fn prefixed_token<'a>() -> Parser<'a, (&'a str, &'a str, &'a str)> {
     let prefix = token();
 
@@ -46,26 +70,35 @@ pub fn prefixed_token<'a>() -> Parser<'a, (&'a str, &'a str, &'a str)> {
     (prefix + short + long).map(|((prefix, short), long)| (prefix, short, long))
 }
 
+/// Parser for whitespace characters (space, tab, newline, carriage return).
 pub fn whitespace<'a>() -> Parser<'a, char> {
     one_of(" \r\n\t")
 }
 
+/// Parser for any character that is not whitespace.
 pub fn non_whitespace<'a>() -> Parser<'a, char> {
     none_of(" \r\n\t")
 }
 
+/// Parser for alphabetic characters (a-z, A-Z).
 pub fn alpha<'a>() -> Parser<'a, char> {
     one_of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 }
 
+/// Parser for numeric characters (0-9).
 pub fn numeric<'a>() -> Parser<'a, char> {
     one_of("0123456789")
 }
 
+/// Parser for alphanumeric characters (combination of alpha and numeric).
 pub fn alphanumeric<'a>() -> Parser<'a, char> {
     alpha() | numeric()
 }
 
+/// Parser for NerveMQ API v1 authentication headers.
+///
+/// Expects format: "NerveMqApiV1 prefix_shorttoken_longtoken"
+/// Validates the prefix and constructs an ApiKey from the tokens.
 fn nervemq_api_v1<'a>() -> Parser<'a, AuthHeader<'a>> {
     let tag = seq("NerveMqApiV1");
     let space = sym(' ').repeat(1..).discard();
@@ -84,6 +117,10 @@ fn nervemq_api_v1<'a>() -> Parser<'a, AuthHeader<'a>> {
         .name("nervemq api v1")
 }
 
+/// Parser for AWS Signature Version 4 authentication headers.
+///
+/// Expects format: "AWS4-HMAC-SHA256 Credential=...,SignedHeaders=...,Signature=..."
+/// Parses and validates all required components of the SigV4 authentication scheme.
 fn sigv4<'a>() -> Parser<'a, AuthHeader<'a>> {
     let tag = seq("AWS4-HMAC-SHA256");
 
@@ -156,6 +193,10 @@ fn sigv4<'a>() -> Parser<'a, AuthHeader<'a>> {
         .name("sqs api credential")
 }
 
+/// Main parser for authentication headers.
+///
+/// Attempts to parse either a NerveMQ API v1 or AWS SigV4 authentication header.
+/// Returns the parsed authentication information in an AuthHeader enum.
 pub fn auth_header<'a>() -> Parser<'a, AuthHeader<'a>> {
     (nervemq_api_v1() | sigv4()).name("auth header")
 }

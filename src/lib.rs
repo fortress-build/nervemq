@@ -2,6 +2,7 @@ pub mod api;
 pub mod auth;
 pub mod config;
 pub mod error;
+pub mod kms;
 pub mod message;
 pub mod namespace;
 pub mod queue;
