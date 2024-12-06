@@ -1,3 +1,8 @@
+//! In-memory implementation of the Key Management Service.
+//!
+//! Provides a thread-safe, in-memory KMS using AES-GCM-SIV encryption.
+//! Primarily used for testing and development environments.
+
 use std::{future::Future, pin::Pin, sync::Arc};
 
 use aes_gcm_siv::{aead::Aead, Aes256GcmSiv, KeyInit, Nonce};
@@ -7,11 +12,15 @@ use crate::auth::crypto::generate_token;
 use super::KeyManager;
 
 #[derive(Clone)]
+/// Thread-safe in-memory key manager implementation.
+///
+/// Stores encryption keys in memory using a concurrent hash map.
 pub struct InMemoryKeyManager {
     keys: Arc<papaya::HashMap<String, Arc<aes_gcm_siv::Key<Aes256GcmSiv>>>>,
 }
 
 impl InMemoryKeyManager {
+    /// Creates a new empty key manager instance.
     pub fn new() -> Self {
         Self {
             keys: Arc::new(papaya::HashMap::new()),
@@ -20,6 +29,7 @@ impl InMemoryKeyManager {
 }
 
 impl KeyManager for InMemoryKeyManager {
+    /// Encrypts data using AES-GCM-SIV with the specified key.
     fn encrypt(
         &self,
         key_id: &String,
@@ -56,6 +66,7 @@ impl KeyManager for InMemoryKeyManager {
         })
     }
 
+    /// Decrypts AES-GCM-SIV encrypted data using the specified key.
     fn decrypt(
         &self,
         key_id: &String,
@@ -89,6 +100,7 @@ impl KeyManager for InMemoryKeyManager {
         })
     }
 
+    /// Generates a new random encryption key with unique ID.
     fn create_key(&self) -> Pin<Box<dyn std::future::Future<Output = eyre::Result<String>>>> {
         let self_clone = self.clone();
         Box::pin(async move {
@@ -116,6 +128,7 @@ impl KeyManager for InMemoryKeyManager {
         })
     }
 
+    /// Removes a key from the in-memory store.
     fn delete_key(
         &self,
         key_id: &String,

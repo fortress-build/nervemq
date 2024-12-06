@@ -1,3 +1,8 @@
+//! Protected route middleware for role-based access control.
+//!
+//! Provides middleware to restrict route access based on user authentication
+//! and role requirements (admin or regular user).
+
 use std::future::{Future, Ready};
 use std::pin::Pin;
 use std::rc::Rc;
@@ -10,20 +15,26 @@ use actix_web::{dev::ServiceRequest, dev::ServiceResponse, Error};
 
 use crate::api::auth::Role;
 
+/// Configuration for protected route access.
+///
+/// Controls whether a route requires admin privileges or just authentication.
 #[derive(Clone)]
 pub struct Protected {
     admin_only: bool,
 }
 
 impl Protected {
+    /// Creates new protection config with specified admin requirement.
     pub fn new(admin_only: bool) -> Self {
         Self { admin_only }
     }
 
+    /// Shorthand to create admin-only route protection.
     pub fn admin_only() -> Self {
         Self::new(true)
     }
 
+    /// Shorthand to create protection requiring only authentication.
     pub fn authenticated() -> Self {
         Self::new(false)
     }
@@ -55,6 +66,9 @@ where
     }
 }
 
+/// Middleware that enforces route protection rules.
+///
+/// Validates user identity and role requirements before allowing access.
 pub struct ProtectedRouteMiddleware<S> {
     service: Rc<S>,
     config: Protected,

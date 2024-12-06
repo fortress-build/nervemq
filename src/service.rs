@@ -190,15 +190,21 @@ impl QueueAttributes {
     }
 }
 
+/// Trait for type-safe queue attributes.
+///
+/// Used to define queue attribute names and types for extraction from
+/// the database.
 pub trait QueueAttribute {
     type Value;
 
+    /// Returns the name of the queue attribute's column in the database.
     fn name(&self) -> &str;
 }
 
 pub mod queue_attributes {
     use super::QueueAttribute;
 
+    /// Represents the delay_seconds queue attribute.
     pub struct DelaySeconds;
 
     impl QueueAttribute for DelaySeconds {
@@ -209,15 +215,18 @@ pub mod queue_attributes {
         }
     }
 
+    /// Represents the max_message_size queue
     pub struct MaxMessageSize;
 
     impl QueueAttribute for MaxMessageSize {
         type Value = u64;
+
         fn name(&self) -> &str {
             "max_message_size"
         }
     }
 
+    /// Represents the message_retention_period queue attribute.
     pub struct MessageRetentionPeriod;
 
     impl QueueAttribute for MessageRetentionPeriod {
@@ -227,6 +236,7 @@ pub mod queue_attributes {
         }
     }
 
+    /// Represents the receive_message_wait_time_seconds queue attribute.
     pub struct ReceiveMessageWaitTimeSeconds;
 
     impl QueueAttribute for ReceiveMessageWaitTimeSeconds {
@@ -236,6 +246,7 @@ pub mod queue_attributes {
         }
     }
 
+    /// Represents the visibility_timeout queue.
     pub struct VisibilityTimeout;
 
     impl QueueAttribute for VisibilityTimeout {
@@ -245,6 +256,7 @@ pub mod queue_attributes {
         }
     }
 
+    /// Represents the redrive_policy queue attribute.
     pub struct RedrivePolicy;
 
     impl QueueAttribute for RedrivePolicy {
@@ -255,6 +267,7 @@ pub mod queue_attributes {
         }
     }
 
+    /// Represents an arbitrary stringly-typed queue attribute.
     pub struct Other(String);
 
     impl QueueAttribute for Other {
@@ -313,15 +326,18 @@ pub struct MessageDetails {
 pub struct Service {
     kms: Arc<dyn KeyManager>,
     db: SqlitePool,
-    #[allow(unused)]
     config: Arc<crate::config::Config>,
 }
 
 impl Service {
+    /// Returns a reference to the underlying SQLite connection pool.
     pub fn db(&self) -> &SqlitePool {
         &self.db
     }
 
+    /// Creates a new Service instance with default configuration and in-memory key management.
+    ///
+    /// Mostly useful for tests and debugging.
     pub async fn connect() -> Result<Self, Error> {
         Self::connect_with(Config::default(), |_| async move {
             Ok(InMemoryKeyManager::new())
@@ -329,10 +345,16 @@ impl Service {
         .await
     }
 
+    /// Returns a reference to the service configuration.
     pub fn config(&self) -> &Config {
         &self.config
     }
 
+    /// Creates a new Service instance with custom configuration and key management.
+    ///
+    /// # Arguments
+    /// * `config` - Custom service configuration
+    /// * `kms_factory` - Factory function to create a key management service
     pub async fn connect_with<K, F, R>(config: Config, kms_factory: F) -> Result<Self, Error>
     where
         F: Fn(&SqlitePool) -> R,
@@ -389,6 +411,10 @@ impl Service {
         Ok(svc)
     }
 
+    /// Deletes a user account and their associated encryption key.
+    ///
+    /// # Arguments
+    /// * `email` - Email address of the user to delete
     pub async fn delete_user(&self, email: Email) -> Result<(), Error> {
         let mut tx = self.db().begin().await?;
 
@@ -411,6 +437,12 @@ impl Service {
         Ok(())
     }
 
+    /// Gets the internal ID for a queue given its namespace and name.
+    ///
+    /// # Arguments
+    /// * `namespace` - Namespace containing the queue
+    /// * `name` - Name of the queue
+    /// * `exec` - Database executor to use
     pub async fn get_queue_id(
         &self,
         namespace: &str,
@@ -430,6 +462,11 @@ impl Service {
         .await?)
     }
 
+    /// Gets the internal ID for a namespace given its name.
+    ///
+    /// # Arguments
+    /// * `name` - Name of the namespace
+    /// * `ex` - Database executor to use
     pub async fn get_namespace_id<'a>(
         &self,
         name: &str,
@@ -445,6 +482,10 @@ impl Service {
         .await?)
     }
 
+    /// Lists all namespaces accessible to the authenticated user.
+    ///
+    /// # Arguments
+    /// * `identity` - Identity of the authenticated user
     pub async fn list_namespaces(&self, identity: Identity) -> Result<Vec<Namespace>, Error> {
         let email = identity.id()?;
 
@@ -462,6 +503,11 @@ impl Service {
         .await?)
     }
 
+    /// Verifies that a user has at least the specified role level.
+    ///
+    /// # Arguments
+    /// * `identity` - Identity of the user to check
+    /// * `role` - Minimum required role level
     pub async fn check_user_role(&self, identity: Identity, role: Role) -> Result<(), Error> {
         let email = identity.id()?;
         let user: User = sqlx::query_as("SELECT * FROM users WHERE email = $1")
@@ -475,6 +521,11 @@ impl Service {
         return Ok(());
     }
 
+    /// Creates a new namespace. Only admin users can create namespaces.
+    ///
+    /// # Arguments
+    /// * `name` - Name of the namespace to create
+    /// * `identity` - Identity of the authenticated admin user
     pub async fn create_namespace(&self, name: &str, identity: Identity) -> Result<u64, Error> {
         let mut tx = self.db().begin().await?;
 
@@ -514,6 +565,11 @@ impl Service {
         Ok(user.id)
     }
 
+    /// Deletes a namespace and all its queues. User must have delete permission.
+    ///
+    /// # Arguments
+    /// * `name` - Name of the namespace to delete
+    /// * `identity` - Identity of the authenticated user
     pub async fn delete_namespace(&self, name: &str, identity: Identity) -> Result<(), Error> {
         let mut tx = self.db().begin().await?;
 
@@ -545,6 +601,15 @@ impl Service {
         Ok(())
     }
 
+    /// Checks if a user has access to a namespace and returns their permissions.
+    ///
+    /// # Arguments
+    /// * `identity` - Identity of the user to check
+    /// * `ns` - ID of the namespace
+    /// * `exec` - Database executor to use
+    ///
+    /// # Returns
+    /// Tuple of (user_id, can_delete_ns)
     pub async fn check_user_access<'a>(
         &self,
         identity: &Identity,
@@ -572,6 +637,14 @@ impl Service {
         }
     }
 
+    /// Creates a new queue in a namespace.
+    ///
+    /// # Arguments
+    /// * `namespace` - Namespace to create the queue in
+    /// * `name` - Name of the queue
+    /// * `attributes` - Queue configuration attributes
+    /// * `tags` - Metadata tags for the queue
+    /// * `identity` - Identity of the authenticated user
     pub async fn create_queue(
         &self,
         namespace: &str,
@@ -652,6 +725,13 @@ impl Service {
         self.kms.as_ref()
     }
 
+    /// Updates the attributes of an existing queue.
+    ///
+    /// # Arguments
+    /// * `ns` - Namespace containing the queue
+    /// * `queue` - Name of the queue
+    /// * `attributes` - New queue attributes
+    /// * `identity` - Identity of the authenticated user
     pub async fn set_queue_attributes(
         &self,
         ns: &str,
@@ -859,6 +939,13 @@ impl Service {
         Ok(())
     }
 
+    /// Gets the current attributes of a queue.
+    ///
+    /// # Arguments
+    /// * `ns` - Namespace containing the queue
+    /// * `queue` - Name of the queue
+    /// * `names` - Names of attributes to retrieve
+    /// * `identity` - Identity of the authenticated user
     pub async fn get_queue_attributes(
         &self,
         ns: &str,
@@ -926,6 +1013,13 @@ impl Service {
         Ok(attributes)
     }
 
+    /// Adds or updates tags on a queue.
+    ///
+    /// # Arguments
+    /// * `ns` - Namespace containing the queue
+    /// * `queue` - Name of the queue
+    /// * `tags` - Tags to set
+    /// * `identity` - Identity of the authenticated user
     pub async fn tag_queue(
         &self,
         ns: &str,
@@ -964,6 +1058,13 @@ impl Service {
         Ok(())
     }
 
+    /// Removes tags from a queue.
+    ///
+    /// # Arguments
+    /// * `ns` - Namespace containing the queue
+    /// * `queue` - Name of the queue
+    /// * `tags` - Tags to remove
+    /// * `identity` - Identity of the authenticated user
     pub async fn untag_queue(
         &self,
         ns: &str,
@@ -999,6 +1100,12 @@ impl Service {
         Ok(())
     }
 
+    /// Gets all tags for a queue.
+    ///
+    /// # Arguments
+    /// * `ns` - Namespace containing the queue
+    /// * `queue` - Name of the queue
+    /// * `identity` - Identity of the authenticated user
     pub async fn get_queue_tags(
         &self,
         ns: &str,
@@ -1031,6 +1138,12 @@ impl Service {
         Ok(res.into_iter().collect())
     }
 
+    /// Deletes a queue and all its messages.
+    ///
+    /// # Arguments
+    /// * `namespace` - Namespace containing the queue
+    /// * `name` - Name of the queue
+    /// * `identity` - Identity of the authenticated user
     pub async fn delete_queue(
         &self,
         namespace: &str,
@@ -1062,6 +1175,11 @@ impl Service {
         Ok(())
     }
 
+    /// Lists queues, optionally filtered by namespace.
+    ///
+    /// # Arguments
+    /// * `namespace` - Optional namespace to filter by
+    /// * `identity` - Identity of the authenticated user
     pub async fn list_queues(
         &self,
         namespace: Option<&str>,
@@ -1087,6 +1205,10 @@ impl Service {
         }
     }
 
+    /// Lists all queues in a specific namespace.
+    ///
+    /// # Arguments
+    /// * `namespace` - Namespace to list queues from
     pub async fn list_queues_for_namespace(&self, namespace: &str) -> Result<Vec<Queue>, Error> {
         let mut db = self.db().acquire().await?;
         let mut stream = sqlx::query_as(
@@ -1108,6 +1230,10 @@ impl Service {
         Ok(queues)
     }
 
+    /// Lists all queues accessible to the authenticated user.
+    ///
+    /// # Arguments
+    /// * `identity` - Identity of the authenticated user
     pub async fn list_all_queues(&self, identity: Identity) -> Result<Vec<Queue>, Error> {
         let email = identity.id()?;
 
@@ -1128,6 +1254,10 @@ impl Service {
         Ok(queues)
     }
 
+    /// Gets the KMS key ID associated with a user.
+    ///
+    /// # Arguments
+    /// * `user_email` - Email of the user
     pub async fn get_key_id(&self, user_email: String) -> Result<String, Error> {
         let key_id = sqlx::query_scalar(
             "
@@ -1142,6 +1272,12 @@ impl Service {
         Ok(key_id)
     }
 
+    /// Creates an API token for accessing a namespace.
+    ///
+    /// # Arguments
+    /// * `name` - Name of the token
+    /// * `namespace` - Namespace to grant access to
+    /// * `identity` - Identity of the authenticated user
     pub async fn create_token(
         &self,
         name: String,
@@ -1202,6 +1338,13 @@ impl Service {
         })
     }
 
+    /// Creates a new user account.
+    ///
+    /// # Arguments
+    /// * `email` - User's email address
+    /// * `password` - User's password
+    /// * `role` - Optional role to assign
+    /// * `namespaces` - Namespaces to grant access to
     pub async fn create_user(
         &self,
         email: Email,
@@ -1249,6 +1392,12 @@ impl Service {
         Ok(())
     }
 
+    /// Sends a single message to a queue.
+    ///
+    /// # Arguments
+    /// * `queue` - Queue ID to send to
+    /// * `message` - Message body
+    /// * `kv` - Message attributes
     pub async fn sqs_send(
         &self,
         queue: u64,
@@ -1278,6 +1427,12 @@ impl Service {
         Ok(msg_id)
     }
 
+    /// Sends multiple messages to a queue in one operation.
+    ///
+    /// # Arguments
+    /// * `namespace` - Namespace containing the queue
+    /// * `queue` - Queue name
+    /// * `messages` - Vector of (message body, attributes) pairs
     pub async fn sqs_send_batch(
         &self,
         namespace: &str,
@@ -1328,6 +1483,11 @@ impl Service {
         Ok(message_ids)
     }
 
+    /// Receives a single message from a queue.
+    ///
+    /// # Arguments
+    /// * `namespace` - Namespace containing the queue
+    /// * `queue` - Queue name
     pub async fn sqs_recv(
         &self,
         namespace: impl AsRef<str>,
@@ -1406,6 +1566,12 @@ impl Service {
         Ok(message)
     }
 
+    /// Receives multiple messages from a queue in one operation.
+    ///
+    /// # Arguments
+    /// * `namespace` - Namespace containing the queue
+    /// * `queue` - Queue name
+    /// * `max_messages` - Maximum number of messages to receive
     pub async fn sqs_recv_batch(
         &self,
         namespace: &str,
@@ -1507,62 +1673,11 @@ impl Service {
         Ok(messages)
     }
 
-    // pub async fn sqs_peek(
-    //     &self,
-    //     namespace: &str,
-    //     queue: &str,
-    //     message_id: u64,
-    // ) -> Result<Option<SqsMessage>, Error> {
-    //     let mut db = self.db().acquire().await?;
-    //
-    //     let msg: Option<Message> = sqlx::query_as(
-    //         "
-    //         SELECT
-    //             m.*,
-    //             q.name as queue,
-    //             (CASE
-    //                 WHEN m.delivered_at IS NULL AND m.tries < conf.max_retries THEN 'pending'
-    //                 WHEN m.delivered_at IS NULL AND m.tries >= conf.max_retries THEN 'failed'
-    //                 ELSE 'delivered'
-    //             END) as status
-    //         FROM messages m
-    //         JOIN queues q ON m.queue = q.id
-    //         JOIN queue_configurations conf ON q.id = conf.queue
-    //         JOIN namespaces n ON q.ns = n.id
-    //         WHERE n.name = $1 AND q.name = $2 AND m.id = $3
-    //         ",
-    //     )
-    //     .bind(namespace)
-    //     .bind(queue)
-    //     .bind(message_id as i64)
-    //     .fetch_optional(&mut *db)
-    //     .await?;
-    //
-    //     let msg = match msg {
-    //         Some(msg) => SqsMessage {
-    //             message_id: msg.id.to_string(),
-    //             md5_of_body: hex::encode(md5::compute(&msg.body).as_slice()),
-    //             body: msg.body,
-    //         },
-    //         None => return Ok(None),
-    //     };
-    //
-    //     // let mut kv = sqlx::query_as::<_, (String, Vec<u8>)>(
-    //     //     "
-    //     //     SELECT k, v FROM kv_pairs WHERE message = $1
-    //     //     ",
-    //     // )
-    //     // .bind(msg.id as i64)
-    //     // .fetch(&mut *db);
-    //     //
-    //     // while let Some((k, v)) = kv.next().await.transpose()? {
-    //     //     msg.kv
-    //     //         .insert(k, bincode::deserialize(&v).map_err(Error::internal)?);
-    //     // }
-    //
-    //     Ok(Some(msg))
-    // }
-
+    /// Lists all messages in a queue.
+    ///
+    /// # Arguments
+    /// * `namespace` - Namespace containing the queue
+    /// * `queue` - Queue name
     pub async fn list_messages(
         &self,
         namespace: &str,
@@ -1676,6 +1791,10 @@ impl Service {
         Ok(messages)
     }
 
+    /// Gets the configuration for a queue.
+    ///
+    /// # Arguments
+    /// * `queue` - Queue ID
     pub async fn get_queue_configuration(&self, queue: u64) -> Result<QueueConfig, Error> {
         let mut db = self.db().acquire().await?;
         Ok(sqlx::query_as(
@@ -1688,6 +1807,11 @@ impl Service {
         .await?)
     }
 
+    /// Updates the configuration for a queue.
+    ///
+    /// # Arguments
+    /// * `queue` - Queue ID
+    /// * `new_config` - New configuration settings
     pub async fn update_queue_configuration(
         &self,
         queue: u64,
@@ -1711,6 +1835,12 @@ impl Service {
         Ok(())
     }
 
+    /// Gets statistics for a specific queue.
+    ///
+    /// # Arguments
+    /// * `identity` - Identity of the authenticated user
+    /// * `namespace` - Namespace containing the queue
+    /// * `queue` - Queue name
     pub async fn queue_statistics(
         &self,
         identity: Identity,
@@ -1749,6 +1879,10 @@ impl Service {
         .await?)
     }
 
+    /// Gets statistics for all queues accessible to the user.
+    ///
+    /// # Arguments
+    /// * `identity` - Identity of the authenticated user
     pub async fn global_queue_statistics(
         &self,
         identity: Identity,
@@ -1789,6 +1923,16 @@ impl Service {
         Ok(res)
     }
 
+    /// Deletes multiple messages from a queue.
+    ///
+    /// # Arguments
+    /// * `namespace` - Namespace containing the queue
+    /// * `queue` - Queue name
+    /// * `message_ids` - IDs of messages to delete
+    /// * `identity` - Identity of the authenticated user
+    ///
+    /// # Returns
+    /// Tuple of (successfully deleted IDs, failed deletions with errors)
     pub async fn delete_message_batch(
         &self,
         namespace: &str,
@@ -1848,6 +1992,13 @@ impl Service {
         Ok((success, failure))
     }
 
+    /// Deletes a single message from a queue.
+    ///
+    /// # Arguments
+    /// * `namespace` - Namespace containing the queue
+    /// * `queue` - Queue name
+    /// * `message_id` - ID of message to delete
+    /// * `identity` - Identity of the authenticated user
     pub async fn delete_message(
         &self,
         namespace: &str,
@@ -1893,6 +2044,12 @@ impl Service {
         Ok(())
     }
 
+    /// Deletes all messages from a queue.
+    ///
+    /// # Arguments
+    /// * `namespace` - Namespace containing the queue
+    /// * `queue` - Queue name
+    /// * `identity` - Identity of the authenticated user
     pub async fn purge_queue(
         &self,
         namespace: &str,
@@ -1932,6 +2089,10 @@ impl Service {
         Ok(())
     }
 
+    /// Gets statistics for all namespaces accessible to the user.
+    ///
+    /// # Arguments
+    /// * `identity` - Identity of the authenticated user
     pub async fn list_namespace_statistics(
         &self,
         identity: Identity,

@@ -55,10 +55,6 @@ md5 = "0.7.0"
 papaya = "0.1.6"
 pom = "3.4.0"
 rand = "0.8.5"
-scratchstack-aws-principal = "0.4.9"
-scratchstack-aws-signature = { path = "../scratchstack-aws-signature", features = [
-  "unstable",
-] } # version = "0.10.6"
 secrecy = { version = "0.10.3", features = ["serde"] }
 serde = { version = "1.0.215", features = ["derive"] }
 serde-email = "3.1.0"
