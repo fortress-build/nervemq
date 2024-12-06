@@ -1,0 +1,14 @@
+{
+  "name": "nervemq_example",
+  "module": "index.ts",
+  "type": "module",
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "@aws-sdk/client-sqs": "^3.699.0"
+  }
+}
