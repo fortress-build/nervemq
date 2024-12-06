@@ -18,11 +18,8 @@ use types::{
     list_queues::{ListQueuesRequest, ListQueuesResponse},
     purge_queue::{PurgeQueueRequest, PurgeQueueResponse},
     receive_message::{ReceiveMessageRequest, ReceiveMessageResponse},
-    send_message::{SendMessageRequest, SendMessageResponse},
-    send_message_batch::{
-        SendMessageBatchRequest, SendMessageBatchResponse, SendMessageBatchResultEntry,
-        SendMessageBatchResultErrorEntry,
-    },
+    send_message::SendMessageRequest,
+    send_message_batch::SendMessageBatchRequest,
     set_queue_attributes::{SetQueueAttributesRequest, SetQueueAttributesResponse},
     SqsResponse,
 };
@@ -100,17 +97,9 @@ async fn send_message(
         .await?
         .ok_or_else(|| Error::queue_not_found(queue_name, namespace_name))?;
 
-    // FIXME: Implement delay_seconds
-    let message_id = service
-        .sqs_send(queue_id, &request.message_body, request.message_attributes)
-        .await?;
+    let res = service.sqs_send(queue_id, request).await?;
 
-    let digest = hex::encode(md5::compute(&request.message_body).as_ref());
-
-    Ok(SqsResponse::SendMessage(SendMessageResponse {
-        message_id,
-        md5_of_message_body: digest,
-    }))
+    Ok(SqsResponse::SendMessage(res))
 }
 
 async fn send_message_batch(
@@ -126,8 +115,9 @@ async fn send_message_batch(
         .map_err(|e| Error::internal(e))?
         .ok_or_else(|| Error::missing_parameter("missing request body"))?;
 
-    let mut path = request
-        .queue_url
+    let queue_url = request.queue_url.clone();
+
+    let mut path = queue_url
         .path_segments()
         .ok_or_else(|| Error::missing_parameter("queue name"))?;
 
@@ -149,46 +139,11 @@ async fn send_message_batch(
         return Err(Error::Unauthorized);
     }
 
-    let queue_id = service
-        .get_queue_id(namespace_name, queue_name, service.db())
-        .await?
-        .ok_or_else(|| Error::queue_not_found(queue_name, namespace_name))?;
+    let res = service
+        .sqs_send_batch(namespace_name, queue_name, request)
+        .await?;
 
-    let mut successful = Vec::new();
-    let mut failed = Vec::new();
-
-    for entry in request.entries {
-        let message_attributes = entry.message_attributes;
-        let message_body = entry.message_body;
-
-        match service
-            .sqs_send(queue_id, &message_body, message_attributes)
-            .await
-        {
-            Ok(message_id) => {
-                let digest = hex::encode(md5::compute(&message_body).as_ref());
-                successful.push(SendMessageBatchResultEntry {
-                    id: entry.id,
-                    message_id: message_id.to_string(),
-                    md5_of_message_body: digest,
-                });
-            }
-            Err(e) => {
-                failed.push(SendMessageBatchResultErrorEntry {
-                    id: entry.id,
-                    sender_fault: true,
-                    code: "InternalError".to_string(),
-                    message: e.to_string(),
-                });
-            }
-        }
-    }
-
-    Ok(if !failed.is_empty() {
-        SqsResponse::SendMessageBatch(SendMessageBatchResponse::Failed { failed })
-    } else {
-        SqsResponse::SendMessageBatch(SendMessageBatchResponse::Successful { successful })
-    })
+    Ok(SqsResponse::SendMessageBatch(res))
 }
 
 async fn receive_message(

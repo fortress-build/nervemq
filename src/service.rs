@@ -72,8 +72,9 @@ use std::{
 };
 
 use actix_identity::Identity;
-use actix_web::{error::ErrorUnauthorized, web};
+use actix_web::{error::ErrorUnauthorized, web, ResponseError};
 use base64::Engine;
+use bytes::{BufMut, BytesMut};
 use secrecy::SecretString;
 use serde::{Deserialize, Serialize};
 use serde_email::Email;
@@ -100,6 +101,13 @@ use crate::{
     namespace::{Namespace, NamespaceStatistics},
     queue::{Queue, QueueStatistics},
     sqs::types::{SqsMessage, SqsMessageAttribute},
+    types::{
+        send_message::{SendMessageRequest, SendMessageResponse},
+        send_message_batch::{
+            SendMessageBatchRequest, SendMessageBatchResponse, SendMessageBatchResultEntry,
+            SendMessageBatchResultErrorEntry,
+        },
+    },
 };
 
 /// Configuration for dead-letter queue redrive policy.
@@ -1317,27 +1325,63 @@ impl Service {
     }
 
     /// Sends a single message to a queue.
-    ///
-    /// # Arguments
-    /// * `queue` - Queue ID to send to
-    /// * `message` - Message body
-    /// * `kv` - Message attributes
     pub async fn sqs_send(
         &self,
         queue: u64,
-        message: &String,
-        kv: HashMap<String, SqsMessageAttribute>,
-    ) -> Result<u64, Error> {
+        req: SendMessageRequest,
+    ) -> Result<SendMessageResponse, Error> {
         let mut tx = self.db().begin().await?;
+
+        let res = self.sqs_send_internal(queue, req, &mut tx).await?;
+
+        tx.commit().await?;
+
+        Ok(res)
+    }
+
+    async fn sqs_send_internal(
+        &self,
+        queue: u64,
+        req: SendMessageRequest,
+        exec: impl Acquire<'_, Database = Sqlite>,
+    ) -> Result<SendMessageResponse, Error> {
+        let mut tx = exec.acquire().await?;
 
         let msg_id: u64 =
             sqlx::query_scalar("INSERT INTO messages (queue, body) VALUES ($1, $2) RETURNING id")
                 .bind(queue as i64)
-                .bind(message)
+                .bind(&req.message_body)
                 .fetch_one(&mut *tx)
                 .await?;
 
-        for (k, v) in kv.into_iter() {
+        let mut attr_bytes_to_digest = BytesMut::new();
+        for (k, v) in req.message_attributes.into_iter() {
+            // Serialize the attributes in the expected binary format
+            //
+            // [key length (4 bytes)][key bytes][type (1 byte)][value length (4 bytes)][value bytes]
+            match &v {
+                SqsMessageAttribute::String { string_value }
+                | SqsMessageAttribute::Number { string_value } => {
+                    let k_bytes = k.as_bytes();
+                    attr_bytes_to_digest.put_u32(k_bytes.len() as u32);
+                    attr_bytes_to_digest.put_slice(k_bytes);
+                    attr_bytes_to_digest.put_u8(1); // Type 1 is string (or number)
+
+                    let v_bytes = string_value.as_bytes();
+                    attr_bytes_to_digest.put_u32(v_bytes.len() as u32);
+                    attr_bytes_to_digest.extend_from_slice(v_bytes);
+                }
+                SqsMessageAttribute::Binary { binary_value } => {
+                    let k_bytes = k.as_bytes();
+                    attr_bytes_to_digest.put_u32(k_bytes.len() as u32);
+                    attr_bytes_to_digest.put_slice(k_bytes);
+                    attr_bytes_to_digest.put_u8(2); // Type 2 is binary
+
+                    let v_bytes = binary_value.as_slice();
+                    attr_bytes_to_digest.put_u32(v_bytes.len() as u32);
+                    attr_bytes_to_digest.extend_from_slice(v_bytes);
+                }
+            };
             sqlx::query("INSERT INTO kv_pairs (message, k, v) VALUES ($1, $2, $3)")
                 .bind(msg_id as i64)
                 .bind(k)
@@ -1346,9 +1390,15 @@ impl Service {
                 .await?;
         }
 
-        tx.commit().await?;
+        let body_digest = hex::encode(md5::compute(&req.message_body).as_ref());
+        let attr_digest = hex::encode(md5::compute(&attr_bytes_to_digest).as_ref());
 
-        Ok(msg_id)
+        Ok(SendMessageResponse {
+            message_id: msg_id,
+            md5_of_message_body: body_digest,
+            md5_of_message_attributes: attr_digest,
+            md5_of_message_system_attributes: hex::encode(md5::compute(b"").as_ref()),
+        })
     }
 
     /// Sends multiple messages to a queue in one operation.
@@ -1360,52 +1410,62 @@ impl Service {
     #[allow(unused)]
     pub async fn sqs_send_batch(
         &self,
-        namespace: &str,
-        queue: &str,
-        messages: Vec<(Vec<u8>, HashMap<String, SqsMessageAttribute>)>,
-    ) -> Result<Vec<u64>, Error> {
+        queue_name: &str,
+        namespace_name: &str,
+        req: SendMessageBatchRequest,
+    ) -> Result<SendMessageBatchResponse, Error> {
         let mut tx = self.db().begin().await?;
 
-        // Get queue ID once for all messages
-        let queue_id: u64 = sqlx::query_scalar(
-            "
-            SELECT q.id FROM queues q
-            JOIN namespaces n ON q.ns = n.id
-            WHERE n.name = $1 AND q.name = $2
-            ",
-        )
-        .bind(namespace)
-        .bind(queue)
-        .fetch_one(&mut *tx)
-        .await?;
+        let queue_id = self
+            .get_queue_id(namespace_name, queue_name, &mut *tx)
+            .await?
+            .ok_or_else(|| Error::queue_not_found(queue_name, namespace_name))?;
 
-        let mut message_ids = Vec::with_capacity(messages.len());
+        let mut successful = Vec::new();
+        let mut failed = Vec::new();
 
-        // Insert all messages in the batch
-        for (message, kv) in messages {
-            let msg_id: u64 = sqlx::query_scalar(
-                "INSERT INTO messages (queue, body) VALUES ($1, $2) RETURNING id",
-            )
-            .bind(queue_id as i64)
-            .bind(&message)
-            .fetch_one(&mut *tx)
-            .await?;
+        for entry in req.entries {
+            let message_attributes = entry.message_attributes;
+            let message_body = entry.message_body;
 
-            for (k, v) in kv.into_iter() {
-                sqlx::query("INSERT INTO kv_pairs (message, k, v) VALUES ($1, $2, $3)")
-                    .bind(msg_id as i64)
-                    .bind(k)
-                    .bind(serde_json::to_vec(&v).map_err(Error::internal)?)
-                    .execute(&mut *tx)
-                    .await?;
+            match self
+                .sqs_send_internal(
+                    queue_id,
+                    SendMessageRequest {
+                        queue_url: req.queue_url.clone(),
+                        message_body,
+                        delay_seconds: entry.delay_seconds,
+                        message_attributes,
+                        message_deduplication_id: entry.message_deduplication_id,
+                        message_group_id: entry.message_group_id,
+                    },
+                    &mut *tx,
+                )
+                .await
+            {
+                Ok(res) => {
+                    successful.push(SendMessageBatchResultEntry {
+                        id: entry.id,
+                        message_id: res.message_id.to_string(),
+                        md5_of_message_body: res.md5_of_message_body,
+                        md5_of_message_attributes: res.md5_of_message_attributes,
+                        md5_of_message_system_attributes: res.md5_of_message_system_attributes,
+                    });
+                }
+                Err(e) => {
+                    failed.push(SendMessageBatchResultErrorEntry {
+                        id: entry.id,
+                        sender_fault: false,
+                        code: e.status_code().to_string(),
+                        message: Some(e.to_string()),
+                    });
+                }
             }
-
-            message_ids.push(msg_id);
         }
 
         tx.commit().await?;
 
-        Ok(message_ids)
+        Ok(SendMessageBatchResponse { successful, failed })
     }
 
     /// Receives a single message from a queue.
