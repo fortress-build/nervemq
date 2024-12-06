@@ -1,3 +1,9 @@
+//! API Key authentication middleware for Actix-web.
+//!
+//! Provides middleware that authenticates requests using either NerveMQ API keys
+//! or AWS SigV4 signatures. Successful authentication creates an Identity session
+//! and injects the authorized namespace into request extensions.
+
 use std::future::{Future, Ready};
 use std::pin::Pin;
 use std::sync::Arc;
@@ -15,6 +21,10 @@ use crate::auth::header::AuthHeader;
 use crate::auth::protocols::nervemq::authenticate_api_key;
 use crate::auth::protocols::sigv4::authenticate_sigv4;
 
+/// Transform factory for API key authentication middleware.
+///
+/// Used by Actix-web to create the authentication middleware that processes
+/// requests with API keys or AWS SigV4 signatures.
 pub struct ApiKeyAuth;
 
 impl<S: 'static, B> Transform<S, ServiceRequest> for ApiKeyAuth
@@ -36,6 +46,13 @@ where
     }
 }
 
+/// Middleware that performs API key authentication.
+///
+/// Intercepts requests to:
+/// 1. Check for Authorization header
+/// 2. Parse and validate API keys or AWS SigV4 signatures
+/// 3. Create user session on successful authentication
+/// 4. Inject authorized namespace into request extensions
 pub struct ApiKeyAuthMiddleware<S> {
     service: Arc<S>,
 }
@@ -57,6 +74,11 @@ where
         self.service.poll_ready(cx)
     }
 
+    /// Processes each request to authenticate API keys.
+    ///
+    /// If no Authorization header is present, allows the request to pass through
+    /// for potential cookie-based authentication later. Otherwise validates the
+    /// provided credentials and establishes the user session.
     fn call(&self, mut req: ServiceRequest) -> <Self as Service<ServiceRequest>>::Future {
         let svc = Arc::clone(&self.service);
 

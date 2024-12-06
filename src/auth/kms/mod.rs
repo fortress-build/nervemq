@@ -7,6 +7,7 @@ use std::{future::Future, pin::Pin};
 
 pub mod aws;
 pub mod memory;
+pub mod sqlite;
 
 /// Represents an in-progress key rotation operation.
 ///

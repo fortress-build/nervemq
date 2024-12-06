@@ -1,5 +1,73 @@
+//! Core service implementation for NerveMQ message queue system.
+//!
+//! This module implements the main service layer that provides:
+//!
+//! - Queue management (create, delete, list, purge)
+//! - Message operations (send, receive, delete)
+//! - Namespace management (create, delete, list)
+//! - User management and authentication
+//! - Statistics and monitoring
+//!
+//! # Key Types
+//!
+//! - [`Service`] - The main service struct that handles all operations
+//! - [`QueueAttributes`] - Configuration options for queues
+//! - [`QueueConfig`] - Internal queue configuration
+//! - [`MessageDetails`] - Detailed message information
+//!
+//! # Examples
+//!
+//! ```no_run
+//! use nervemq::service::Service;
+//!
+//! async fn example() -> Result<(), Box<dyn std::error::Error>> {
+//!     // Connect to the service
+//!     let service = Service::connect().await?;
+//!
+//!     // Create a namespace
+//!     service.create_namespace("my-namespace", identity).await?;
+//!
+//!     // Create a queue
+//!     service.create_queue(
+//!         "my-namespace",
+//!         "my-queue",
+//!         HashMap::new(),
+//!         HashMap::new(),
+//!         identity
+//!     ).await?;
+//!
+//!     Ok(())
+//! }
+//! ```
+//!
+//! # Database Schema
+//!
+//! The service uses SQLite with the following main tables:
+//!
+//! - `namespaces` - Namespace definitions
+//! - `queues` - Queue definitions
+//! - `messages` - Message storage
+//! - `users` - User accounts
+//! - `user_permissions` - Access control
+//! - `queue_configurations` - Queue settings
+//! - `queue_attributes` - Queue attributes
+//! - `queue_tags` - Queue metadata
+//! - `kv_pairs` - Message attributes
+//!
+//! # Architecture
+//!
+//! The service implements an AWS SQS-compatible message queue with:
+//!
+//! - Multi-tenant support via namespaces
+//! - Role-based access control
+//! - Dead letter queues
+//! - Message attributes
+//! - Configurable retry policies
+//! - Queue tags and attributes
+//!
 use std::{
     collections::{HashMap, HashSet},
+    future::Future,
     sync::Arc,
 };
 
@@ -26,7 +94,7 @@ use crate::{
     },
     auth::{
         crypto::{generate_api_key, hash_secret, GeneratedKey},
-        kms::KeyManager,
+        kms::{memory::InMemoryKeyManager, KeyManager},
     },
     config::Config,
     error::Error,
@@ -36,6 +104,10 @@ use crate::{
     sqs::types::{SqsMessage, SqsMessageAttribute},
 };
 
+/// Configuration for dead-letter queue redrive policy.
+///
+/// This defines how failed messages should be moved to a dead-letter queue
+/// after exceeding the maximum number of receive attempts.
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RedrivePolicy {
@@ -44,6 +116,14 @@ pub struct RedrivePolicy {
     max_receive_count: u64,
 }
 
+/// Configurable attributes for a queue.
+///
+/// These attributes control the queue's behavior including:
+/// - Message delay
+/// - Message size limits
+/// - Message retention
+/// - Visibility timeout
+/// - Dead letter queue configuration
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct QueueAttributes {
@@ -186,6 +266,12 @@ pub mod queue_attributes {
     }
 }
 
+/// Internal configuration for a queue stored in the database.
+///
+/// Contains:
+/// - Queue ID
+/// - Maximum retry attempts
+/// - Optional dead letter queue ID
 #[derive(Debug, Serialize, Deserialize, FromRow)]
 pub struct QueueConfig {
     pub queue: u64,
@@ -194,6 +280,13 @@ pub struct QueueConfig {
 }
 
 /// Represents the details of a message for display in the UI.
+/// Detailed information about a message for display in the UI.
+///
+/// Includes:
+/// - Message ID and queue
+/// - Delivery status and attempts
+/// - Message body and attributes
+/// - Timestamps
 #[derive(Debug, Serialize)]
 pub struct MessageDetails {
     pub id: u64,
@@ -209,6 +302,13 @@ pub struct MessageDetails {
     pub message_attributes: HashMap<String, serde_json::Value>,
 }
 
+/// Main service struct that handles all queue operations.
+///
+/// The service manages:
+/// - Queue and message operations
+/// - User authentication and authorization
+/// - Database connections
+/// - Key management for encryption
 #[derive(Clone)]
 pub struct Service {
     kms: Arc<dyn KeyManager>,
@@ -222,15 +322,23 @@ impl Service {
         &self.db
     }
 
-    pub async fn connect(kms: impl KeyManager) -> Result<Self, Error> {
-        Self::connect_with(kms, Config::default()).await
+    pub async fn connect() -> Result<Self, Error> {
+        Self::connect_with(Config::default(), |_| async move {
+            Ok(InMemoryKeyManager::new())
+        })
+        .await
     }
 
     pub fn config(&self) -> &Config {
         &self.config
     }
 
-    pub async fn connect_with(kms: impl KeyManager, config: Config) -> Result<Self, Error> {
+    pub async fn connect_with<K, F, R>(config: Config, kms_factory: F) -> Result<Self, Error>
+    where
+        F: Fn(&SqlitePool) -> R,
+        R: Future<Output = Result<K, Error>>,
+        K: KeyManager,
+    {
         let opts = SqliteConnectOptions::new()
             .filename(config.db_path())
             .create_if_missing(true)
@@ -243,6 +351,8 @@ impl Service {
         let pool = SqlitePoolOptions::new().connect_with(opts).await?;
 
         sqlx::migrate!("./migrations").run(&pool).await?;
+
+        let kms = kms_factory(&pool).await?;
 
         let svc = Self {
             kms: Arc::new(kms),

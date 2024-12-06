@@ -19,7 +19,7 @@ use nervemq::{
         data, namespace, queue, tokens,
     },
     auth::{
-        kms::memory::InMemoryKeyManager,
+        kms::sqlite::SqliteKeyManager,
         middleware::{api_keys::ApiKeyAuth, protected_route::Protected},
         session::SqliteSessionStore,
     },
@@ -60,9 +60,11 @@ async fn main() -> eyre::Result<()> {
 
     let config = Config::load()?;
 
-    let kms = InMemoryKeyManager::new();
-
-    let service = Service::connect_with(kms, config).await?;
+    let service = Service::connect_with(config, |db| {
+        let db = db.clone();
+        async move { SqliteKeyManager::new(db).await }
+    })
+    .await?;
 
     let session_store = SqliteSessionStore::new(service.db().clone());
 

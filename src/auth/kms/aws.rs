@@ -1,18 +1,32 @@
+//! AWS KMS (Key Management Service) implementation.
+//!
+//! Provides encryption, decryption, and key management operations using
+//! AWS KMS as the backend service. Implements the KeyManager trait for
+//! seamless integration with the rest of the system.
+
 use std::{future::Future, pin::Pin};
 
 use aws_sdk_kms::operation::encrypt::EncryptOutput;
 
+/// AWS KMS implementation of the KeyManager trait.
+///
+/// Manages cryptographic operations using AWS KMS service,
+/// supporting symmetric encryption/decryption and key lifecycle.
 pub struct AwsKeyManager {
     client: aws_sdk_kms::Client,
 }
 
 impl AwsKeyManager {
+    /// Creates a new AWS KMS manager with the provided client.
     pub fn new(client: aws_sdk_kms::Client) -> Self {
         Self { client }
     }
 }
 
 impl super::KeyManager for AwsKeyManager {
+    /// Encrypts data using AWS KMS with the specified key.
+    ///
+    /// Uses symmetric encryption with the default algorithm.
     fn encrypt(
         &self,
         key_id: &String,
@@ -43,6 +57,7 @@ impl super::KeyManager for AwsKeyManager {
         })
     }
 
+    /// Decrypts KMS-encrypted data using the specified key.
     fn decrypt(
         &self,
         key_id: &String,
@@ -64,6 +79,7 @@ impl super::KeyManager for AwsKeyManager {
         })
     }
 
+    /// Creates a new KMS key for encryption/decryption.
     fn create_key(&self) -> Pin<Box<dyn Future<Output = eyre::Result<String>>>> {
         let client = self.client.clone();
         Box::pin(async move {
@@ -81,6 +97,10 @@ impl super::KeyManager for AwsKeyManager {
         })
     }
 
+    /// Schedules deletion of a KMS key.
+    ///
+    /// Note: This initiates key deletion with AWS KMS's standard
+    /// waiting period before actual deletion.
     fn delete_key(&self, key_id: &String) -> Pin<Box<dyn Future<Output = eyre::Result<()>>>> {
         let client = self.client.clone();
         let key_id = key_id.clone();
