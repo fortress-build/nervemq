@@ -19,7 +19,7 @@ import {
   listUserAllowedNamespaces,
   updateUserAllowedNamespaces,
   updateUserRole,
-} from "@/actions/api";
+} from "@/lib/actions/api";
 import { Spinner } from "@nextui-org/react";
 import { ChevronsUpDown, Plus, Check } from "lucide-react";
 import {
@@ -32,10 +32,10 @@ import {
 } from "./ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { toast } from "sonner";
-import { useInvalidate } from "@/hooks/use-invalidate";
+import { useInvalidate } from "@/lib/hooks/use-invalidate";
 import CreateNamespace from "./create-namespace";
 import { useState } from "react";
-import { modifyUserSchema } from "@/schemas/modify-user";
+import { modifyUserSchema } from "@/lib/schemas/modify-user";
 import type { UserStatistics } from "./create-user";
 
 import {
@@ -241,7 +241,7 @@ export default function ModifyUser({
                                 }}
                               >
                                 <div className="flex items-center gap-2">
-                                <div className="w-4 h-4 flex items-center justify-center">
+                                  <div className="w-4 h-4 flex items-center justify-center">
                                     {field.state.value.has(namespace.name) && (
                                       <Check className="h-4 w-4" />
                                     )}

@@ -1,15 +1,15 @@
 "use client";
 
-import { listQueues } from "@/actions/api";
+import { listQueues } from "@/lib/actions/api";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 
-import { columns, type QueueStatistics } from "@/components/queues/table";
-import { DataTable } from "@/components/data-table";
-import CreateQueue from "@/components/create-queue";
-import { Button } from "@/components/ui/button";
+import { columns, type QueueStatistics } from "@/lib/components/queues/table";
+import { DataTable } from "@/lib/components/data-table";
+import CreateQueue from "@/lib/components/create-queue";
+import { Button } from "@/lib/components/ui/button";
 import { useState } from "react";
-import { deleteQueue } from "@/actions/api";
+import { deleteQueue } from "@/lib/actions/api";
 import {
   Dialog,
   DialogContent,
@@ -17,10 +17,10 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
-} from "@/components/ui/dialog";
+} from "@/lib/components/ui/dialog";
 import type { SortingState, ColumnFiltersState } from "@tanstack/react-table";
-import { Input } from "@/components/ui/input";
-import { deleteQueueSchema } from "@/schemas/delete-queue";
+import { Input } from "@/lib/components/ui/input";
+import { deleteQueueSchema } from "@/lib/schemas/delete-queue";
 import { toast } from "sonner";
 
 export type Queue = {

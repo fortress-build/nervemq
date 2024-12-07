@@ -13,7 +13,7 @@ import {
   SidebarMenuItem,
   SidebarTrigger,
   useSidebar,
-} from "@/components/ui/sidebar";
+} from "@/lib/components/ui/sidebar";
 import { cn } from "@/lib/utils";
 import {
   Axis3D,

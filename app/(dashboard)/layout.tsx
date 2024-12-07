@@ -1,6 +1,6 @@
-import { AuthVerifier } from "@/components/auth-verifier";
-import Header from "@/components/header";
-import DashboardSidebar from "@/components/sidebar";
+import { AuthVerifier } from "@/lib/components/auth-verifier";
+import Header from "@/lib/components/header";
+import DashboardSidebar from "@/lib/components/sidebar";
 import type React from "react";
 
 export default function Layout({ children }: { children: React.ReactNode }) {

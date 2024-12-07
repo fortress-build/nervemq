@@ -6,7 +6,7 @@ import {
   BreadcrumbLink,
   BreadcrumbList,
   BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb";
+} from "@/lib/components/ui/breadcrumb";
 import { useSession } from "@/lib/state/global";
 import { capitalize, cn } from "@/lib/utils";
 import { Menu, Slash, User } from "lucide-react";
@@ -22,7 +22,7 @@ import {
 } from "./ui/dropdown-menu";
 import { Button } from "./ui/button";
 import { useSidebar } from "./ui/sidebar";
-import { logout } from "@/actions/api";
+import { logout } from "@/lib/actions/api";
 
 export default function Header({ className }: { className?: string }) {
   const pathName = usePathname();

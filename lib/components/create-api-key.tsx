@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/lib/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -8,25 +8,25 @@ import {
   DialogFooter,
   DialogTitle,
   DialogClose,
-} from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
+} from "@/lib/components/ui/dialog";
+import { Label } from "@/lib/components/ui/label";
 import { cn, isAlphaNumeric } from "@/lib/utils";
 import { type InferType, object, string } from "yup";
 import { useForm } from "@tanstack/react-form";
 import { yupValidator } from "@tanstack/yup-form-adapter";
 import { Spinner } from "@nextui-org/react";
-import { Input } from "@/components/ui/input";
-import { useInvalidate } from "@/hooks/use-invalidate";
+import { Input } from "@/lib/components/ui/input";
+import { useInvalidate } from "@/lib/hooks/use-invalidate";
 import { DialogHeader } from "./ui/dialog";
-import { createAPIKey } from "@/actions/api";
+import { createAPIKey } from "@/lib/actions/api";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from "@/components/ui/tooltip";
+} from "@/lib/components/ui/tooltip";
 import { Copy as CopyIcon, Info as InfoIcon } from "lucide-react";
-import { listNamespaces } from "@/actions/api";
+import { listNamespaces } from "@/lib/actions/api";
 import { useQuery } from "@tanstack/react-query";
 import CreateNamespace from "./create-namespace";
 import { ChevronsUpDown, Plus, Check } from "lucide-react";
@@ -37,12 +37,12 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-} from "@/components/ui/command";
+} from "@/lib/components/ui/command";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@/components/ui/popover";
+} from "@/lib/components/ui/popover";
 
 // Add schema
 export const createApiKeySchema = object({
@@ -95,7 +95,6 @@ export default function CreateApiKey({
     queryKey: ["namespaces"],
   });
 
-
   const form = useForm({
     defaultValues: {
       name: "",
@@ -128,7 +127,6 @@ export default function CreateApiKey({
       form.setFieldValue("namespace", namespaces[0].name);
     }
   }, [namespaces, form]);
-
 
   const downloadKey = useCallback(() => {
     if (apiKey?.access_key && apiKey?.secret_key) {
