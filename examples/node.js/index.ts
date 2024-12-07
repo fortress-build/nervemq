@@ -11,7 +11,6 @@ const hostUrl = "http://localhost:8080/sqs";
 const sqs = new SQSClient({
   endpoint: hostUrl,
   region: "us-west-1",
-  // md5: false,
   credentials: {
     accessKeyId: "6kkMWFC1nin",
     secretAccessKey: "FhwbQ682XAe7PxcY7WWkJKGscqdpdknZP",
@@ -29,7 +28,6 @@ const sendResult = await sqs.send(
   new SendMessageCommand({
     QueueUrl: url,
     MessageBody: "Hello World!",
-
     MessageAttributes: {
       Test: {
         StringValue: "TestString",
@@ -44,12 +42,7 @@ console.log(`Message ID: ${sendResult.MessageId}`);
 const receiveResult = await sqs.send(
   new ReceiveMessageCommand({
     QueueUrl: url,
-    // AttributeNames: [],
     MessageAttributeNames: ["Test"],
-    // MaxNumberOfMessages: 10,
-    // VisibilityTimeout: 0,
-    // WaitTimeSeconds: 0,
-    // ReceiveRequestAttemptId: "1",
   }),
 );
 
