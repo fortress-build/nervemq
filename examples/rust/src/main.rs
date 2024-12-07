@@ -21,7 +21,7 @@ async fn main() -> Result<(), eyre::Report> {
 
     let sqs = aws_sdk_sqs::Client::from_conf(config);
 
-    let res = sqs.get_queue_url().queue_name("bruh").send().await;
+    let res = sqs.get_queue_url().queue_name("test").send().await;
 
     tracing::info!("Result: {:?}", res);
 
