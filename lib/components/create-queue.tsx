@@ -15,7 +15,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { cn } from "@/lib/utils";
-import { createQueue, listNamespaces } from "@/actions/api";
+import { createQueue, listNamespaces } from "@/lib/actions/api";
 import { Spinner } from "@nextui-org/react";
 import { ChevronsUpDown, Plus } from "lucide-react";
 import {
@@ -28,13 +28,13 @@ import {
 } from "./ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { toast } from "sonner";
-import { useInvalidate } from "@/hooks/use-invalidate";
+import { useInvalidate } from "@/lib/hooks/use-invalidate";
 import CreateNamespace from "./create-namespace";
 import { useState, useEffect } from "react";
 import {
   type CreateQueueRequest,
   createQueueSchema,
-} from "@/schemas/create-queue";
+} from "@/lib/schemas/create-queue";
 import KeyValueForm from "./key-value-pairs";
 
 export default function CreateQueue({

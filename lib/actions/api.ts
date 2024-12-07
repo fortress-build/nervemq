@@ -1,21 +1,21 @@
-import type { NamespaceStatistics } from "@/components/namespaces/table";
-import type { QueueStatistics } from "@/components/queues/table";
-import type { CreateNamespaceRequest } from "@/schemas/create-namespace";
-import type { CreateQueueRequest } from "@/schemas/create-queue";
+import type { NamespaceStatistics } from "@/lib/components/namespaces/table";
+import type { QueueStatistics } from "@/lib/components/queues/table";
+import type { CreateNamespaceRequest } from "@/lib/schemas/create-namespace";
+import type { CreateQueueRequest } from "@/lib/schemas/create-queue";
 import type {
   QueueConfig,
   UpdateQueueConfigRequest,
-} from "@/schemas/queue-settings";
-import type { APIKey } from "@/components/create-api-key";
-import type { UserStatistics } from "@/components/create-user";
+} from "@/lib/schemas/queue-settings";
+import type { APIKey } from "@/lib/components/create-api-key";
+import type { UserStatistics } from "@/lib/components/create-user";
 import { SERVER_ENDPOINT } from "@/app/globals";
-import type { CreateUserRequest } from "@/schemas/create-user";
+import type { CreateUserRequest } from "@/lib/schemas/create-user";
 import { toast } from "sonner";
-import type { ApiKey } from "@/components/api-keys/table";
+import type { ApiKey } from "@/lib/components/api-keys/table";
 import type { AdminSession, Role } from "@/lib/state/global";
 import type { MessageObject } from "@/app/(dashboard)/queues/list";
-import type { LoginRequest } from "@/schemas/login-form";
-import type { DeleteQueueRequest } from "@/schemas/delete-queue";
+import type { LoginRequest } from "@/lib/schemas/login-form";
+import type { DeleteQueueRequest } from "@/lib/schemas/delete-queue";
 
 export async function logout() {
   await fetch(`${SERVER_ENDPOINT}/auth/logout`, {

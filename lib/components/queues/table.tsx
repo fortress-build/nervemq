@@ -21,7 +21,7 @@ import {
   CommandList,
 } from "../ui/command";
 import { useQuery } from "@tanstack/react-query";
-import { listNamespaces } from "@/actions/api"; // adjust import path as needed
+import { listNamespaces } from "@/lib/actions/api"; // adjust import path as needed
 
 export type Queue = {
   id: string;

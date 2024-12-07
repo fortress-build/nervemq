@@ -1,6 +1,6 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "@/lib/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -8,15 +8,15 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+} from "@/lib/components/ui/dialog";
+import { Input } from "@/lib/components/ui/input";
+import { Label } from "@/lib/components/ui/label";
 import { ChevronsUpDown, Settings2 } from "lucide-react";
 import {
   getQueueSettings,
   listQueues,
   updateQueueSettings,
-} from "@/actions/api";
+} from "@/lib/actions/api";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useState } from "react";
@@ -26,7 +26,7 @@ import {
   type QueueConfig,
   type UpdateQueueConfigRequest,
   updateQueueConfigSchema,
-} from "@/schemas/queue-settings";
+} from "@/lib/schemas/queue-settings";
 import type { QueueStatistics } from "./queues/table";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { cn } from "@/lib/utils";

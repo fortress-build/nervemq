@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Button } from "@/components/ui/button";
-import { DataTable } from "@/components/data-table";
+import { Button } from "@/lib/components/ui/button";
+import { DataTable } from "@/lib/components/data-table";
 import {
   Dialog,
   DialogContent,
@@ -11,17 +11,17 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
-} from "@/components/ui/dialog";
-import CreateApiKey from "@/components/create-api-key";
-import { columns } from "@/components/api-keys/table";
+} from "@/lib/components/ui/dialog";
+import CreateApiKey from "@/lib/components/create-api-key";
+import { columns } from "@/lib/components/api-keys/table";
 import { toast } from "sonner";
 import {
   listAPIKeys,
   deleteAPIKey,
   type DeleteTokenRequest,
-} from "@/actions/api";
+} from "@/lib/actions/api";
 import { KeyToDeleteContext } from "@/lib/contexts/key-to-delete";
-import { Input } from "@/components/ui/input";
+import { Input } from "@/lib/components/ui/input";
 import type { SortingState } from "@tanstack/react-table";
 
 export default function ApiKeys() {
@@ -42,7 +42,7 @@ export default function ApiKeys() {
   });
 
   const filteredData = data.filter((apiKey) =>
-    apiKey.name.toLowerCase().includes(searchQuery.toLowerCase())
+    apiKey.name.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
   const handleDeleteKey = async (data: DeleteTokenRequest) => {

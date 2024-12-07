@@ -15,7 +15,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { cn } from "@/lib/utils";
-import { createUser, listNamespaces } from "@/actions/api";
+import { createUser, listNamespaces } from "@/lib/actions/api";
 import { Spinner } from "@nextui-org/react";
 import { ChevronsUpDown, Plus, Check } from "lucide-react";
 import {
@@ -28,10 +28,10 @@ import {
 } from "./ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { toast } from "sonner";
-import { useInvalidate } from "@/hooks/use-invalidate";
+import { useInvalidate } from "@/lib/hooks/use-invalidate";
 import CreateNamespace from "./create-namespace";
 import { useState } from "react";
-import { createUserSchema } from "@/schemas/create-user";
+import { createUserSchema } from "@/lib/schemas/create-user";
 import {
   Select,
   SelectContent,
@@ -275,7 +275,7 @@ export default function CreateUser({
                                 }}
                               >
                                 <div className="flex items-center gap-2 w-4">
-                                {field.state.value.has(namespace.name) ? (
+                                  {field.state.value.has(namespace.name) ? (
                                     <Check className="h-4 w-4" />
                                   ) : null}
                                 </div>

@@ -1,5 +1,5 @@
 "use client";
-import useClickOutside from "@/hooks/use-click-outside";
+import useClickOutside from "@/lib/hooks/use-click-outside";
 import { cn } from "@/lib/utils";
 import { Computer, Moon, Sun } from "lucide-react";
 import { useRef, useState, useEffect, type JSX } from "react";

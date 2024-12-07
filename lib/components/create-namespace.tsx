@@ -14,12 +14,12 @@ import { yupValidator } from "@tanstack/yup-form-adapter";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { cn } from "@/lib/utils";
-import { createNamespace } from "@/actions/api";
+import { createNamespace } from "@/lib/actions/api";
 import { Spinner } from "@nextui-org/react";
 import { toast } from "sonner";
-import { useInvalidate } from "@/hooks/use-invalidate";
-import { createNamespaceSchema } from "@/schemas/create-namespace";
-import { listNamespaces } from "@/actions/api";
+import { useInvalidate } from "@/lib/hooks/use-invalidate";
+import { createNamespaceSchema } from "@/lib/schemas/create-namespace";
+import { listNamespaces } from "@/lib/actions/api";
 import { useQuery } from "@tanstack/react-query";
 
 interface CreateNamespaceProps {
@@ -52,7 +52,7 @@ export default function CreateNamespace({
       onMount: createNamespaceSchema,
     },
     onSubmit: async ({ value: data, formApi }) => {
-      if (namespaces.some(namespace => namespace.name === data.name)) {
+      if (namespaces.some((namespace) => namespace.name === data.name)) {
         toast.error("This name is already taken");
         return;
       }
@@ -82,7 +82,7 @@ export default function CreateNamespace({
       }}
     >
       <DialogContent className="rounded-lg sm:rounded-lg">
-      <form
+        <form
           onSubmit={(e) => {
             e.preventDefault();
             e.stopPropagation();

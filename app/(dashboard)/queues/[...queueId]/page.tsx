@@ -1,12 +1,17 @@
 "use client";
 import MessageList from "@/app/(dashboard)/queues/list";
 import { useQuery } from "@tanstack/react-query";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import type { QueueStatistics } from "@/components/queues/table";
-import { fetchQueue } from "@/actions/api";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
+} from "@/lib/components/ui/card";
+import type { QueueStatistics } from "@/lib/components/queues/table";
+import { fetchQueue } from "@/lib/actions/api";
 import { useParams, useRouter } from "next/navigation";
-import { QueueSettings } from "@/components/queue-settings";
-import { Button } from "@/components/ui/button";
+import { QueueSettings } from "@/lib/components/queue-settings";
+import { Button } from "@/lib/components/ui/button";
 import { Spinner } from "@nextui-org/spinner";
 import { createContext, useContext } from "react";
 
