@@ -7,10 +7,10 @@ authors = ["Will Hopkins <willothyh@gmail.com>"]
 [tool.poetry.dependencies]
 python = "^3.12"
 boto3 = "^1.35.73"
-types-boto3 = {extras = ["full"], version = "^1.35.73"}
+types-boto3 = { extras = ["full"], version = "^1.35.73" }
 
 [tool.poetry.scripts]
-main = "nervemq_example:main"
+main = "example:main"
 
 [build-system]
 requires = ["poetry-core"]

@@ -51,7 +51,11 @@ export default function QueuePage() {
     refetchInterval: 30000,
   });
 
-  if (error !== null && error.cause === 403) {
+  if (
+    error !== null &&
+    // FIXME: Improve error handling here
+    error.message === "Access Denied"
+  ) {
     return (
       <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center">
         <Card className="w-[400px] border">

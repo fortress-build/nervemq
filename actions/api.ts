@@ -15,6 +15,7 @@ import type { ApiKey } from "@/components/api-keys/table";
 import type { AdminSession, Role } from "@/lib/state/global";
 import type { MessageObject } from "@/app/(dashboard)/queues/list";
 import type { LoginRequest } from "@/schemas/login-form";
+import type { DeleteQueueRequest } from "@/schemas/delete-queue";
 
 export async function logout() {
   await fetch(`${SERVER_ENDPOINT}/auth/logout`, {
@@ -164,7 +165,7 @@ export async function createQueue(data: CreateQueueRequest) {
   }).catch(() => toast.error("Something went wrong"));
 }
 
-export async function deleteQueue(data: CreateQueueRequest) {
+export async function deleteQueue(data: DeleteQueueRequest) {
   await fetch(`${SERVER_ENDPOINT}/queue/${data.namespace}/${data.name}`, {
     method: "DELETE",
     credentials: "include",
@@ -204,9 +205,7 @@ export async function fetchQueue(
     },
   }).then((res) => {
     if (res.status === 403) {
-      throw new Error("Access Denied", {
-        cause: 403,
-      });
+      throw new Error("Access Denied");
     }
     return res.json();
   });

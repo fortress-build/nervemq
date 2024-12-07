@@ -1,3 +1,5 @@
+use std::env;
+
 use aws_config::{BehaviorVersion, Region};
 
 #[tokio::main]
@@ -5,8 +7,8 @@ async fn main() -> Result<(), eyre::Report> {
     tracing_subscriber::fmt::init();
 
     let credentials = aws_sdk_sqs::config::Credentials::new(
-        "6kkMWFC1nin",
-        "FhwbQ682XAe7PxcY7WWkJKGscqdpdknZP",
+        env::var("AWS_ACCESS_KEY_ID").unwrap(),
+        env::var("AWS_SECRET_ACCESS_KEY").unwrap(),
         None,
         None,
         "Static",
