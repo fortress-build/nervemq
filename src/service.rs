@@ -66,7 +66,7 @@
 //! - Queue tags and attributes
 //!
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{BTreeMap, HashMap, HashSet},
     future::Future,
     sync::Arc,
 };
@@ -74,7 +74,7 @@ use std::{
 use actix_identity::Identity;
 use actix_web::{error::ErrorUnauthorized, web, ResponseError};
 use base64::Engine;
-use bytes::{BufMut, BytesMut};
+use itertools::Itertools;
 use secrecy::SecretString;
 use serde::{Deserialize, Serialize};
 use serde_email::Email;
@@ -1190,14 +1190,14 @@ impl Service {
     ///
     /// # Arguments
     /// * `user_email` - Email of the user
-    pub async fn get_key_id(&self, user_email: String) -> Result<String, Error> {
+    pub async fn get_key_id(&self, user_email: &str) -> Result<String, Error> {
         let key_id = sqlx::query_scalar(
             "
             SELECT kms_key_id FROM users
             WHERE email = $1
             ",
         )
-        .bind(user_email.as_str())
+        .bind(user_email)
         .fetch_one(self.db())
         .await?;
 
@@ -1236,7 +1236,7 @@ impl Service {
         self.check_user_access(&identity, namespace_id, &mut *tx)
             .await?;
 
-        let key_id = self.get_key_id(identity.id()?).await?;
+        let key_id = self.get_key_id(&identity.id()?).await?;
 
         let encrypted_key = self
             .kms
@@ -1354,34 +1354,10 @@ impl Service {
                 .fetch_one(&mut *tx)
                 .await?;
 
-        let mut attr_bytes_to_digest = BytesMut::new();
+        let mut attr_bytes_to_digest = Vec::new();
         for (k, v) in req.message_attributes.into_iter() {
-            // Serialize the attributes in the expected binary format
-            //
-            // [key length (4 bytes)][key bytes][type (1 byte)][value length (4 bytes)][value bytes]
-            match &v {
-                SqsMessageAttribute::String { string_value }
-                | SqsMessageAttribute::Number { string_value } => {
-                    let k_bytes = k.as_bytes();
-                    attr_bytes_to_digest.put_u32(k_bytes.len() as u32);
-                    attr_bytes_to_digest.put_slice(k_bytes);
-                    attr_bytes_to_digest.put_u8(1); // Type 1 is string (or number)
+            v.serialize_into(&k, &mut attr_bytes_to_digest);
 
-                    let v_bytes = string_value.as_bytes();
-                    attr_bytes_to_digest.put_u32(v_bytes.len() as u32);
-                    attr_bytes_to_digest.extend_from_slice(v_bytes);
-                }
-                SqsMessageAttribute::Binary { binary_value } => {
-                    let k_bytes = k.as_bytes();
-                    attr_bytes_to_digest.put_u32(k_bytes.len() as u32);
-                    attr_bytes_to_digest.put_slice(k_bytes);
-                    attr_bytes_to_digest.put_u8(2); // Type 2 is binary
-
-                    let v_bytes = binary_value.as_slice();
-                    attr_bytes_to_digest.put_u32(v_bytes.len() as u32);
-                    attr_bytes_to_digest.extend_from_slice(v_bytes);
-                }
-            };
             sqlx::query("INSERT INTO kv_pairs (message, k, v) VALUES ($1, $2, $3)")
                 .bind(msg_id as i64)
                 .bind(k)
@@ -1397,7 +1373,7 @@ impl Service {
             message_id: msg_id,
             md5_of_message_body: body_digest,
             md5_of_message_attributes: attr_digest,
-            md5_of_message_system_attributes: hex::encode(md5::compute(b"").as_ref()),
+            // md5_of_message_system_attributes: hex::encode(md5::compute(b"").as_ref()),
         })
     }
 
@@ -1448,8 +1424,8 @@ impl Service {
                         id: entry.id,
                         message_id: res.message_id.to_string(),
                         md5_of_message_body: res.md5_of_message_body,
-                        md5_of_message_attributes: res.md5_of_message_attributes,
-                        md5_of_message_system_attributes: res.md5_of_message_system_attributes,
+                        // md5_of_message_attributes: res.md5_of_message_attributes,
+                        // md5_of_message_system_attributes: res.md5_of_message_system_attributes,
                     });
                 }
                 Err(e) => {
@@ -1478,6 +1454,7 @@ impl Service {
         &self,
         namespace: impl AsRef<str>,
         queue: impl AsRef<str>,
+        attribute_names: HashSet<String>,
     ) -> Result<Option<SqsMessage>, Error> {
         let mut tx = self.db().begin().await?;
 
@@ -1518,28 +1495,41 @@ impl Service {
         .await?;
 
         let message = if let Some(message) = message {
-            let mut message_attributes = HashMap::new();
-
             let mut kv = sqlx::query_as::<_, (String, Vec<u8>)>(
                 "
                 SELECT k, v FROM kv_pairs WHERE message = $1
                 ",
             )
             .bind(message.id as i64)
-            .fetch(&mut *tx);
+            .fetch_all(&mut *tx)
+            .await?
+            .into_iter()
+            .collect::<BTreeMap<_, _>>();
 
-            while let Some((k, v)) = kv.next().await.transpose()? {
+            let mut message_attributes = HashMap::new();
+            let mut attr_bytes_to_digest = Vec::new();
+            for (k, v) in kv.into_iter().filter(|(k, _)| attribute_names.contains(k)) {
                 let v: SqsMessageAttribute = serde_json::from_slice(&v).map_err(Error::internal)?;
+
+                v.serialize_into(&k, &mut attr_bytes_to_digest);
+
                 message_attributes.insert(k, v);
             }
 
             let sqs_message = SqsMessage {
                 message_id: message.id.to_string(),
+
                 md5_of_body: hex::encode(md5::compute(&message.body).as_slice()),
                 body: message.body,
+
+                md5_of_message_attributes: hex::encode(
+                    md5::compute(&attr_bytes_to_digest).as_ref(),
+                ),
                 message_attributes,
+                // md5_of_system_attributes: hex::encode(md5::compute([]).as_ref()), // TODO
                 attributes: HashMap::new(),
-                receipt_handle: "TODO".to_owned(),
+                //
+                // receipt_handle: "".to_owned(),
             };
 
             Some(sqs_message)
@@ -1563,6 +1553,7 @@ impl Service {
         namespace: &str,
         queue: &str,
         max_messages: u64,
+        attribute_names: HashSet<String>,
     ) -> Result<Vec<SqsMessage>, Error> {
         let mut tx = self.db().begin().await?;
 
@@ -1619,35 +1610,46 @@ impl Service {
 
         let mut messages = vec![];
         while let Some(message) = stream.next().await.transpose()? {
-            let mut message_attributes = HashMap::new();
-            let mut kv = sqlx::query_as::<_, (String, Vec<u8>)>(
+            let kv = sqlx::query_as::<_, (String, Vec<u8>)>(
                 "
                 SELECT k, v FROM kv_pairs WHERE message = $1
                 ",
             )
             .bind(message.id as i64)
-            .fetch(self.db());
+            .fetch_all(self.db())
+            .await?
+            .into_iter()
+            .collect::<BTreeMap<_, _>>();
 
-            while let Some((k, v)) = kv.next().await.transpose()? {
-                let Ok(v) = serde_json::from_slice::<SqsMessageAttribute>(&v) else {
-                    tracing::warn!(
-                        attribute = k,
-                        message = message.id,
-                        "Failed to deserialize message attribute",
-                    );
+            let mut message_attributes = HashMap::new();
+            let mut attr_bytes_to_digest = Vec::new();
+            for (k, v) in kv
+                .into_iter()
+                .filter(|(k, _)| attribute_names.contains(k))
+                .sorted_by_key(|(k, _)| k.clone())
+            {
+                tracing::info!("Attribute {k}");
+                let v: SqsMessageAttribute = serde_json::from_slice(&v).map_err(Error::internal)?;
 
-                    continue;
-                };
+                v.serialize_into(&k, &mut attr_bytes_to_digest);
+
                 message_attributes.insert(k, v);
             }
 
             let sqs_message = SqsMessage {
                 message_id: message.id.to_string(),
-                md5_of_body: hex::encode(md5::compute(&message.body).as_slice()),
+
+                md5_of_body: hex::encode(md5::compute(&message.body.as_bytes()).as_slice()),
                 body: message.body,
+
+                md5_of_message_attributes: hex::encode(
+                    md5::compute(&attr_bytes_to_digest).as_ref(),
+                ),
                 message_attributes,
+                // md5_of_system_attributes: hex::encode(md5::compute([]).as_ref()), // TODO
                 attributes: HashMap::new(),
-                receipt_handle: "TODO".to_owned(),
+                //
+                // receipt_handle: "".to_owned(),
             };
             messages.push(sqs_message);
         }

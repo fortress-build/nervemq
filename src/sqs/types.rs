@@ -25,6 +25,7 @@
 //! The types in this module are designed to be wire-compatible with the
 //! AWS SQS API, using the same field names and serialization formats.
 
+use bytes::BufMut;
 use std::collections::HashMap;
 use url::Url;
 
@@ -52,9 +53,13 @@ pub mod send_message {
     /// Response for the SendMessage operation.
     pub struct SendMessageResponse {
         pub message_id: u64,
+
+        #[serde(rename = "MD5OfMessageBody")]
         pub md5_of_message_body: String,
+
+        #[serde(rename = "MD5OfMessageAttributes")]
         pub md5_of_message_attributes: String,
-        pub md5_of_message_system_attributes: String,
+        // pub md5_of_message_system_attributes: String,
         // pub sequence_number: Option<String>,
     }
 }
@@ -239,12 +244,17 @@ pub mod receive_message {
     /// Contains the queue URL and various options for message retrieval.
     pub struct ReceiveMessageRequest {
         pub queue_url: Url,
+
+        #[serde(default)]
         pub attribute_names: Vec<String>,
+
+        #[serde(default)]
         pub message_attribute_names: Vec<String>,
-        pub max_number_of_messages: u64,
-        pub visibility_timeout: u64,
-        pub wait_time_seconds: u64,
-        pub receive_request_attempt_id: String,
+
+        pub max_number_of_messages: Option<u64>,
+        pub visibility_timeout: Option<u64>,
+        pub wait_time_seconds: Option<u64>,
+        pub receive_request_attempt_id: Option<String>,
     }
 
     #[derive(Debug, serde::Serialize)]
@@ -291,6 +301,7 @@ pub mod send_message_batch {
     }
 
     #[derive(Debug, serde::Serialize)]
+    #[serde(rename_all = "PascalCase")]
     /// Successful result entry for a batch message send operation.
     ///
     /// Contains the ID of the successfully sent message along with
@@ -298,9 +309,10 @@ pub mod send_message_batch {
     pub struct SendMessageBatchResultEntry {
         pub id: String,
         pub message_id: String,
+        #[serde(rename = "MD5OfMessageBody")]
         pub md5_of_message_body: String,
-        pub md5_of_message_attributes: String,
-        pub md5_of_message_system_attributes: String,
+        // pub md5_of_message_attributes: String,
+        // pub md5_of_message_system_attributes: String,
     }
 
     #[derive(Debug, serde::Serialize)]
@@ -502,6 +514,58 @@ pub enum SqsMessageAttribute {
     },
 }
 
+impl SqsMessageAttribute {
+    pub fn data_type(&self) -> &'static str {
+        match self {
+            SqsMessageAttribute::String { .. } => "String",
+            SqsMessageAttribute::Number { .. } => "Number",
+            SqsMessageAttribute::Binary { .. } => "Binary",
+        }
+    }
+
+    /// Serializes the attributes in the expected binary format for SQS attributes.
+    ///
+    /// [key length (4 bytes)][key bytes][type (1 byte)][value length (4 bytes)][value bytes]
+    pub fn serialize(&self, key: &str) -> Vec<u8> {
+        let mut buf = Vec::new();
+        self.serialize_into(key, &mut buf);
+        buf
+    }
+
+    /// Serializes the attributes in the expected binary format for SQS attributes, writing the
+    /// results to the buffer specified in `buf`.
+    ///
+    /// [key length (4 bytes)][key bytes][type (1 byte)][value length (4 bytes)][value bytes]
+    pub fn serialize_into(&self, key: &str, buf: &mut Vec<u8>) {
+        let k_bytes = key.as_bytes();
+
+        buf.put_u32(k_bytes.len() as u32);
+        buf.put_slice(k_bytes);
+
+        let t_bytes = self.data_type().as_bytes();
+        buf.put_u32(t_bytes.len() as u32);
+        buf.put_slice(t_bytes);
+
+        match self {
+            SqsMessageAttribute::String { string_value }
+            | SqsMessageAttribute::Number { string_value } => {
+                let v_bytes = string_value.as_bytes();
+                buf.put_u8(1); // Type 1 is string (or number)
+
+                buf.put_u32(v_bytes.len() as u32);
+                buf.put_slice(v_bytes);
+            }
+            SqsMessageAttribute::Binary { binary_value } => {
+                let v_bytes = binary_value.as_slice();
+                buf.put_u8(2); // Type 2 is binary
+
+                buf.put_u32(v_bytes.len() as u32);
+                buf.put_slice(v_bytes);
+            }
+        };
+    }
+}
+
 #[test]
 fn test_sqs_message_attribute() {
     let attr = SqsMessageAttribute::String {
@@ -539,13 +603,16 @@ fn test_sqs_message_attribute() {
 #[serde(rename_all = "PascalCase")]
 pub struct SqsMessage {
     pub message_id: String,
-    pub receipt_handle: String,
-
+    // pub receipt_handle: String,
+    #[serde(rename = "MD5OfBody")]
     pub md5_of_body: String,
     pub body: String,
 
+    // pub md5_of_system_attributes: String,
     pub attributes: HashMap<String, String>,
 
+    #[serde(rename = "MD5OfMessageAttributes")]
+    pub md5_of_message_attributes: String,
     pub message_attributes: HashMap<String, SqsMessageAttribute>,
 }
 
