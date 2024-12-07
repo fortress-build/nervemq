@@ -35,6 +35,7 @@ import {
   type CreateQueueRequest,
   createQueueSchema,
 } from "@/schemas/create-queue";
+import KeyValueForm from "./key-value-pairs";
 
 export default function CreateQueue({
   open,
@@ -207,6 +208,23 @@ export default function CreateQueue({
                       </Command>
                     </PopoverContent>
                   </Popover>
+                  {field.state.meta.errors ? (
+                    <span className="text-sm text-destructive">
+                      {field.state.meta.errors.join(", ")}
+                    </span>
+                  ) : null}
+                </div>
+              )}
+            </form.Field>
+
+            <form.Field name="tags">
+              {(field) => (
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor={field.name}>Tags</Label>
+                  <KeyValueForm
+                    value={field.state.value}
+                    onChange={(value) => field.handleChange(value)}
+                  />
                   {field.state.meta.errors ? (
                     <span className="text-sm text-destructive">
                       {field.state.meta.errors.join(", ")}
