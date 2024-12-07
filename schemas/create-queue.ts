@@ -1,23 +1,18 @@
-import { isAlphaNumeric } from "@/lib/utils";
-import { array, type InferType, object, string, tuple } from "yup";
+import { z } from "zod";
 
-export const createQueueSchema = object({
-  name: string()
-    .required()
-    .max(32)
+export const createQueueSchema = z.object({
+  name: z
+    .string()
     .min(1)
-    .test("name", "name should be alphanumeric", isAlphaNumeric),
-  namespace: string()
-    .required()
     .max(32)
+    .regex(/^[a-zA-Z0-9]+$/),
+  namespace: z
+    .string()
     .min(1)
-    .test("namespace", "namespace should be alphanumeric", isAlphaNumeric),
-  attributes: array()
-    .of(tuple([string(), string()]).required())
-    .default([]),
-  tags: array()
-    .of(tuple([string().required(), string().required()]).required())
-    .default([]),
+    .max(32)
+    .regex(/^[a-zA-Z0-9]+$/),
+  attributes: z.map(z.string().min(1), z.string()),
+  tags: z.map(z.string().min(1), z.string()),
 });
 
-export type CreateQueueRequest = InferType<typeof createQueueSchema>;
+export type CreateQueueRequest = z.infer<typeof createQueueSchema>;

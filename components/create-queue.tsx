@@ -10,7 +10,7 @@ import {
 } from "./ui/dialog";
 
 import { useForm } from "@tanstack/react-form";
-import { yupValidator } from "@tanstack/yup-form-adapter";
+import { zodValidator, type ZodValidator } from "@tanstack/zod-form-adapter";
 import { useQuery } from "@tanstack/react-query";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
@@ -31,7 +31,10 @@ import { toast } from "sonner";
 import { useInvalidate } from "@/hooks/use-invalidate";
 import CreateNamespace from "./create-namespace";
 import { useState, useEffect } from "react";
-import { createQueueSchema } from "@/schemas/create-queue";
+import {
+  type CreateQueueRequest,
+  createQueueSchema,
+} from "@/schemas/create-queue";
 
 export default function CreateQueue({
   open,
@@ -50,12 +53,14 @@ export default function CreateQueue({
 
   const invalidate = useInvalidate(["queues"]);
 
-  const form = useForm({
+  const form = useForm<CreateQueueRequest, ZodValidator>({
     defaultValues: {
       name: "",
       namespace: "",
+      attributes: new Map(),
+      tags: new Map(),
     },
-    validatorAdapter: yupValidator(),
+    validatorAdapter: zodValidator(),
     validators: {
       onChange: createQueueSchema,
       onMount: createQueueSchema,
@@ -97,8 +102,8 @@ export default function CreateQueue({
           }
         }}
       >
-      <DialogContent className="rounded-lg sm:rounded-lg">
-      <form
+        <DialogContent className="rounded-lg sm:rounded-lg">
+          <form
             onSubmit={(e) => {
               e.preventDefault();
               e.stopPropagation();

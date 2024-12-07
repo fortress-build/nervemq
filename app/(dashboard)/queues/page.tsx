@@ -20,6 +20,8 @@ import {
 } from "@/components/ui/dialog";
 import type { SortingState, ColumnFiltersState } from "@tanstack/react-table";
 import { Input } from "@/components/ui/input";
+import { deleteQueueSchema } from "@/schemas/delete-queue";
+import { toast } from "sonner";
 
 export type Queue = {
   id: string;
@@ -108,14 +110,16 @@ export default function Queues() {
               variant="destructive"
               onClick={async () => {
                 if (queueToDelete) {
-                  await deleteQueue({
-                    name: queueToDelete.name,
-                    namespace: queueToDelete.ns,
-                    attributes: [],
-                    tags: []
-                  });
-                  refetch();
-                  setQueueToDelete(null);
+                  deleteQueueSchema
+                    .parseAsync(queueToDelete)
+                    .then((req) => deleteQueue(req))
+                    .then(() => {
+                      refetch();
+                      setQueueToDelete(null);
+                    })
+                    .catch(() => {
+                      toast.error("Something went wrong");
+                    });
                 }
               }}
             >

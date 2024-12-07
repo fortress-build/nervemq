@@ -30,7 +30,7 @@ import { usePathname } from "next/navigation";
 import ThemeSelector from "./theme";
 import { Tooltip, TooltipContent } from "./ui/tooltip";
 import { TooltipTrigger } from "@radix-ui/react-tooltip";
-import { useState, type MouseEventHandler } from "react";
+import { type JSX, useState, type MouseEventHandler } from "react";
 import CreateQueue from "./create-queue";
 import CreateNamespace from "./create-namespace";
 import CreateApiKey from "./create-api-key";

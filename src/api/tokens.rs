@@ -92,7 +92,7 @@ pub async fn list_tokens(
 
     let tokens = sqlx::query_as(
         "
-        SELECT *, ns.name as namespace FROM users u
+        SELECT k.*, ns.name as namespace FROM users u
         INNER JOIN api_keys k ON u.id = k.user
         JOIN namespaces ns ON k.ns = ns.id
         WHERE u.email = $1
