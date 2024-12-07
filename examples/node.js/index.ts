@@ -1,58 +1,56 @@
-import { SQSClient, GetQueueUrlCommand, CreateQueueCommand, SendMessageCommand, ReceiveMessageCommand } from "@aws-sdk/client-sqs";
+import {
+  SQSClient,
+  GetQueueUrlCommand,
+  ReceiveMessageCommand,
+  SendMessageCommand,
+  CreateQueueCommand,
+} from "@aws-sdk/client-sqs";
 
-const hostUrl = 'http://localhost:8080/sqs';
+const hostUrl = "http://localhost:8080/sqs";
 
-async function main() {
-    const sqs = new SQSClient({
-        endpoint: hostUrl,
-        region: "us-west-1",
-        credentials: {
-            accessKeyId: "ZBcnTSTKX69",
-            secretAccessKey: "38zBir4Vvn2SKAx6VpPAvdNY4LzBaBGBQ"
-        }
-    });
+const sqs = new SQSClient({
+  endpoint: hostUrl,
+  region: "us-west-1",
+  // md5: false,
+  credentials: {
+    accessKeyId: "6kkMWFC1nin",
+    secretAccessKey: "FhwbQ682XAe7PxcY7WWkJKGscqdpdknZP",
+  },
+});
 
-    // biome-ignore lint/suspicious/noImplicitAnyLet: <explanation>
-    let url;
-    try {
-        const res = await sqs.send(new GetQueueUrlCommand({
-            QueueName: 'bruh'
-        }));
-        url = res.QueueUrl;
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    } catch (error) {
-        const res = await sqs.send(new CreateQueueCommand({
-            QueueName: 'bruh'
-        }));
-        url = res.QueueUrl;
-    }
+const url = await sqs
+  .send(new GetQueueUrlCommand({ QueueName: "bruh" }))
+  .catch(() => sqs.send(new CreateQueueCommand({ QueueName: "bruh" })))
+  .then((res) => res.QueueUrl);
 
-    console.log(`Queue URL: ${url}`);
+console.log(`Queue URL: ${url}`);
 
-    const sendResult = await sqs.send(new SendMessageCommand({
-        QueueUrl: url,
-        MessageBody: 'Hello World!',
-        MessageAttributes: {
-            'Test': {
-                StringValue: 'TestString',
-                DataType: 'String'
-            }
-        }
-    }));
+const sendResult = await sqs.send(
+  new SendMessageCommand({
+    QueueUrl: url,
+    MessageBody: "Hello World!",
 
-    console.log(`Message ID: ${sendResult.MessageId}`);
+    MessageAttributes: {
+      Test: {
+        StringValue: "TestString",
+        DataType: "String",
+      },
+    },
+  }),
+);
 
-    const receiveResult = await sqs.send(new ReceiveMessageCommand({
-        QueueUrl: url,
-        AttributeNames: ['All'],
-        MessageAttributeNames: ['Test'],
-        MaxNumberOfMessages: 10,
-        VisibilityTimeout: 0,
-        WaitTimeSeconds: 0,
-        ReceiveRequestAttemptId: '1'
-    }));
+console.log(`Message ID: ${sendResult.MessageId}`);
 
-    console.log(`Messages: ${JSON.stringify(receiveResult.Messages)}`);
-}
+const receiveResult = await sqs.send(
+  new ReceiveMessageCommand({
+    QueueUrl: url,
+    // AttributeNames: [],
+    MessageAttributeNames: ["Test"],
+    // MaxNumberOfMessages: 10,
+    // VisibilityTimeout: 0,
+    // WaitTimeSeconds: 0,
+    // ReceiveRequestAttemptId: "1",
+  }),
+);
 
-main().catch(console.error);
+console.log(`Messages: ${JSON.stringify(receiveResult.Messages)}`);

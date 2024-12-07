@@ -2,17 +2,20 @@
   "compilerOptions": {
     // Enable latest features
     "lib": ["ESNext", "DOM"],
-    "target": "ESNext",
-    "module": "ESNext",
+    "target": "esnext",
+    "module": "NodeNext",
     "moduleDetection": "force",
-    "jsx": "react-jsx",
+    "moduleResolution": "nodenext",
+    // "jsx": "react-jsx",
     "allowJs": true,
 
+    "outDir": "dist",
+
     // Bundler mode
-    "moduleResolution": "bundler",
-    "allowImportingTsExtensions": true,
-    "verbatimModuleSyntax": true,
-    "noEmit": true,
+    // "moduleResolution": "bundler",
+    // "allowImportingTsExtensions": true,
+    // "verbatimModuleSyntax": true,
+    // "noEmit": true,
 
     // Best practices
     "strict": true,
@@ -20,8 +23,10 @@
     "noFallthroughCasesInSwitch": true,
 
     // Some stricter flags (disabled by default)
-    "noUnusedLocals": false,
-    "noUnusedParameters": false,
-    "noPropertyAccessFromIndexSignature": false
-  }
+    // "noUnusedLocals": false,
+    // "noUnusedParameters": false,
+    // "noPropertyAccessFromIndexSignature": false
+  },
+  "include": ["index.ts"]
+
 }

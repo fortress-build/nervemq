@@ -41,8 +41,10 @@ pub enum Role {
 
 #[derive(Debug, Clone, Deserialize, FromRow)]
 pub struct Permission {
+    #[allow(unused)]
     pub id: u64,
     pub user: u64,
+    #[allow(unused)]
     pub namespace: u64,
     pub can_delete_ns: bool,
 }

@@ -1,14 +1,16 @@
+use std::collections::HashSet;
+
 use actix_identity::Identity;
 use actix_web::{post, web::Data, Responder, Scope};
-use bytes::Bytes;
-use futures_util::{stream::MapErr, TryStreamExt as _};
+use futures_util::TryStreamExt as _;
 use method::Method;
-use tokio_serde::{formats::SymmetricalJson, Framed};
+use tokio_serde::{formats::SymmetricalJson, SymmetricallyFramed};
 use tokio_stream::StreamExt;
 use tokio_util::{
     codec::{BytesCodec, FramedRead},
     io::StreamReader,
 };
+use tracing::instrument;
 use types::{
     create_queue::{CreateQueueRequest, CreateQueueResponse},
     delete_message::{DeleteMessageRequest, DeleteMessageResponse},
@@ -40,35 +42,13 @@ fn queue_url(mut host: Url, queue_name: &str, namespace_name: &str) -> Result<ur
     Ok(host)
 }
 
-type Stream<M> = Framed<
-    FramedRead<
-        StreamReader<
-            MapErr<
-                actix_web::web::Payload,
-                Box<dyn FnMut(actix_web::error::PayloadError) -> std::io::Error>,
-            >,
-            Bytes,
-        >,
-        BytesCodec,
-    >,
-    M,
-    M,
-    SymmetricalJson<M>,
->;
-
+#[instrument(skip(service, identity))]
 async fn send_message(
     service: Data<crate::service::Service>,
     identity: Identity,
     namespace: AuthorizedNamespace,
-    mut stream: Stream<SendMessageRequest>,
+    request: SendMessageRequest,
 ) -> Result<SqsResponse, Error> {
-    let request = stream
-        .next()
-        .await
-        .transpose()
-        .map_err(|e| Error::internal(e))?
-        .ok_or_else(|| Error::missing_parameter("missing request body"))?;
-
     let mut path = request
         .queue_url
         .path_segments()
@@ -102,19 +82,13 @@ async fn send_message(
     Ok(SqsResponse::SendMessage(res))
 }
 
+#[instrument(skip(service, identity))]
 async fn send_message_batch(
     service: Data<crate::service::Service>,
     identity: Identity,
     namespace: AuthorizedNamespace,
-    mut stream: Stream<SendMessageBatchRequest>,
+    request: SendMessageBatchRequest,
 ) -> Result<SqsResponse, Error> {
-    let request = stream
-        .next()
-        .await
-        .transpose()
-        .map_err(|e| Error::internal(e))?
-        .ok_or_else(|| Error::missing_parameter("missing request body"))?;
-
     let queue_url = request.queue_url.clone();
 
     let mut path = queue_url
@@ -146,19 +120,13 @@ async fn send_message_batch(
     Ok(SqsResponse::SendMessageBatch(res))
 }
 
+#[instrument(skip(service, identity))]
 async fn receive_message(
     service: Data<crate::service::Service>,
     identity: Identity,
     namespace: AuthorizedNamespace,
-    mut stream: Stream<ReceiveMessageRequest>,
+    request: ReceiveMessageRequest,
 ) -> Result<SqsResponse, Error> {
-    let request = stream
-        .next()
-        .await
-        .transpose()
-        .map_err(|e| Error::internal(e))?
-        .ok_or_else(|| Error::missing_parameter("missing request body"))?;
-
     let mut path = request
         .queue_url
         .path_segments()
@@ -186,7 +154,8 @@ async fn receive_message(
         .sqs_recv_batch(
             namespace_name,
             queue_name,
-            request.max_number_of_messages as u64,
+            request.max_number_of_messages.unwrap_or(1) as u64,
+            HashSet::from_iter(request.attribute_names.into_iter()),
         )
         .await?;
 
@@ -195,19 +164,13 @@ async fn receive_message(
     }))
 }
 
+#[instrument(skip(service, identity))]
 async fn delete_message(
     service: Data<crate::service::Service>,
     identity: Identity,
     namespace: AuthorizedNamespace,
-    mut stream: Stream<DeleteMessageRequest>,
+    request: DeleteMessageRequest,
 ) -> Result<SqsResponse, Error> {
-    let request = stream
-        .next()
-        .await
-        .transpose()
-        .map_err(|e| Error::internal(e))?
-        .ok_or_else(|| Error::missing_parameter("missing request body"))?;
-
     let mut path = request
         .queue_url
         .path_segments()
@@ -310,19 +273,13 @@ async fn delete_message(
 //     Ok(DeleteMessageBatchResponse { failed, successful })
 // }
 
+#[instrument(skip(service, identity))]
 async fn list_queues(
     service: Data<crate::service::Service>,
     identity: Identity,
     namespace: AuthorizedNamespace,
-    mut stream: Stream<ListQueuesRequest>,
+    request: ListQueuesRequest,
 ) -> Result<SqsResponse, Error> {
-    let request = stream
-        .next()
-        .await
-        .transpose()
-        .map_err(|e| Error::internal(e))?
-        .ok_or_else(|| Error::missing_parameter("missing request body"))?;
-
     let namespace_id = service
         .get_namespace_id(&namespace.0, service.db())
         .await?
@@ -359,19 +316,13 @@ async fn list_queues(
     }))
 }
 
+#[instrument(skip(service, identity))]
 async fn get_queue_url(
     service: Data<crate::service::Service>,
     identity: Identity,
     namespace: AuthorizedNamespace,
-    mut stream: Stream<GetQueueUrlRequest>,
+    request: GetQueueUrlRequest,
 ) -> Result<SqsResponse, Error> {
-    let request = stream
-        .next()
-        .await
-        .transpose()
-        .map_err(|e| Error::internal(e))?
-        .ok_or_else(|| Error::missing_parameter("missing request body"))?;
-
     let namespace_id = service
         .get_namespace_id(&namespace.0, service.db())
         .await?
@@ -393,19 +344,13 @@ async fn get_queue_url(
     }))
 }
 
+#[instrument(skip(service, identity))]
 async fn create_queue(
     service: Data<crate::service::Service>,
     identity: Identity,
     namespace: AuthorizedNamespace,
-    mut stream: Stream<CreateQueueRequest>,
+    request: CreateQueueRequest,
 ) -> Result<SqsResponse, Error> {
-    let request = stream
-        .next()
-        .await
-        .transpose()
-        .map_err(|e| Error::internal(e))?
-        .ok_or_else(|| Error::missing_parameter("missing request body"))?;
-
     let namespace_id = service
         .get_namespace_id(&namespace.0, service.db())
         .await?
@@ -432,19 +377,13 @@ async fn create_queue(
     }))
 }
 
+#[instrument(skip(service, identity))]
 async fn set_queue_attributes(
     service: Data<crate::service::Service>,
     identity: Identity,
     namespace: AuthorizedNamespace,
-    mut stream: Stream<SetQueueAttributesRequest>,
+    request: SetQueueAttributesRequest,
 ) -> Result<SqsResponse, Error> {
-    let request = stream
-        .next()
-        .await
-        .transpose()
-        .map_err(|e| Error::internal(e))?
-        .ok_or_else(|| Error::missing_parameter("missing request body"))?;
-
     let mut path = request
         .queue_url
         .path_segments()
@@ -477,19 +416,13 @@ async fn set_queue_attributes(
     ))
 }
 
+#[instrument(skip(service, identity))]
 async fn get_queue_attributes(
     service: Data<crate::service::Service>,
     identity: Identity,
     namespace: AuthorizedNamespace,
-    mut stream: Stream<GetQueueAttributesRequest>,
+    request: GetQueueAttributesRequest,
 ) -> Result<SqsResponse, Error> {
-    let request = stream
-        .next()
-        .await
-        .transpose()
-        .map_err(|e| Error::internal(e))?
-        .ok_or_else(|| Error::missing_parameter("missing request body"))?;
-
     let mut path = request
         .queue_url
         .path_segments()
@@ -527,19 +460,13 @@ async fn get_queue_attributes(
     ))
 }
 
+#[instrument(skip(service, identity))]
 async fn purge_queue(
     service: Data<crate::service::Service>,
     identity: Identity,
     _namespace: AuthorizedNamespace,
-    mut stream: Stream<PurgeQueueRequest>,
+    request: PurgeQueueRequest,
 ) -> Result<SqsResponse, Error> {
-    let request = stream
-        .next()
-        .await
-        .transpose()
-        .map_err(|e| Error::internal(e))?
-        .ok_or_else(|| Error::missing_parameter("missing request body"))?;
-
     let mut path = request
         .queue_url
         .path_segments()
@@ -567,19 +494,13 @@ async fn purge_queue(
     Ok(SqsResponse::PurgeQueue(PurgeQueueResponse { success }))
 }
 
+#[instrument(skip(service, identity))]
 async fn delete_queue(
     service: Data<crate::service::Service>,
     identity: Identity,
     _namespace: AuthorizedNamespace,
-    mut stream: Stream<DeleteQueueRequest>,
+    request: DeleteQueueRequest,
 ) -> Result<SqsResponse, Error> {
-    let request = stream
-        .next()
-        .await
-        .transpose()
-        .map_err(|e| Error::internal(e))?
-        .ok_or_else(|| Error::missing_parameter("missing request body"))?;
-
     let mut path = request
         .queue_url
         .path_segments()
@@ -606,19 +527,13 @@ async fn delete_queue(
     Ok(SqsResponse::DeleteQueue(DeleteQueueResponse {}))
 }
 
+#[instrument(skip(service, identity))]
 async fn list_queue_tags(
     service: Data<crate::service::Service>,
     identity: Identity,
     namespace: AuthorizedNamespace,
-    mut stream: Stream<types::list_queue_tags::ListQueueTagsRequest>,
+    request: types::list_queue_tags::ListQueueTagsRequest,
 ) -> Result<SqsResponse, Error> {
-    let request = stream
-        .next()
-        .await
-        .transpose()
-        .map_err(|e| Error::internal(e))?
-        .ok_or_else(|| Error::missing_parameter("missing request body"))?;
-
     let mut path = request
         .queue_url
         .path_segments()
@@ -651,19 +566,13 @@ async fn list_queue_tags(
     ))
 }
 
+#[instrument(skip(service, identity))]
 async fn tag_queue(
     service: Data<crate::service::Service>,
     identity: Identity,
     namespace: AuthorizedNamespace,
-    mut stream: Stream<types::tag_queue::TagQueueRequest>,
+    request: types::tag_queue::TagQueueRequest,
 ) -> Result<SqsResponse, Error> {
-    let request = stream
-        .next()
-        .await
-        .transpose()
-        .map_err(|e| Error::internal(e))?
-        .ok_or_else(|| Error::missing_parameter("missing request body"))?;
-
     let mut path = request
         .queue_url
         .path_segments()
@@ -685,19 +594,13 @@ async fn tag_queue(
     Ok(SqsResponse::TagQueue(types::tag_queue::TagQueueResponse {}))
 }
 
+#[instrument(skip(service, identity))]
 async fn untag_queue(
     service: Data<crate::service::Service>,
     identity: Identity,
     namespace: AuthorizedNamespace,
-    mut stream: Stream<types::untag_queue::UntagQueueRequest>,
+    request: types::untag_queue::UntagQueueRequest,
 ) -> Result<SqsResponse, Error> {
-    let request = stream
-        .next()
-        .await
-        .transpose()
-        .map_err(|e| Error::internal(e))?
-        .ok_or_else(|| Error::missing_parameter("missing request body"))?;
-
     let mut path = request
         .queue_url
         .path_segments()
@@ -743,7 +646,12 @@ pub async fn sqs_service(
                 service,
                 identity,
                 namespace,
-                Framed::new(stream, SymmetricalJson::default()),
+                SymmetricallyFramed::new(stream, SymmetricalJson::default())
+                    .next()
+                    .await
+                    .transpose()
+                    .map_err(|e| Error::internal(e))?
+                    .ok_or_else(|| Error::missing_parameter("missing request body"))?,
             )
             .await?
         }
@@ -752,7 +660,12 @@ pub async fn sqs_service(
                 service,
                 identity,
                 namespace,
-                Framed::new(stream, SymmetricalJson::default()),
+                SymmetricallyFramed::new(stream, SymmetricalJson::default())
+                    .next()
+                    .await
+                    .transpose()
+                    .map_err(|e| Error::internal(e))?
+                    .ok_or_else(|| Error::missing_parameter("missing request body"))?,
             )
             .await?
         }
@@ -761,7 +674,12 @@ pub async fn sqs_service(
                 service,
                 identity,
                 namespace,
-                Framed::new(stream, SymmetricalJson::default()),
+                SymmetricallyFramed::new(stream, SymmetricalJson::default())
+                    .next()
+                    .await
+                    .transpose()
+                    .map_err(|e| Error::internal(e))?
+                    .ok_or_else(|| Error::missing_parameter("missing request body"))?,
             )
             .await?
         }
@@ -770,7 +688,12 @@ pub async fn sqs_service(
                 service,
                 identity,
                 namespace,
-                Framed::new(stream, SymmetricalJson::default()),
+                SymmetricallyFramed::new(stream, SymmetricalJson::default())
+                    .next()
+                    .await
+                    .transpose()
+                    .map_err(|e| Error::internal(e))?
+                    .ok_or_else(|| Error::missing_parameter("missing request body"))?,
             )
             .await?
         }
@@ -779,7 +702,12 @@ pub async fn sqs_service(
                 service,
                 identity,
                 namespace,
-                Framed::new(stream, SymmetricalJson::default()),
+                SymmetricallyFramed::new(stream, SymmetricalJson::default())
+                    .next()
+                    .await
+                    .transpose()
+                    .map_err(|e| Error::internal(e))?
+                    .ok_or_else(|| Error::missing_parameter("missing request body"))?,
             )
             .await?
         }
@@ -788,7 +716,12 @@ pub async fn sqs_service(
                 service,
                 identity,
                 namespace,
-                Framed::new(stream, SymmetricalJson::default()),
+                SymmetricallyFramed::new(stream, SymmetricalJson::default())
+                    .next()
+                    .await
+                    .transpose()
+                    .map_err(|e| Error::internal(e))?
+                    .ok_or_else(|| Error::missing_parameter("missing request body"))?,
             )
             .await?
         }
@@ -797,7 +730,12 @@ pub async fn sqs_service(
                 service,
                 identity,
                 namespace,
-                Framed::new(stream, SymmetricalJson::default()),
+                SymmetricallyFramed::new(stream, SymmetricalJson::default())
+                    .next()
+                    .await
+                    .transpose()
+                    .map_err(|e| Error::internal(e))?
+                    .ok_or_else(|| Error::missing_parameter("missing request body"))?,
             )
             .await?
         }
@@ -806,7 +744,12 @@ pub async fn sqs_service(
                 service,
                 identity,
                 namespace,
-                Framed::new(stream, SymmetricalJson::default()),
+                SymmetricallyFramed::new(stream, SymmetricalJson::default())
+                    .next()
+                    .await
+                    .transpose()
+                    .map_err(|e| Error::internal(e))?
+                    .ok_or_else(|| Error::missing_parameter("missing request body"))?,
             )
             .await?
         }
@@ -815,7 +758,12 @@ pub async fn sqs_service(
                 service,
                 identity,
                 namespace,
-                Framed::new(stream, SymmetricalJson::default()),
+                SymmetricallyFramed::new(stream, SymmetricalJson::default())
+                    .next()
+                    .await
+                    .transpose()
+                    .map_err(|e| Error::internal(e))?
+                    .ok_or_else(|| Error::missing_parameter("missing request body"))?,
             )
             .await?
         }
@@ -824,7 +772,12 @@ pub async fn sqs_service(
                 service,
                 identity,
                 namespace,
-                Framed::new(stream, SymmetricalJson::default()),
+                SymmetricallyFramed::new(stream, SymmetricalJson::default())
+                    .next()
+                    .await
+                    .transpose()
+                    .map_err(|e| Error::internal(e))?
+                    .ok_or_else(|| Error::missing_parameter("missing request body"))?,
             )
             .await?
         }
@@ -833,7 +786,12 @@ pub async fn sqs_service(
                 service,
                 identity,
                 namespace,
-                Framed::new(stream, SymmetricalJson::default()),
+                SymmetricallyFramed::new(stream, SymmetricalJson::default())
+                    .next()
+                    .await
+                    .transpose()
+                    .map_err(|e| Error::internal(e))?
+                    .ok_or_else(|| Error::missing_parameter("missing request body"))?,
             )
             .await?
         }
@@ -842,7 +800,12 @@ pub async fn sqs_service(
                 service,
                 identity,
                 namespace,
-                Framed::new(stream, SymmetricalJson::default()),
+                SymmetricallyFramed::new(stream, SymmetricalJson::default())
+                    .next()
+                    .await
+                    .transpose()
+                    .map_err(|e| Error::internal(e))?
+                    .ok_or_else(|| Error::missing_parameter("missing request body"))?,
             )
             .await?
         }
@@ -851,7 +814,12 @@ pub async fn sqs_service(
                 service,
                 identity,
                 namespace,
-                Framed::new(stream, SymmetricalJson::default()),
+                SymmetricallyFramed::new(stream, SymmetricalJson::default())
+                    .next()
+                    .await
+                    .transpose()
+                    .map_err(|e| Error::internal(e))?
+                    .ok_or_else(|| Error::missing_parameter("missing request body"))?,
             )
             .await?
         }
@@ -860,7 +828,12 @@ pub async fn sqs_service(
                 service,
                 identity,
                 namespace,
-                Framed::new(stream, SymmetricalJson::default()),
+                SymmetricallyFramed::new(stream, SymmetricalJson::default())
+                    .next()
+                    .await
+                    .transpose()
+                    .map_err(|e| Error::internal(e))?
+                    .ok_or_else(|| Error::missing_parameter("missing request body"))?,
             )
             .await?
         }

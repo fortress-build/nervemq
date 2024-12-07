@@ -12,7 +12,7 @@ use actix_web::{
     App, HttpServer,
 };
 use auth::{
-    middleware::{api_keys::ApiKeyAuth, protected_route::Protected},
+    middleware::{authentication::Authentication, protected_route::Protected},
     session::SqliteSessionStore,
 };
 use chrono::TimeDelta;
@@ -118,11 +118,17 @@ where
         let form_cfg = FormConfig::default();
 
         App::new()
+            .wrap(
+                // IMPORTANT: This must be first in the middleware stack (executed last) because
+                // it mutated the request path, which breaks AWS SigV4 authentication because the
+                // request path is used in the hash/signature. We do need this however, since the
+                // Actix router doesn't seem to work without it.
+                NormalizePath::new(TrailingSlash::Trim),
+            )
             .wrap(TracingLogger::default())
-            .wrap(ApiKeyAuth)
+            .wrap(Authentication)
             .wrap(identity_middleware)
             .wrap(session_middleware)
-            .wrap(NormalizePath::new(TrailingSlash::Trim))
             .wrap(cors)
             .service(api::queue::service().wrap(Protected::authenticated()))
             .service(api::data::service().wrap(Protected::authenticated()))

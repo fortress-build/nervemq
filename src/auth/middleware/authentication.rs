@@ -25,9 +25,9 @@ use crate::auth::protocols::sigv4::authenticate_sigv4;
 ///
 /// Used by Actix-web to create the authentication middleware that processes
 /// requests with API keys or AWS SigV4 signatures.
-pub struct ApiKeyAuth;
+pub struct Authentication;
 
-impl<S: 'static, B> Transform<S, ServiceRequest> for ApiKeyAuth
+impl<S: 'static, B> Transform<S, ServiceRequest> for Authentication
 where
     S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error>,
     S::Future: 'static,
@@ -36,11 +36,11 @@ where
     type Response = ServiceResponse<B>;
     type Error = Error;
     type InitError = ();
-    type Transform = ApiKeyAuthMiddleware<S>;
+    type Transform = AuthMiddleware<S>;
     type Future = Ready<Result<Self::Transform, Self::InitError>>;
 
     fn new_transform(&self, service: S) -> <Self as Transform<S, ServiceRequest>>::Future {
-        std::future::ready(Ok(ApiKeyAuthMiddleware {
+        std::future::ready(Ok(AuthMiddleware {
             service: Arc::new(service),
         }))
     }
@@ -53,11 +53,11 @@ where
 /// 2. Parse and validate API keys or AWS SigV4 signatures
 /// 3. Create user session on successful authentication
 /// 4. Inject authorized namespace into request extensions
-pub struct ApiKeyAuthMiddleware<S> {
+pub struct AuthMiddleware<S> {
     service: Arc<S>,
 }
 
-impl<S, B> Service<ServiceRequest> for ApiKeyAuthMiddleware<S>
+impl<S, B> Service<ServiceRequest> for AuthMiddleware<S>
 where
     S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error> + 'static,
     S::Future: 'static,
@@ -128,8 +128,12 @@ where
                 _ => return Err(ErrorUnauthorized("unimplemented")),
             };
 
+            tracing::debug!(email = user.email, "Authenticated user");
+
             match Identity::login(&req.extensions(), user.email.clone()) {
-                Ok(_) => {}
+                Ok(_) => {
+                    tracing::debug!("User session established");
+                }
                 Err(e) => return Err(ErrorUnauthorized(e)),
             }
 
