@@ -37,14 +37,14 @@ use aws_sdk_sqs::{Client, Config};
 
 async fn example() {
     let config = Config::builder()
-        .endpoint_url("http://localhost:8080")
+        .endpoint_url("http://localhost:8080/sqs")
         .build();
 
     let client = Client::from_conf(config);
 
     // Send a message
     client.send_message()
-        .queue_url("http://localhost:8080/queue/myqueue")
+        .queue_url("http://localhost:8080/namespace/myqueue")
         .message_body("Hello World!")
         .send()
         .await?;
