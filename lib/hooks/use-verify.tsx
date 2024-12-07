@@ -5,7 +5,7 @@ import { SERVER_ENDPOINT } from "@/app/globals";
 
 export function useVerifyUser(intervalMs: number = 300 * 1000) {
   const router = useRouter();
-  const intervalRef = useRef<NodeJS.Timeout>();
+  const intervalRef = useRef<NodeJS.Timeout | undefined>(undefined);
 
   useEffect(() => {
     const verify = async () => {
