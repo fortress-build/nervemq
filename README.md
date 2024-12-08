@@ -2,23 +2,26 @@
   <span>
     <h1>NerveMQ</h1>
 
-  [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-
+    <img alt="GitHub License" src="https://img.shields.io/github/license/fortress-build/nervemq">
   </span>
 
 A lightweight, SQLite-backed message queue with AWS SQS-compatible API, written in Rust.
 
 </div>
 
+> [!NOTE]
+> This project is still in development. It is not recommended to it in
+> mission-critical production scenarios just yet.
+
 ## Features
 
 - 🚀 **AWS SQS Compatible API** - Drop-in replacement for applications using AWS SQS
 - 💾 **SQLite Backend** - Reliable, embedded storage with ACID guarantees
 - 🔒 **Multi-tenant** - Namespace isolation with built-in authentication
-- 🔄 **Message Visibility Control** - Configure message processing timeouts
 - 📊 **Queue Attributes** - Track message counts, timestamps, and queue settings
 - 🏃 **Fast & Efficient** - Written in Rust for optimal performance
 - 🎯 **Self-contained** - Self-contained binary with minimal requirements
+- 📱 Admin Interface - Manage queues and tenants via UI or API
 
 ## Quick Start
 
@@ -51,18 +54,6 @@ async fn example() {
 }
 ```
 
-### Using HTTP API
-
-```bash
-# Send a message
-curl -X POST http://localhost:8080/queue/myqueue/messages \
-  -H "Content-Type: application/json" \
-  -d '{"MessageBody": "Hello World!"}'
-
-# Receive messages
-curl http://localhost:8080/queue/myqueue/messages
-```
-
 ## Why NerveMQ?
 
 - **Simple Deployment**: Single binary, no external dependencies
@@ -93,13 +84,13 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+Copyright 2024 Fetchflow, Inc.
 
-## Acknowledgments
+Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the License. You may obtain a copy of the License at
 
-- AWS SQS for API inspiration
-- SQLite for reliable storage
-- Rust community for excellent tools and libraries
+<http://www.apache.org/licenses/LICENSE-2.0>
+
+Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
 
 ---
 
