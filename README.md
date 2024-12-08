@@ -24,7 +24,12 @@ A lightweight, SQLite-backed message queue with AWS SQS-compatible API, written 
 - 🎯 **Self-contained** - Self-contained binary with minimal requirements
 - 📱 Admin Interface - Manage queues and tenants via UI or API
 
-## Installation
+## Installation / Quick Start
+
+NerveMQ is intended to be modular and extensible. As such, it can be consumed in two ways: using
+the preconfigured binary in `main.rs`, or including `nervemq` as a library and providing the custom
+implementations needed for your use-case. We also plan to add more configuration options to the preconfigured
+binary so that common use-cases are covered.
 
 For now, only the server is packaged on `crates.io`.
 
@@ -60,13 +65,6 @@ git clone https://github.com/fortress-build/nervemq
 cd nervemq
 bun run start # node and deno should work here too :)
 ```
-
-## Quick Start
-
-NerveMQ is intended to be modular and extensible. As such, it can be consumed in two ways: using
-the preconfigured binary in `main.rs`, or including `nervemq` as a library and providing the custom
-implementations needed for your use-case. We also plan to add more configuration options to the preconfigured
-binary so that common use-cases are covered.
 
 ## Usage Examples
 
