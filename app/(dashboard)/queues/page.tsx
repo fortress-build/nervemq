@@ -63,7 +63,7 @@ export default function Queues() {
   };
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="h-full flex flex-col gap-4">
       <div className="flex w-full max-w-sm items-center space-x-2">
         <Input
           type="text"
