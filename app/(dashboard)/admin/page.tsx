@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Button } from "@/lib/components/ui/button";
-import { DataTable } from "@/lib/components/data-table";
+import { Button } from "@/components/ui/button";
+import { DataTable } from "@/components/data-table";
 import {
   Dialog,
   DialogContent,
@@ -11,16 +11,16 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
-} from "@/lib/components/ui/dialog";
-import type { UserStatistics } from "@/lib/components/create-user";
-import CreateUser from "@/lib/components/create-user";
-import ModifyUser from "@/lib/components/modify-user";
-import { columns } from "@/lib/components/admin/table";
+} from "@/components/ui/dialog";
+import type { UserStatistics } from "@/components/create-user";
+import CreateUser from "@/components/create-user";
+import ModifyUser from "@/components/modify-user";
+import { columns } from "@/components/admin/table";
 import { toast } from "sonner";
 import { listUsers, deleteUser } from "@/lib/actions/api";
 import { useIsAdmin } from "@/lib/state/global";
 import { redirect } from "next/navigation";
-import { Input } from "@/lib/components/ui/input";
+import { Input } from "@/components/ui/input";
 import type { SortingState } from "@tanstack/react-table";
 
 export default function AdminPanel() {

@@ -1,11 +1,11 @@
 "use client";
 import { listNamespaces } from "@/lib/actions/api";
-import { columns } from "@/lib/components/namespaces/table";
-import CreateNamespace from "@/lib/components/create-namespace";
+import { columns } from "@/components/namespaces/table";
+import CreateNamespace from "@/components/create-namespace";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { Button } from "@/lib/components/ui/button";
-import { DataTable } from "@/lib/components/data-table";
+import { Button } from "@/components/ui/button";
+import { DataTable } from "@/components/data-table";
 import {
   Dialog,
   DialogContent,
@@ -13,9 +13,9 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
-} from "@/lib/components/ui/dialog";
+} from "@/components/ui/dialog";
 import { deleteNamespace } from "@/lib/actions/api";
-import { Input } from "@/lib/components/ui/input";
+import { Input } from "@/components/ui/input";
 import type { SortingState } from "@tanstack/react-table";
 
 export default function Namespaces() {

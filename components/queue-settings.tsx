@@ -1,6 +1,6 @@
 "use client";
 
-import { Button } from "@/lib/components/ui/button";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -8,9 +8,9 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/lib/components/ui/dialog";
-import { Input } from "@/lib/components/ui/input";
-import { Label } from "@/lib/components/ui/label";
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { ChevronsUpDown, Settings2 } from "lucide-react";
 import {
   getQueueSettings,
