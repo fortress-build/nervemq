@@ -1,7 +1,6 @@
 "use client";
 import type { ColumnDef } from "@tanstack/react-table";
 import {
-  Activity,
   Braces,
   KeySquare,
   Trash2,
@@ -129,23 +128,6 @@ export const columns: ColumnDef<QueueStatistics>[] = [
       if (!filterValue?.length) return true;
       return filterValue.includes(row.getValue(columnId));
     },
-  },
-  {
-    accessorKey: "pending",
-    header: ({ column }) => (
-      <div className="flex items-center gap-2">
-        <Activity className="h-4 w-4" />
-        <Button
-          variant="ghost"
-          className="p-0 hover:bg-transparent"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-        >
-          <span>Inflight</span>
-          <ArrowUpDown className="ml-2 h-4 w-4" />
-        </Button>
-      </div>
-    ),
-    enableSorting: true,
   },
   {
     id: "actions",
