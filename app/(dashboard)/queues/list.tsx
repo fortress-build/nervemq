@@ -1,9 +1,9 @@
 "use client";
 
-import { DataTable } from "@/lib/components/data-table";
+import { DataTable } from "@/components/data-table";
 import type { ColumnDef, ColumnFiltersState } from "@tanstack/react-table";
 import { ChevronDown, ChevronRight } from "lucide-react";
-import { Button } from "@/lib/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
 import { listMessages } from "@/lib/actions/api";
 import { Filter, Check } from "lucide-react";
@@ -11,7 +11,7 @@ import {
   Popover,
   PopoverTrigger,
   PopoverContent,
-} from "@/lib/components/ui/popover";
+} from "@/components/ui/popover";
 import {
   Command,
   CommandInput,
@@ -19,7 +19,7 @@ import {
   CommandList,
   CommandEmpty,
   CommandGroup,
-} from "@/lib/components/ui/command";
+} from "@/components/ui/command";
 import React from "react";
 
 export type MessageObject = {

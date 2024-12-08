@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
 import { toast } from "sonner";
-import { Button } from "@/lib/components/ui/button";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -8,14 +8,14 @@ import {
   DialogFooter,
   DialogTitle,
   DialogClose,
-} from "@/lib/components/ui/dialog";
-import { Label } from "@/lib/components/ui/label";
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import { cn, isAlphaNumeric } from "@/lib/utils";
 import { type InferType, object, string } from "yup";
 import { useForm } from "@tanstack/react-form";
 import { yupValidator } from "@tanstack/yup-form-adapter";
 import { Spinner } from "@nextui-org/react";
-import { Input } from "@/lib/components/ui/input";
+import { Input } from "@/components/ui/input";
 import { useInvalidate } from "@/lib/hooks/use-invalidate";
 import { DialogHeader } from "./ui/dialog";
 import { createAPIKey } from "@/lib/actions/api";
@@ -24,7 +24,7 @@ import {
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from "@/lib/components/ui/tooltip";
+} from "@/components/ui/tooltip";
 import { Copy as CopyIcon, Info as InfoIcon } from "lucide-react";
 import { listNamespaces } from "@/lib/actions/api";
 import { useQuery } from "@tanstack/react-query";
@@ -37,12 +37,12 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-} from "@/lib/components/ui/command";
+} from "@/components/ui/command";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@/lib/components/ui/popover";
+} from "@/components/ui/popover";
 
 // Add schema
 export const createApiKeySchema = object({

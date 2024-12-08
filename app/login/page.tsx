@@ -1,15 +1,15 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Button } from "@/lib/components/ui/button";
-import { Input } from "@/lib/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Card,
   CardHeader,
   CardContent,
   CardFooter,
-} from "@/lib/components/ui/card";
-import { Label } from "@/lib/components/ui/label";
+} from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { useForm } from "@tanstack/react-form";
 import { type YupValidator, yupValidator } from "@tanstack/yup-form-adapter";

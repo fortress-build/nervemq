@@ -6,7 +6,7 @@ import {
   BreadcrumbLink,
   BreadcrumbList,
   BreadcrumbSeparator,
-} from "@/lib/components/ui/breadcrumb";
+} from "@/components/ui/breadcrumb";
 import { useSession } from "@/lib/state/global";
 import { capitalize, cn } from "@/lib/utils";
 import { Menu, Slash, User } from "lucide-react";

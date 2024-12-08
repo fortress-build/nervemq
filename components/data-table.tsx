@@ -20,7 +20,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/lib/components/ui/table";
+} from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { Spinner } from "@nextui-org/spinner";
 import React from "react";

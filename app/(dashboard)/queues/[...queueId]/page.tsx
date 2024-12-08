@@ -6,12 +6,12 @@ import {
   CardHeader,
   CardTitle,
   CardContent,
-} from "@/lib/components/ui/card";
-import type { QueueStatistics } from "@/lib/components/queues/table";
+} from "@/components/ui/card";
+import type { QueueStatistics } from "@/components/queues/table";
 import { fetchQueue } from "@/lib/actions/api";
 import { useParams, useRouter } from "next/navigation";
-import { QueueSettings } from "@/lib/components/queue-settings";
-import { Button } from "@/lib/components/ui/button";
+import { QueueSettings } from "@/components/queue-settings";
+import { Button } from "@/components/ui/button";
 import { Spinner } from "@nextui-org/spinner";
 import { createContext, useContext } from "react";
 
