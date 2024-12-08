@@ -11,7 +11,7 @@ A lightweight, SQLite-backed message queue with AWS SQS-compatible API, written 
 </div>
 
 > [!NOTE]
-> This project is still in development. It is not recommended to it in
+> This project is still in development and is not recommended for
 > mission-critical production scenarios just yet.
 
 ## Features
