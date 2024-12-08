@@ -12,13 +12,15 @@
 //! - Managing session TTL
 //! - Deleting sessions
 
-use actix_session::storage::{LoadError, SaveError, SessionKey, SessionState, UpdateError};
+use actix_session::storage::{LoadError, SaveError, SessionKey, UpdateError};
 use rand::distributions::{Alphanumeric, DistString};
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
 use tokio_stream::StreamExt;
 
 pub use actix_session::storage::SessionStore;
+
+pub type SessionState = serde_json::Map<String, serde_json::Value>;
 
 /// SQLite-based implementation of the session store.
 ///
