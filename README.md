@@ -2,7 +2,8 @@
   <span>
     <h1>NerveMQ</h1>
 
-    <img alt="GitHub License" src="https://img.shields.io/github/license/fortress-build/nervemq">
+    ![GitHub License](https://img.shields.io/github/license/fortress-build/nervemq)
+
   </span>
 
 A lightweight, SQLite-backed message queue with AWS SQS-compatible API, written in Rust.
