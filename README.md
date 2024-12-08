@@ -2,7 +2,7 @@
   <span>
     <h1>NerveMQ</h1>
 
-[![GitHub License](https://img.shields.io/github/license/fortress-build/nervemq)](https://github.com/fortress-build/nervemq/blob/main/LICENSE))
+[![GitHub License](https://img.shields.io/github/license/fortress-build/nervemq)](https://github.com/fortress-build/nervemq/blob/main/LICENSE)
 
   </span>
 
