@@ -23,15 +23,53 @@ A lightweight, SQLite-backed message queue with AWS SQS-compatible API, written 
 - 🎯 **Self-contained** - Self-contained binary with minimal requirements
 - 📱 Admin Interface - Manage queues and tenants via UI or API
 
+## Installation
+
+For now, only the server is packaged on `crates.io`.
+
+```bash
+cargo install nervemq
+```
+
+The server expects a few configuration parameters to be available via
+environment variables:
+
+- `NERVEMQ_DB_PATH` (optional; default: `./nervemq.db`)
+  Database file path
+
+- `NERVEMQ_DEFAULT_MAX_RETRIES` (optional; default: `10`)
+  Default retry limit
+
+- `NERVEMQ_HOST` (optional; default `http://localhost:8080`)
+  Server host URL (for UI access)
+
+- `NERVEMQ_ROOT_EMAIL` (optional; default `admin@example.com`)
+  Root admin email
+
+- `NERVEMQ_ROOT_PASSWORD` (optional; default `password`)
+  Root admin password
+
+The server doesn't have any subcommands or CLI interface. Just run `nervemq` to start.
+
+To use the UI (for now) you must clone the git repo and run the nextjs app manually. We may make a hosted version
+available in the future or rework the webapp to be bundled statically and served by the server as well.
+
+```bash
+git clone https://github.com/fortress-build/nervemq
+cd nervemq
+bun run start # node and deno should work here too :)
+```
+
 ## Quick Start
 
-TODO
-
-## Configuration
-
-TODO
+NerveMQ is intended to be modular and extensible. As such, it can be consumed in two ways: using
+the preconfigured binary in `main.rs`, or including `nervemq` as a library and providing the custom
+implementations needed for your use-case. We also plan to add more configuration options to the preconfigured
+binary so that common use-cases are covered.
 
 ## Usage Examples
+
+NerveMQ's queue APIs are compatible with SQS, so you can you any SQS client.
 
 ### Using AWS SDK
 
@@ -53,6 +91,10 @@ async fn example() {
         .await?;
 }
 ```
+
+## Admin API
+
+TODO
 
 ## Why NerveMQ?
 
