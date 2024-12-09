@@ -10,6 +10,12 @@ A lightweight, SQLite-backed message queue with AWS SQS-compatible API, written 
 
 </div>
 
+
+
+https://github.com/user-attachments/assets/a9a601ec-2163-4656-91f3-80dd4bf58c2f
+
+
+
 > [!NOTE]
 > This project is still in development and has not been tested in production scenarios.
 
