@@ -5,19 +5,18 @@ use actix_web::{
     web::{self, Json},
     HttpResponse, Responder, Scope,
 };
-use secrecy::SecretString;
 use serde::{Deserialize, Serialize};
 use serde_email::Email;
 use sqlx::FromRow;
 
-use crate::service::Service;
+use crate::{error::Error, service::Service};
 
 use super::auth::Role;
 
 #[derive(Debug, Deserialize)]
 pub struct CreateUserRequest {
     email: String,
-    password: SecretString,
+    password: String,
     role: Role,
     namespaces: Vec<String>,
 }
@@ -26,7 +25,7 @@ pub struct CreateUserRequest {
 pub async fn create_user(
     data: web::Json<CreateUserRequest>,
     service: web::Data<Service>,
-) -> actix_web::Result<impl Responder> {
+) -> Result<impl Responder, Error> {
     let data = data.into_inner();
 
     let email = Email::from_str(&data.email).map_err(|e| ErrorBadRequest(e))?;

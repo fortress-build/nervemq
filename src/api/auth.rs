@@ -1,16 +1,11 @@
 use actix_identity::Identity;
 use actix_session::SessionExt;
-use actix_web::{
-    error::{ErrorInternalServerError, ErrorUnauthorized},
-    http::StatusCode,
-    post, web, HttpMessage, HttpRequest, HttpResponse, Responder, ResponseError, Scope,
-};
+use actix_web::{post, web, HttpMessage, HttpRequest, HttpResponse, Responder, Scope};
 use argon2::{password_hash::PasswordHashString, Argon2, PasswordVerifier};
 use serde::{Deserialize, Serialize};
-use snafu::Snafu;
 use sqlx::prelude::FromRow;
 
-use crate::service::Service;
+use crate::{error::Error, service::Service};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct LoginRequest {
@@ -49,26 +44,6 @@ pub struct Permission {
     pub can_delete_ns: bool,
 }
 
-#[derive(Debug, Snafu)]
-pub enum Error {
-    #[snafu(display("Identity not found"))]
-    IdentityNotFound,
-    #[snafu(display("Unauthorized"))]
-    Unauthorized,
-    #[snafu(display("Internal server error"))]
-    InternalError { source: eyre::Report },
-}
-
-impl ResponseError for Error {
-    fn status_code(&self) -> actix_web::http::StatusCode {
-        match self {
-            Error::IdentityNotFound => StatusCode::UNAUTHORIZED,
-            Error::Unauthorized => StatusCode::UNAUTHORIZED,
-            Error::InternalError { .. } => StatusCode::INTERNAL_SERVER_ERROR,
-        }
-    }
-}
-
 #[derive(Deserialize, FromRow)]
 struct LoginData {
     hashed_pass: String,
@@ -80,7 +55,7 @@ pub async fn login(
     request: HttpRequest,
     form: web::Json<LoginRequest>,
     service: web::Data<Service>,
-) -> Result<impl Responder, Error> {
+) -> Result<web::Json<SessionResponse>, Error> {
     let form = form.into_inner();
 
     let Ok(Some(user_data)) =
@@ -89,7 +64,7 @@ pub async fn login(
             .fetch_optional(service.db())
             .await
     else {
-        return Err(Error::IdentityNotFound);
+        return Err(Error::UserNotFound { email: form.email });
     };
 
     match tokio::task::spawn_blocking(move || {
@@ -105,8 +80,8 @@ pub async fn login(
         }
         Err(e) => {
             tracing::error!("{e}");
-            return Err(Error::InternalError {
-                source: eyre::eyre!(e),
+            return Err(Error::InternalServerError {
+                source: Some(eyre::eyre!(e)),
             });
         }
         Ok(Ok(_)) => {}
@@ -122,13 +97,13 @@ pub async fn login(
         }
         Err(e) => {
             tracing::error!("Failed to login: {e}");
-            return Err(Error::InternalError {
-                source: eyre::eyre!(e),
+            return Err(Error::InternalServerError {
+                source: Some(eyre::eyre!(e)),
             });
         }
     }
 
-    Ok(HttpResponse::Ok().json(SessionResponse {
+    Ok(web::Json(SessionResponse {
         email: form.email,
         role: user_data.role,
     }))
@@ -153,23 +128,21 @@ pub struct User {
 pub async fn verify(
     identity: Option<Identity>,
     service: web::Data<Service>,
-) -> actix_web::Result<impl Responder> {
+) -> Result<web::Json<SessionResponse>, Error> {
     match identity {
         Some(identity) => {
-            let email = identity
-                .id()
-                .map_err(actix_web::error::ErrorInternalServerError)?;
+            let email = identity.id().map_err(Error::internal)?;
 
             let User { email, role, .. } = sqlx::query_as("SELECT * FROM users WHERE email = $1")
                 .bind(&email)
                 .fetch_optional(service.db())
                 .await
-                .map_err(|e| ErrorInternalServerError(e))?
-                .ok_or_else(|| ErrorUnauthorized("Unauthorized"))?;
+                .map_err(Error::internal)?
+                .ok_or_else(|| Error::Unauthorized)?;
 
             Ok(web::Json(SessionResponse { email, role }))
         }
-        None => Err(ErrorUnauthorized("Unauthorized")),
+        None => Err(Error::Unauthorized),
     }
 }
 

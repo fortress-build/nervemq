@@ -19,13 +19,13 @@ pub fn sha256_hex(data: &[u8]) -> String {
 }
 
 /// Hashes a secret using Argon2 with a random salt.
-pub fn hash_secret(secret: SecretString) -> eyre::Result<PasswordHashString> {
+pub fn hash_secret(secret: String) -> eyre::Result<PasswordHashString> {
     let argon2 = Argon2::default();
 
     let salt = SaltString::generate(&mut rand::thread_rng());
 
     Ok(argon2
-        .hash_password(secret.expose_secret().as_bytes(), salt.as_salt())?
+        .hash_password(secret.as_bytes(), salt.as_salt())?
         .serialize())
 }
 

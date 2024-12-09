@@ -75,7 +75,6 @@ use actix_identity::Identity;
 use actix_web::{error::ErrorUnauthorized, web, ResponseError};
 use base64::Engine;
 use itertools::Itertools;
-use secrecy::SecretString;
 use serde::{Deserialize, Serialize};
 use serde_email::Email;
 use sqlx::{
@@ -1280,7 +1279,7 @@ impl Service {
     pub async fn create_user(
         &self,
         email: Email,
-        password: SecretString,
+        password: String,
         role: Option<Role>,
         namespaces: Vec<String>,
     ) -> Result<(), Error> {

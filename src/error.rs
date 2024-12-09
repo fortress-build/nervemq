@@ -37,6 +37,9 @@ pub enum Error {
     #[snafu(display("Identity {key_id} not found"))]
     IdentityNotFound { key_id: String },
 
+    #[snafu(display("User not found for email: {email}"))]
+    UserNotFound { email: String },
+
     #[snafu(display("Payload too large"))]
     PayloadTooLarge,
 
@@ -156,8 +159,9 @@ impl Error {
 impl actix_web::ResponseError for Error {
     fn status_code(&self) -> actix_web::http::StatusCode {
         match self {
-            Self::Unauthorized => actix_web::http::StatusCode::UNAUTHORIZED,
-            Self::IdentityNotFound { .. } => actix_web::http::StatusCode::UNAUTHORIZED,
+            Self::Unauthorized | Self::UserNotFound { .. } | Self::IdentityNotFound { .. } => {
+                actix_web::http::StatusCode::UNAUTHORIZED
+            }
             Self::NotFound { .. } => actix_web::http::StatusCode::NOT_FOUND,
 
             Self::MissingHeader { .. }
