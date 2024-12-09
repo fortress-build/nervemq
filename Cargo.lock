@@ -22,11 +22,12 @@ dependencies = [
 [[package]]
 name = "actix-cors"
 version = "0.7.0"
-source = "git+https://github.com/fortress-build/actix-extras?branch=master#217450894eda888f0f36e7fb7096a79d9bc8080a"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f9e772b3bcafe335042b5db010ab7c09013dad6eac4915c91d8d50902769f331"
 dependencies = [
  "actix-utils",
  "actix-web",
- "derive_more 1.0.0",
+ "derive_more 0.99.18",
  "futures-util",
  "log",
  "once_cell",
@@ -70,22 +71,6 @@ dependencies = [
  "tokio-util",
  "tracing",
  "zstd",
-]
-
-[[package]]
-name = "actix-identity"
-version = "0.8.0"
-source = "git+https://github.com/fortress-build/actix-extras?branch=master#217450894eda888f0f36e7fb7096a79d9bc8080a"
-dependencies = [
- "actix-service",
- "actix-session",
- "actix-utils",
- "actix-web",
- "derive_more 1.0.0",
- "futures-core",
- "serde",
- "serde_json",
- "tracing",
 ]
 
 [[package]]
@@ -149,22 +134,6 @@ dependencies = [
  "futures-core",
  "paste",
  "pin-project-lite",
-]
-
-[[package]]
-name = "actix-session"
-version = "0.10.1"
-source = "git+https://github.com/fortress-build/actix-extras?branch=master#217450894eda888f0f36e7fb7096a79d9bc8080a"
-dependencies = [
- "actix-service",
- "actix-utils",
- "actix-web",
- "anyhow",
- "derive_more 1.0.0",
- "rand",
- "serde",
- "serde_json",
- "tracing",
 ]
 
 [[package]]
@@ -2164,8 +2133,6 @@ version = "0.1.0-alpha.1"
 dependencies = [
  "actix-cors",
  "actix-http",
- "actix-identity",
- "actix-session",
  "actix-web",
  "aes-gcm-siv",
  "anyhow",
@@ -2189,6 +2156,8 @@ dependencies = [
  "http 1.2.0",
  "itertools",
  "md5",
+ "nervemq-actix-identity",
+ "nervemq-actix-session",
  "papaya",
  "pom",
  "rand",
@@ -2211,6 +2180,40 @@ dependencies = [
  "url",
  "urlencoding",
  "zeroize",
+]
+
+[[package]]
+name = "nervemq-actix-identity"
+version = "0.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "56e09b1c2bb02db18255ac0253d489765bde768ae45bcd5f6147bd7ece3ae6a3"
+dependencies = [
+ "actix-service",
+ "actix-utils",
+ "actix-web",
+ "derive_more 1.0.0",
+ "futures-core",
+ "nervemq-actix-session",
+ "serde",
+ "serde_json",
+ "tracing",
+]
+
+[[package]]
+name = "nervemq-actix-session"
+version = "0.10.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d01921f460747e786844c5acdd6a39d10411558a635c3c7c579f1b4c2d947909"
+dependencies = [
+ "actix-service",
+ "actix-utils",
+ "actix-web",
+ "anyhow",
+ "derive_more 1.0.0",
+ "rand",
+ "serde",
+ "serde_json",
+ "tracing",
 ]
 
 [[package]]

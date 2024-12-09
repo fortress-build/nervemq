@@ -31,10 +31,12 @@ the preconfigured binary in `main.rs`, or including `nervemq` as a library and p
 implementations needed for your use-case. We also plan to add more configuration options to the preconfigured
 binary so that common use-cases are covered.
 
-For now, only the server is packaged on `crates.io`.
+For now, you will have to clone the repo from github.
 
 ```bash
-cargo install nervemq
+git clone https://github.com/fortress-build/nervemq
+cd nervemq
+cargo run --release
 ```
 
 The server expects a few configuration parameters to be available via

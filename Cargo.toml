@@ -24,19 +24,15 @@ path = "src/main.rs"
 
 [dependencies.actix-cors]
 version = "0.7"
-git = "https://github.com/fortress-build/actix-extras"
-branch = "master"
 
 [dependencies.actix-session]
-version = "0.10"
-git = "https://github.com/fortress-build/actix-extras"
-branch = "master"
+package = "nervemq-actix-session"
+version = "0.10.2"
 features = ["cookie-session"]
 
 [dependencies.actix-identity]
-version = "0.8"
-git = "https://github.com/fortress-build/actix-extras"
-branch = "master"
+package = "nervemq-actix-identity"
+version = "0.8.1"
 
 [dependencies]
 actix-http = "3.9.0"
