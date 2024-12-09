@@ -94,6 +94,8 @@ async fn example() {
 
 ## Admin API
 
+NerveMQ exposes an admin API that is used by the UI, and can be used to programatically control namespaces, users and API keys.
+
 TODO: Document the admin API
 
 ## Why NerveMQ?
