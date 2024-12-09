@@ -182,25 +182,30 @@ export default function MessageList({
   queue,
   namespace,
 }: {
-  queue: string;
-  namespace: string;
+  queue?: string;
+  namespace?: string;
 }) {
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
     [],
   );
 
-  const { data = [] } = useQuery({
+  const { data = [], isLoading } = useQuery({
     queryKey: ["queue-messages", { queue, namespace }],
-    queryFn: () =>
-      listMessages({
+    queryFn: () => {
+      if (queue === undefined || namespace === undefined) {
+        return [];
+      }
+      return listMessages({
         queue,
         namespace,
-      }),
+      });
+    },
   });
 
   return (
     <DataTable
       columns={columns}
+      isLoading={isLoading}
       data={data}
       renderSubComponent={({ row }) => (
         <MessageDetails message={row.original} />
