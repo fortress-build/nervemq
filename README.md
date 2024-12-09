@@ -11,8 +11,7 @@ A lightweight, SQLite-backed message queue with AWS SQS-compatible API, written 
 </div>
 
 > [!NOTE]
-> This project is still in development and is not recommended for
-> mission-critical production scenarios just yet.
+> This project is still in development and has not been tested in production scenarios.
 
 ## Features
 
@@ -95,7 +94,7 @@ async fn example() {
 
 ## Admin API
 
-TODO
+TODO: Document the admin API
 
 ## Why NerveMQ?
 
