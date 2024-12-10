@@ -3,6 +3,8 @@
 //! Handles loading and accessing configuration values from environment
 //! variables with fallback to default values.
 
+use std::pin::Pin;
+
 use secrecy::{ExposeSecret, SecretString};
 use serde::Deserialize;
 use url::Url;
@@ -16,6 +18,142 @@ pub mod defaults {
 
     pub const ROOT_EMAIL: &str = "admin@example.com";
     pub const ROOT_PASSWORD: &str = "password";
+}
+
+#[derive(Debug, snafu::Snafu)]
+pub enum ConfigError {
+    FatalConflict {
+        conflicts: Vec<Conflict>,
+    },
+    Environment {
+        #[snafu(source)]
+        source: envy::Error,
+    },
+}
+
+impl From<envy::Error> for ConfigError {
+    fn from(err: envy::Error) -> Self {
+        ConfigError::Environment { source: err }
+    }
+}
+
+#[derive(Debug)]
+pub enum ConflictSeverity {
+    Fatal,
+    Warning,
+}
+
+#[derive(Debug)]
+#[allow(unused)]
+pub struct Conflict {
+    severity: ConflictSeverity,
+    field: String,
+    message: String,
+}
+
+pub trait Configuration: for<'de> Deserialize<'de> + 'static {
+    fn apply(
+        self,
+        other: Self,
+    ) -> Pin<Box<dyn std::future::Future<Output = Result<Self, ConfigError>>>>;
+
+    fn validate(self) -> Pin<Box<dyn std::future::Future<Output = Result<Self, ConfigError>>>>
+    where
+        Self: Sized,
+    {
+        Box::pin(async move { Ok(self) })
+    }
+}
+
+pub trait Layer {
+    type Config: Configuration;
+
+    fn resolve(
+        &self,
+    ) -> Pin<Box<dyn std::future::Future<Output = Result<Self::Config, ConfigError>>>>;
+
+    fn name(&self) -> &'static str {
+        std::any::type_name::<Self>()
+    }
+}
+
+pub struct ConfigBuilder<C> {
+    base: C,
+    layers: Vec<Box<dyn Layer<Config = C>>>,
+}
+
+impl<C> ConfigBuilder<C>
+where
+    C: Configuration + Default,
+{
+    pub fn new() -> Self {
+        Self {
+            base: Default::default(),
+            layers: Vec::new(),
+        }
+    }
+
+    pub fn with_layer<L: Layer<Config = C> + 'static>(mut self, layer: L) -> Self {
+        self.layers.push(Box::new(layer));
+        self
+    }
+
+    pub async fn load(self) -> Result<C, ConfigError> {
+        let mut config = self.base;
+        for layer in self.layers {
+            let layer_config = layer.resolve().await?;
+            config = config.apply(layer_config).await?;
+        }
+
+        config.validate().await
+    }
+}
+
+pub struct ValueLayer {
+    value: Config,
+}
+
+impl Layer for ValueLayer {
+    type Config = Config;
+
+    fn resolve(
+        &self,
+    ) -> Pin<Box<dyn std::future::Future<Output = Result<Self::Config, ConfigError>>>> {
+        let value = self.value.clone();
+        Box::pin(async { Ok(value) })
+    }
+}
+
+pub struct EnvironmentLayer;
+
+impl Layer for EnvironmentLayer {
+    type Config = Config;
+
+    fn resolve(
+        &self,
+    ) -> Pin<Box<dyn std::future::Future<Output = Result<Self::Config, ConfigError>>>> {
+        Box::pin(async { Ok(envy::prefixed("NERVEMQ_").from_env::<Config>()?) })
+    }
+}
+
+pub struct DefaultsLayer;
+
+impl Layer for DefaultsLayer {
+    type Config = Config;
+
+    fn resolve(
+        &self,
+    ) -> Pin<Box<dyn std::future::Future<Output = Result<Self::Config, ConfigError>>>> {
+        Box::pin(async {
+            Ok(Config {
+                db_path: Some(defaults::DB_PATH.to_string()),
+                default_max_retries: Some(defaults::MAX_RETRIES),
+                host: Some(defaults::HOST.try_into().expect("valid default url")),
+                root_email: Some(defaults::ROOT_EMAIL.to_string()),
+                root_password: Some(SecretString::new(defaults::ROOT_PASSWORD.into())),
+            })
+        })
+    }
 }
 
 #[derive(Clone, Deserialize)]
@@ -59,29 +197,58 @@ impl Default for Config {
     }
 }
 
-impl Config {
-    /// Loads configuration from environment variables.
-    ///
-    /// Reads variables prefixed with `NERVEMQ_` and constructs a Config instance.
-    /// Falls back to default values for any unspecified settings.
-    ///
-    /// # Returns
-    /// * `Ok(Config)` - Successfully loaded configuration
-    /// * `Err` - If environment variables cannot be parsed
-    ///
-    /// # Warning
-    /// Logs a warning if no root email is provided, as using the default is unsafe
-    /// in production environments.
-    pub fn load() -> eyre::Result<Self> {
-        let config = envy::prefixed("NERVEMQ_").from_env::<Self>()?;
+impl Configuration for Config {
+    fn apply(
+        mut self,
+        other: Self,
+    ) -> Pin<Box<dyn std::future::Future<Output = Result<Self, ConfigError>>>> {
+        Box::pin(async move {
+            if let Some(other_db_path) = other.db_path {
+                self.db_path = Some(other_db_path);
+            }
 
-        if config.root_email.is_none() {
-            tracing::warn!("No root email provided, using default - don't do this in production!");
-        }
+            if let Some(other_max_retries) = other.default_max_retries {
+                self.default_max_retries = Some(other_max_retries);
+            }
 
-        Ok(config)
+            if let Some(other_host) = other.host {
+                self.host = Some(other_host);
+            }
+
+            if let Some(other_root_email) = other.root_email {
+                self.root_email = Some(other_root_email);
+            }
+
+            if let Some(other_root_password) = other.root_password {
+                self.root_password = Some(other_root_password);
+            }
+            Ok(self)
+        })
     }
 
+    fn validate(self) -> Pin<Box<dyn std::future::Future<Output = Result<Self, ConfigError>>>>
+    where
+        Self: Sized,
+    {
+        Box::pin(async move {
+            if self.root_email.is_none() {
+                tracing::warn!(
+                    "No root email provided, using default - don't do this in production!"
+                );
+            }
+
+            if self.root_password.is_none() {
+                tracing::warn!(
+                    "No root password provided, using default - don't do this in production!"
+                );
+            }
+
+            Ok(self)
+        })
+    }
+}
+
+impl Config {
     /// Gets the configured server host URL.
     ///
     /// # Returns

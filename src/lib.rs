@@ -16,7 +16,7 @@ use auth::{
     session::SqliteSessionStore,
 };
 use chrono::TimeDelta;
-use config::Config;
+use config::ConfigBuilder;
 use error::Error;
 use kms::KeyManager;
 use sqlx::SqlitePool;
@@ -72,7 +72,11 @@ where
         .finish()
         .try_init()?;
 
-    let config = Config::load()?;
+    let config = ConfigBuilder::new()
+        .with_layer(config::DefaultsLayer)
+        .with_layer(config::EnvironmentLayer)
+        .load()
+        .await?;
 
     let service = service::Service::connect_with()
         .config(config)
