@@ -2130,7 +2130,6 @@ dependencies = [
  "anyhow",
  "argon2",
  "aws-sdk-kms",
- "aws-sdk-sqs",
  "aws-sigv4",
  "base64 0.22.1",
  "bincode",
